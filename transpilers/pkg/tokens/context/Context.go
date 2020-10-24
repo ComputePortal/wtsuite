@@ -1,0 +1,228 @@
+package context
+
+import (
+  "io/ioutil"
+  "strings"
+)
+
+type Source struct {
+	source string
+}
+
+func NewSource(src string) *Source {
+	return &Source{src}
+}
+
+type Context struct {
+	ranges []struct{ start, stop int }
+	source *Source
+	path   string // where context is defined
+	caller string // eg. where a def is called
+}
+
+func newContext(start, stop int, source *Source, path string, caller string) Context {
+	return Context{
+		[]struct{ start, stop int }{{start, stop}},
+		source,
+		path,
+		caller,
+	}
+}
+
+// for preset globals
+func NewDummyContext() Context {
+	return newContext(0, 0, &Source{""}, "", "")
+}
+
+func NewContext(source *Source, path string) Context {
+	if path == "" {
+		panic("use dummycontext instead")
+	}
+	return newContext(0, len(source.source), source, path, "")
+}
+
+func (c *Context) NewContext(relStart, relStop int) Context {
+	start := c.ranges[0].start
+	return newContext(start+relStart, start+relStop, c.source, c.path, c.caller)
+}
+
+func (c *Context) ChangeCaller(caller string) Context {
+	return Context{c.ranges, c.source, c.path, caller}
+}
+
+func (c *Context) getRange(i int) (int, int) {
+	if i == -1 {
+		return c.ranges[0].start, c.ranges[len(c.ranges)-1].stop
+	} else {
+		return c.ranges[i].start, c.ranges[i].stop
+	}
+}
+
+func (c *Context) IsConsecutive(other Context) bool {
+	_, stop := c.getRange(-1)
+	start, _ := other.getRange(-1)
+	return stop == start
+}
+
+func (c *Context) appendRange(start, stop int) {
+	c.ranges = append(c.ranges, struct{ start, stop int }{start, stop})
+}
+
+func (c *Context) slice(start, stop int) Context {
+	result := Context{
+		[]struct{ start, stop int }{},
+		c.source,
+		c.path,
+		c.caller,
+	}
+
+	if a, b := c.getRange(-1); stop < a || start > b {
+		return result
+	}
+
+	for _, r := range c.ranges {
+		a, b := r.start, r.stop
+
+		as, bs := -1, -1
+
+		if b > start {
+			if a < start {
+				as = start
+			} else if a < stop {
+				as = a
+			} else {
+				break
+			}
+
+			if b < stop {
+				bs = b
+			} else {
+				bs = stop
+			}
+			result.appendRange(as, bs)
+		}
+	}
+
+	return result
+}
+
+func (a *Context) Merge(b Context) Context {
+	if a.path != b.path {
+		panic("not same file")
+	}
+
+	c := Context{
+		[]struct{ start, stop int }{},
+		a.source,
+		a.path,
+		a.caller,
+	}
+
+	ia, na := 0, len(a.ranges)
+	ib, nb := 0, len(b.ranges)
+	start, stop := -1, -1
+
+	for ia < na || ib < nb || start != -1 {
+		if start == -1 {
+			// start a new range
+			if (ia < na) && ((ib >= nb) || (a.ranges[ia].start < b.ranges[ib].start)) {
+				start, stop = a.getRange(ia)
+				ia++
+			} else {
+				start, stop = b.getRange(ib)
+				ib++
+			}
+		} else {
+			if (ia < na) && (a.ranges[ia].start <= stop) {
+				// extend the range using a
+				if next := a.ranges[ia].stop; next > stop {
+					stop = next
+				}
+				ia++
+			} else if (ib < nb) && b.ranges[ib].start <= stop {
+				// extend the range using b
+				if next := b.ranges[ib].stop; next > stop {
+					stop = next
+				}
+				ib++
+			} else {
+				// append the range, and reset
+				c.appendRange(start, stop)
+				start, stop = -1, -1
+			}
+		}
+	}
+
+	return c
+}
+
+func MergeContexts(cs ...Context) Context {
+	all := cs[0]
+	for _, c := range cs[1:] {
+		all = all.Merge(c)
+	}
+
+	return all
+}
+
+func (c *Context) Less(other *Context) bool {
+	return c.ranges[0].start < other.ranges[0].start
+}
+
+func (c *Context) Len() int {
+	return c.ranges[len(c.ranges)-1].stop - c.ranges[0].start
+}
+
+func (c *Context) Path() string {
+	return c.path
+}
+
+func (c *Context) Caller() string {
+	if c.caller == "" {
+		return c.Path()
+	} else {
+		return c.caller
+	}
+}
+
+func (c *Context) Content() string {
+	start := c.ranges[0].start
+	stop := c.ranges[len(c.ranges)-1].stop
+
+	return (c.source.source)[start:stop]
+}
+
+// replace sadly means reading entire file, and then replacing it
+// the reading has already been done though, so just use that
+// WARNING: this is irreversible and should only be used during refactorings
+func (c *Context) SearchReplaceOrig(old, new string) error {
+  var b strings.Builder
+
+  prev := 0
+  for _, r := range c.ranges {
+    b.WriteString((c.source.source)[prev:r.start])
+
+    b.WriteString(strings.Replace((c.source.source)[r.start:r.stop], old, new, -1))
+
+    prev = r.stop
+  }
+
+  if prev < len(c.source.source) {
+    b.WriteString((c.source.source)[prev:len(c.source.source)])
+  }
+
+  if err := ioutil.WriteFile(c.Path(), []byte(b.String()), 0); err != nil {
+    return err
+  }
+
+  return nil
+}
+
+func MergeFill(a Context, b Context) Context {
+  ctx := a.Merge(b)
+
+  ctx = newContext(ctx.ranges[0].start, ctx.ranges[len(ctx.ranges)-1].stop, ctx.source, 
+    ctx.path, ctx.caller)
+
+  return ctx
+}
