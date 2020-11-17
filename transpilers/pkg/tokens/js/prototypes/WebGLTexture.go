@@ -1,15 +1,24 @@
 package prototypes
 
-var WebGLTexture *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateWebGLTexturePrototype() bool {
-	*WebGLTexture = BuiltinPrototype{
-		"WebGLTexture", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type WebGLTexture struct {
+  BuiltinPrototype
 }
 
-var _WebGLTextureOk = generateWebGLTexturePrototype()
+func NewWebGLTexturePrototype() values.Prototype {
+  return &WebGLTexture{newBuiltinPrototype("WebGLTexture")}
+}
+
+func NewWebGLTexture(ctx context.Context) values.Value {
+  return values.NewInstance(NewWebGLTexturePrototype(), ctx)
+}
+
+func (p *WebGLTexture) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWebGLTexturePrototype(), ctx), nil
+}

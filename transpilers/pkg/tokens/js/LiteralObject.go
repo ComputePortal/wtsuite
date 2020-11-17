@@ -88,11 +88,11 @@ func (t *LiteralObject) ResolveExpressionNames(scope Scope) error {
 	return nil
 }
 
-func (t *LiteralObject) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *LiteralObject) EvalExpression() (values.Value, error) {
 	props := make(map[string]values.Value)
 
 	for _, item := range t.items {
-		itemValue, err := item.value.EvalExpression(stack)
+		itemValue, err := item.value.EvalExpression()
 		if err != nil {
 			return nil, err
 		}
@@ -107,9 +107,7 @@ func (t *LiteralObject) EvalExpression(stack values.Stack) (values.Value, error)
 		props[item.key.Value()] = itemValue
 	}
 
-	return values.NewInstance(prototypes.Object,
-		values.NewObjectProperties(props, t.Context()),
-		t.Context()), nil
+  return prototypes.NewObject(props, t.Context()), nil
 }
 
 func (t *LiteralObject) ResolveExpressionActivity(usage Usage) error {

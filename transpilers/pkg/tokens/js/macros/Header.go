@@ -225,7 +225,6 @@ func WriteHeaders() string {
 		blobToInstanceHeader,
 		sharedWorkerPostHeader,
 		xmlPostHeader,
-		dollarHeader,
 		webAssemblyEnvHeader,
 		searchIndexHeader,
 	}

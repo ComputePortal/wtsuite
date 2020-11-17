@@ -1,15 +1,24 @@
 package prototypes
 
-var WebGLShader *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateWebGLShaderPrototype() bool {
-	*WebGLShader = BuiltinPrototype{
-		"WebGLShader", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type WebGLShader struct {
+  BuiltinPrototype
 }
 
-var _WebGLShaderOk = generateWebGLShaderPrototype()
+func NewWebGLShaderPrototype() values.Prototype {
+  return &WebGLShader{newBuiltinPrototype("WebGLShader")}
+}
+
+func NewWebGLShader(ctx context.Context) values.Value {
+  return values.NewInstance(NewWebGLShaderPrototype(), ctx)
+}
+
+func (p *WebGLShader) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWebGLShaderPrototype(), ctx), nil
+}

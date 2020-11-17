@@ -1,45 +1,52 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var NodeJS_stream_Readable *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_stream_ReadablePrototype() bool {
-	*NodeJS_stream_Readable = BuiltinPrototype{
-		"stream.Readable", NodeJS_EventEmitter,
-		map[string]BuiltinFunction{
-      "addListener": NewNormalFunction(&And{String, &Function{}}, 
-        func(stack values.Stack, this *values.Instance,
-        args []values.Value, ctx context.Context) (values.Value, error) {
-          if str, ok := args[0].LiteralStringValue(); ok {
-            switch str {
-            case "data":
-              // assume default encoding in properties
-              // TODO: detect encoding and use Buffer if necessary
-              if err := args[1].EvalMethod(stack.Parent(), []values.Value{NewString(ctx)}, ctx); err != nil {
-                return nil, err
-              }
-              return nil, nil
-            }
-          }
-
-          // default doesnt have arguments
-					if err := args[1].EvalMethod(stack.Parent(), []values.Value{}, ctx); err != nil {
-						return nil, err
-					}
-
-					return nil, nil
-        }),
-      "read": NewNormal(&Opt{Int}, Buffer),
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_stream_Readable struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_stream_ReadableOk = generateNodeJS_stream_ReadablePrototype()
+func NewNodeJS_stream_ReadablePrototype() values.Prototype {
+  return &NodeJS_stream_Readable{newBuiltinPrototype("stream.Readable")}
+}
+
+func NewNodeJS_stream_Readable(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_stream_ReadablePrototype(), ctx)
+}
+
+func (p *NodeJS_stream_Readable) GetParent() (values.Prototype, error) {
+  return NewNodeJS_EventEmitterPrototype(), nil
+}
+
+func (p *NodeJS_stream_Readable) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  s := NewString(ctx)
+
+  switch key {
+  case "addListener":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{NewLiteralString("data", ctx), values.NewFunction([]values.Value{
+        s, nil,
+      }, ctx)},
+      []values.Value{s, values.NewFunction([]values.Value{nil}, ctx)},
+    }, ctx), nil
+  case "read":
+    i := NewInt(ctx)
+    buf := NewNodeJS_Buffer(ctx)
+
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{buf},
+      []values.Value{i, buf},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_stream_Readable) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_stream_ReadablePrototype(), ctx), nil
+}

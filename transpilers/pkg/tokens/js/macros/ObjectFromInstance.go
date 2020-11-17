@@ -35,21 +35,26 @@ func (m *ObjectFromInstance) WriteExpression() string {
 }
 
 func isAnObject(v values.Value) bool {
-	if !values.IsAllNull(v) {
-		if v.IsClass() {
-			return false
-		} else if v.IsInstanceOf(prototypes.Number, prototypes.String, prototypes.Array, prototypes.Boolean, prototypes.TypedArray, prototypes.RegExp) {
-			return false
-		}
-	}
-
-	return true
+	if values.IsInstance(v) {
+    if prototypes.IsNumber(v) || 
+      prototypes.IsString(v) ||
+      prototypes.IsArray(v) ||
+      prototypes.IsBoolean(v) || 
+      prototypes.IsTypedArray(v) ||
+      prototypes.IsRegExp(v) {
+      return false
+    } else {
+      return true
+    }
+	} else {
+    return false
+  }
 }
 
-func (m *ObjectFromInstance) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *ObjectFromInstance) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -64,9 +69,7 @@ func (m *ObjectFromInstance) EvalExpression(stack values.Stack) (values.Value, e
 				args[0].TypeName())
 	}
 
-	resProps := values.NewObjectProperties(nil, ctx)
-	resProps.AppendItem(values.NewAllNull(ctx))
-	return values.NewInstance(prototypes.Object, resProps, ctx), nil
+  return prototypes.NewObject(nil, ctx), nil
 }
 
 func (m *ObjectFromInstance) ResolveExpressionActivity(usage js.Usage) error {

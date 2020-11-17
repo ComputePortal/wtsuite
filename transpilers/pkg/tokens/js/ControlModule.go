@@ -4,8 +4,6 @@ package js
 import (
 	"strings"
 
-	"./values"
-
 	"../context"
 
 	"../../files"
@@ -48,13 +46,6 @@ func NewControlModule(ctx context.Context) *ControlModule {
 
 func (m *ControlModule) newScope(globals GlobalScope) Scope {
 	return &ModuleScope{m, globals, newScopeData(globals)}
-}
-
-func (m *ControlModule) newStack(globals values.Stack) values.Stack {
-	return &ModuleStack{
-		m,
-		values.NewStackData(globals),
-	}
 }
 
 // called from within other module
@@ -299,62 +290,9 @@ func (m *ControlModule) ResolveNames(gs GlobalScope) error {
 	return m.Block.HoistAndResolveStatementNames(ms)
 }
 
-func (m *ControlModule) EvalTypes(globals values.Stack) error {
-	stack := m.newStack(globals)
-
-	if err := m.Block.HoistValues(stack); err != nil {
+func (m *ControlModule) EvalTypes() error {
+	if err := m.Block.EvalStatement(); err != nil {
 		return err
-	}
-
-	if err := m.Block.EvalStatement(stack); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *ControlModule) EvalAsEntryPoint(globals values.Stack) error {
-	stack := m.newStack(globals)
-
-	evalFunctionOrClass := func(v Variable, ctx context.Context) error {
-		if v == nil {
-			panic("should've been resolved before")
-		}
-
-		val, err := stack.GetValue(v, ctx)
-		if err != nil {
-			return err
-		}
-
-		if val == nil {
-			errCtx := ctx
-			return errCtx.NewError("Error: variabled declared, but doesn't have a value")
-		}
-
-		if val.IsFunction() || val.IsClass() {
-			return val.EvalAsEntryPoint(stack, ctx)
-		}
-
-		return nil
-	}
-
-	// first evaluate the aggregate exports as entrypoints
-	for _, ae := range m.aggregateExports {
-		if err := evalFunctionOrClass(ae.v, ae.ctx); err != nil {
-			return err
-		}
-	}
-
-	// evaluate the rest, also adds exported values to stack
-	if err := m.EvalTypes(globals); err != nil {
-		return err
-	}
-
-	// evaluate the other exports
-	for _, ex := range m.exportedNames {
-		if err := evalFunctionOrClass(ex.v, ex.ctx); err != nil {
-			return err
-		}
 	}
 
 	return nil

@@ -8,7 +8,6 @@ import (
 	"../files"
 	"../tokens/context"
 	"../tokens/js"
-	"../tokens/js/values"
 	"../tokens/patterns"
 	"../tokens/raw"
 )
@@ -181,7 +180,7 @@ func (p *JSParser) buildRegularImportStatement(ts []raw.Token) error {
 	return nil
 }
 
-func (p *JSParser) buildNodeJSModuleStatement(ts []raw.Token, module values.Prototype) error {
+func (p *JSParser) buildNodeJSImportStatement(ts []raw.Token) error {
 	n := len(ts)
 
 	switch n {
@@ -196,7 +195,7 @@ func (p *JSParser) buildNodeJSModuleStatement(ts []raw.Token, module values.Prot
     }
 
 		expr := js.NewVarExpression(path.Value(), path.Context())
-		statement := js.NewNodeJSModule(expr, module, path.Context())
+		statement := js.NewNodeJSImport(expr, path.Context())
 
 		p.module.AddStatement(statement)
 	default:
@@ -240,8 +239,8 @@ func (p *JSParser) buildImportStatement(ts []raw.Token) ([]raw.Token, error) {
 		return nil, err
 	}
 
-	if nodeJSModule, ok := js.GetNodeJSModule(pathLiteral.Value()); ok {
-		return remainingTokens, p.buildNodeJSModuleStatement(ts, nodeJSModule)
+	if js.IsNodeJSPackage(pathLiteral.Value()) {
+		return remainingTokens, p.buildNodeJSImportStatement(ts)
 	} else {
     // add literal as invisible statement, so refactoring methods can change it using the context
 

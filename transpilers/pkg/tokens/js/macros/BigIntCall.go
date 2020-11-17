@@ -1,6 +1,7 @@
 package macros
 
 import (
+  "fmt"
 	"strings"
 
 	"../"
@@ -16,6 +17,11 @@ type BigIntCall struct {
 }
 
 func NewBigIntCall(args []js.Expression, ctx context.Context) (js.Expression, error) {
+  if len(args) != 1 {
+    errCtx := ctx
+    return nil, errCtx.NewError(fmt.Sprintf("Error: expected 1 argument, got %d", len(args)))
+  }
+
 	return &BigIntCall{newMacro(args, ctx)}, nil
 }
 
@@ -34,16 +40,16 @@ func (m *BigIntCall) WriteExpression() string {
 	return b.String()
 }
 
-func (m *BigIntCall) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *BigIntCall) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
 
-	if err := prototypes.CheckInputs(&prototypes.Any{}, args, ctx); err != nil {
-		return nil, err
-	}
+  if len(args) != 1 {
+    return nil, ctx.NewError("Error: expected 1 argument")
+  }
 
 	return prototypes.NewBigInt(ctx), nil
 }

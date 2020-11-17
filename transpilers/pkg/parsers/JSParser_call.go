@@ -29,6 +29,34 @@ func (p *JSParser) buildCallArgs(t raw.Token) ([]js.Expression, error) {
 	return args, nil
 }
 
+func (p *JSParser) buildCastArgs(t raw.Token) ([]js.Expression, error) {
+	args := make([]js.Expression, 0)
+
+	group, err := raw.AssertParensGroup(t)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, field := range group.Fields {
+
+    if i < len(group.Fields) -1 {
+      arg, err := p.buildExpression(field)
+      if err != nil {
+        return nil, err
+      }
+      args = append(args, arg)
+    } else {
+      arg, err := p.buildTypeExpression(field)
+      if err != nil {
+        return nil, err
+      }
+      args = append(args, arg)
+    }
+	}
+
+	return args, nil
+}
+
 func (p *JSParser) buildCallExpression(ts []raw.Token) (js.Expression, error) {
 	n := len(ts)
 
@@ -41,10 +69,19 @@ func (p *JSParser) buildCallExpression(ts []raw.Token) (js.Expression, error) {
 		return nil, err
 	}
 
-	args, err := p.buildCallArgs(ts[n-1])
-	if err != nil {
-		return nil, err
-	}
+  var args []js.Expression = nil
+
+  if ve, ok := lhs.(*js.VarExpression); ok && ve.Name() == "cast" {
+    args, err = p.buildCastArgs(ts[n-1])
+    if err != nil {
+      return nil, err
+    }
+  } else {
+    args, err = p.buildCallArgs(ts[n-1])
+    if err != nil {
+      return nil, err
+    }
+  }
 
 	if lhsMember, ok := lhs.(*js.Member); ok {
 		if macros.MemberIsClassMacro(lhsMember) {

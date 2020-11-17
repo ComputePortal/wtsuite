@@ -7,30 +7,47 @@ import (
 type Prototype interface {
 	Interface
 
-	GetParent() Prototype // can be nil
+  IsUniversal() bool // if true: can be exported to databases etc.
 
-	// childProto can be used to inject implementations of abstract members (usually childProto is nil though)
-	EvalConstructor(stack Stack, args []Value, childProto Prototype, ctx context.Context) (Value, error)
+  // returns nil if it doesn't have a parent
+  GetParent() (Prototype, error)
 
-	// so that globally exported classes can be evaluated with generated arguments
-	// builtin prototypes ignore this
-	EvalAsEntryPoint(stack Stack, ctx context.Context) error
-	IsUniversal() bool // if true: can be exported to databases etc.
+  // return nil if it doesnt exist
+  GetClassMember(key string, includePrivate bool, ctx context.Context) (Value, error)
 
-	// evaluates Getters, but returns Normal or Static functions
-	GetMember(stack Stack, this *Instance, key string, includePrivate bool,
-		ctx context.Context) (Value, error)
+  // return nil if constructor doesn't exist
+	GetClassValue() (*Class, error)
+}
 
-	// evaluates Setters
-	SetMember(stack Stack, this *Instance, key string, arg Value, includePrivate bool,
-		ctx context.Context) error
+// returns nil if not an Instance with an Interface
+func GetPrototype(v_ Value) Prototype {
+  v_ = UnpackContextValue(v_)
 
-	// special for String, Array, Object
-	GetIndex(stack Stack, this *Instance, index Value,
-		ctx context.Context) (Value, error)
-	SetIndex(stack Stack, this *Instance, index Value, arg Value,
-		ctx context.Context) error
+  switch v := v_.(type) {
+  case *Instance:
+    interf := v.GetInterface()
+    if proto, ok := interf.(Prototype); ok {
+      return proto
+    } else {
+      return nil
+    }
+  default:
+    return nil
+  }
+}
 
-	LoopForIn(this *Instance, fn func(Value) error, ctx context.Context) error
-	LoopForOf(this *Instance, fn func(Value) error, ctx context.Context) error
+func PrototypeIsAncestorOf(parent Prototype, child Prototype) bool {
+  for child != nil {
+    if parent == child {
+      return true
+    }
+
+    var err error
+    child, err = child.GetParent()
+    if err != nil {
+      return false
+    }
+  }
+
+  return false
 }

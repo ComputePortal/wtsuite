@@ -10,7 +10,6 @@ import (
 
 type Assign struct {
 	lhs Expression
-  typeExpr *TypeExpression // can be nil
 	rhs Expression
 	op  string // eg. "+" for "+=" or "-" for "-=", defaults to empty string
 	TokenData
@@ -22,11 +21,7 @@ func NewAssign(lhs Expression, rhs Expression, op string, ctx context.Context) *
 		panic(err)
 	}
 
-	return &Assign{lhs, nil, rhs, op, TokenData{ctx}}
-}
-
-func NewTypedAssign(lhs Expression, typeExpr *TypeExpression, rhs Expression, ctx context.Context) *Assign {
-	return &Assign{lhs, typeExpr, rhs, "", TokenData{ctx}}
+	return &Assign{lhs, rhs, op, TokenData{ctx}}
 }
 
 func (t *Assign) Dump(indent string) string {
@@ -39,9 +34,6 @@ func (t *Assign) Dump(indent string) string {
 	b.WriteString("=\n")
 
   b.WriteString(t.lhs.Dump(indent + "  lhs:"))
-  if t.typeExpr != nil {
-    b.WriteString(t.typeExpr.Dump(indent + "  type:"))
-  }
   b.WriteString(t.rhs.Dump(indent + "  rhs:"))
 
 	return b.String()
@@ -71,10 +63,6 @@ func (t *Assign) Args() []Token {
 	return []Token{t.lhs, t.rhs}
 }
 
-func (t *Assign) Precedence() int {
-	return _binaryPrecedenceMap["="] // same precedence if op != ""
-}
-
 func (t *Assign) AddStatement(st Statement) {
 	panic("not a block")
 }
@@ -83,12 +71,6 @@ func (t *Assign) ResolveExpressionNames(scope Scope) error {
 	if err := t.lhs.ResolveExpressionNames(scope); err != nil {
 		return err
 	}
-
-  if t.typeExpr != nil {
-    if err := t.typeExpr.ResolveExpressionNames(scope); err != nil {
-      return err
-    }
-  }
 
 	if err := t.rhs.ResolveExpressionNames(scope); err != nil {
 		return err
@@ -105,12 +87,7 @@ func (t *Assign) ResolveStatementNames(scope Scope) error {
 	return t.ResolveExpressionNames(scope)
 }
 
-func (t *Assign) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-// TODO: use the typeExpr for cast
-func (t *Assign) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *Assign) EvalExpression() (values.Value, error) {
 	var rhsValue values.Value
 	var err error
 	if t.op != "" {
@@ -120,12 +97,12 @@ func (t *Assign) EvalExpression(stack values.Stack) (values.Value, error) {
 			return nil, errCtx.NewError("Error: bad assign operator")
 		}
 
-		rhsValue, err = op.EvalExpression(stack)
+		rhsValue, err = op.EvalExpression()
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		rhsValue, err = t.rhs.EvalExpression(stack)
+		rhsValue, err = t.rhs.EvalExpression()
 		if err != nil {
 			return nil, err
 		}
@@ -136,49 +113,29 @@ func (t *Assign) EvalExpression(stack values.Stack) (values.Value, error) {
 		return nil, errCtx.NewError("Error: rhs is void")
 	}
 
-	// eval rhs literal function if its args list is completely typed (this is useful for certain callbacks)
-	if rhsFn, ok := t.rhs.(*Function); ok {
-		// check if arglists is complete
-		if _, argsErr := rhsFn.GenerateArgInstances(stack, t.Context()); argsErr == nil {
-			if err := rhsValue.EvalAsEntryPoint(stack, t.Context()); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-  // contrain using a type
-  if t.typeExpr != nil {
-    rhsValue, err = t.typeExpr.Constrain(stack, rhsValue)
-    if err != nil {
-      return nil, err
-    }
-  }
-
 	switch lhs := t.lhs.(type) {
 	case *VarExpression:
-		if err := stack.SetValue(lhs.ref, rhsValue, true,
-			t.Context()); err != nil {
-			return nil, err
-		}
+    if err := lhs.EvalSet(rhsValue, t.Context()); err != nil {
+      return nil, err
+    }
 	case *Member:
-		if err := lhs.EvalSet(stack, rhsValue, t.Context()); err != nil {
+		if err := lhs.EvalSet(rhsValue, t.Context()); err != nil {
 			return nil, err
 		}
 	case *Index:
-		if err := lhs.EvalSet(stack, rhsValue, t.Context()); err != nil {
+		if err := lhs.EvalSet(rhsValue, t.Context()); err != nil {
 			return nil, err
 		}
 	default:
 		errCtx := t.Context()
 		return nil, errCtx.NewError("Error: unexpected assign lhs")
-		//panic("unexpected assign lhs" + reflect.TypeOf(t.lhs).String())
 	}
 
 	return rhsValue, nil
 }
 
-func (t *Assign) EvalStatement(stack values.Stack) error {
-	_, err := t.EvalExpression(stack)
+func (t *Assign) EvalStatement() error {
+	_, err := t.EvalExpression()
 
 	return err
 }
@@ -205,12 +162,6 @@ func (t *Assign) resolveExpressionActivity(usage Usage, isNew bool) error {
 	if err := t.rhs.ResolveExpressionActivity(usage); err != nil {
 		return err
 	}
-
-  if t.typeExpr != nil {
-    if err := t.typeExpr.ResolveExpressionActivity(usage); err != nil {
-      return err
-    }
-  }
 
 	switch lhs := t.lhs.(type) {
 	case *VarExpression:
@@ -241,12 +192,6 @@ func (t *Assign) UniversalExpressionNames(ns Namespace) error {
 		return err
 	}
 
-  if t.typeExpr != nil {
-    if err := t.typeExpr.UniversalExpressionNames(ns); err != nil {
-      return err
-    }
-  }
-
 	return t.rhs.UniversalExpressionNames(ns)
 }
 
@@ -254,12 +199,6 @@ func (t *Assign) UniqueExpressionNames(ns Namespace) error {
 	if err := t.lhs.UniqueExpressionNames(ns); err != nil {
 		return err
 	}
-
-  if t.typeExpr != nil {
-    if err := t.typeExpr.UniqueExpressionNames(ns); err != nil {
-      return err
-    }
-  }
 
 	return t.rhs.UniqueExpressionNames(ns)
 }
@@ -275,12 +214,6 @@ func (t *Assign) UniqueStatementNames(ns Namespace) error {
 func (t *Assign) Walk(fn WalkFunc) error {
   if err := t.lhs.Walk(fn); err != nil {
     return err
-  }
-
-  if t.typeExpr != nil {
-    if err := t.typeExpr.Walk(fn); err != nil {
-      return err
-    }
   }
 
   if err := t.rhs.Walk(fn); err != nil {

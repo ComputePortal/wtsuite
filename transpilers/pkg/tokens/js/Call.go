@@ -97,11 +97,11 @@ func (t *Call) ResolveStatementNames(scope Scope) error {
 	return t.ResolveExpressionNames(scope)
 }
 
-func (t *Call) evalArgs(stack values.Stack) ([]values.Value, error) {
+func (t *Call) evalArgs() ([]values.Value, error) {
 	result := make([]values.Value, 0)
 
 	for _, a := range t.args {
-		val, err := a.EvalExpression(stack)
+		val, err := a.EvalExpression()
 		if err != nil {
 			return nil, err
 		}
@@ -112,62 +112,54 @@ func (t *Call) evalArgs(stack values.Stack) ([]values.Value, error) {
 	return result, nil
 }
 
-func (t *Call) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-func (t *Call) EvalExpression(stack values.Stack) (values.Value, error) {
-	lhsVal, err := t.lhs.EvalExpression(stack)
+func (t *Call) EvalExpression() (values.Value, error) {
+	lhsVal, err := t.lhs.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	args, err := t.evalArgs(stack)
+	args, err := t.evalArgs()
 	if err != nil {
 		return nil, err
 	}
 
-	if lhsVal.IsClass() {
-		errCtx := t.Context()
-		err := errCtx.NewError("Error: can't call a Class (hint: use new)")
-		return nil, err
-	}
-
-	// 'this' is included in value
-	res, err := lhsVal.EvalFunction(stack, args, t.Context())
-	if err != nil {
+  res, err := lhsVal.EvalFunction(args, false, t.Context())
+  if err != nil {
 		if VERBOSITY >= 1 {
 			context.AppendContextString(err, "Info: called here", t.Context())
 		}
-		return nil, err
-	}
 
-	return res, nil
+    return nil, err
+  } else if res == nil {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: function returns void")
+  }
+
+  return res, nil
 }
 
-func (t *Call) EvalStatement(stack values.Stack) error {
-	lhsVal, err := t.lhs.EvalExpression(stack)
+func (t *Call) EvalStatement() error {
+	lhsVal, err := t.lhs.EvalExpression()
 	if err != nil {
 		return err
 	}
 
-	args, err := t.evalArgs(stack)
+	args, err := t.evalArgs()
 	if err != nil {
 		return err
 	}
 
-	if lhsVal.IsClass() {
-		errCtx := t.Context()
-		return errCtx.NewError("Error: instantiating a class is not a statement")
-	}
-
-	// 'this' is included in value
-	if err := lhsVal.EvalMethod(stack, args, t.Context()); err != nil {
+  res, err := lhsVal.EvalFunction(args, true, t.Context())
+  if err != nil {
 		if VERBOSITY >= 1 {
 			context.AppendContextString(err, "Info: called here", t.Context())
 		}
-		return err
-	}
+
+    return err
+  } else if res != nil {
+    errCtx := t.Context()
+    return errCtx.NewError("Error: method returns non-void")
+  }
 
 	return nil
 }

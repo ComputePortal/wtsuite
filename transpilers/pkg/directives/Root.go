@@ -9,7 +9,7 @@ import (
 	"../tree/scripts"
 )
 
-func NewRoot(path string, url string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, *js.ViewInterface, error) {
+func NewRoot(path string, url string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
 	_, node, err := BuildFile(path, "", true)
 	if err != nil {
 		return nil, nil, nil, err
@@ -36,38 +36,34 @@ func NewRoot(path string, url string, control string, cssUrl string, jsUrl strin
 
 	idMap := tree.NewIDMap()
 	if err := root.CollectIDs(idMap); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	classMap := tree.NewClassMap()
 	if err := root.CollectClasses(classMap); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	// bundleableRules is [][]string
 	bundleableRules, err := root.CollectStyles(idMap, classMap, cssUrl)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	bundle := scripts.NewInlineBundle()
 	if err := root.CollectScripts(idMap, classMap, bundle); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	viewInterface := js.NewViewInterface(path, url)
-
 	if control != "" {
-		idMap.FillViewInterface(viewInterface)
-
-		if err := root.ApplyControl(control, viewInterface, jsUrl); err != nil {
-			return nil, nil, nil, err
+		if err := root.ApplyControl(control, jsUrl); err != nil {
+			return nil, nil, err
 		}
 	}
 
 	if err := root.Validate(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	return root, bundleableRules, viewInterface, nil
+	return root, bundleableRules, nil
 }

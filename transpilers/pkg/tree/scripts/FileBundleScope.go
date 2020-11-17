@@ -50,6 +50,10 @@ func (bs *FileBundleScope) FriendlyPrototypes() []values.Prototype {
 	return bs.globals.FriendlyPrototypes()
 }
 
+func (bs *FileBundleScope) GetFunction() *js.Function {
+  return nil
+}
+
 func (bs *FileBundleScope) IsBreakable() bool {
 	return bs.globals.IsBreakable() // false of course
 }

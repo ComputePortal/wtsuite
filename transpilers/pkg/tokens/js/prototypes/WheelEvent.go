@@ -1,19 +1,40 @@
 package prototypes
 
-var WheelEvent *EventPrototype = allocEventPrototype()
+import (
+  "../values"
 
-func generateWheelEventPrototype() bool {
-	*WheelEvent = EventPrototype{BuiltinPrototype{
-		"WheelEvent", MouseEvent,
-		map[string]BuiltinFunction{
-			"deltaX": NewGetter(Number),
-			"deltaY": NewGetter(Number),
-			"deltaZ": NewGetter(Number),
-		},
-		nil,
-	}}
+  "../../context"
+)
 
-	return true
+type WheelEvent struct {
+  AbstractEvent
 }
 
-var _WheelEventOk = generateWheelEventPrototype()
+func NewWheelEventPrototype(target values.Value) values.Prototype {
+  return &WheelEvent{newAbstractEventPrototype("WheelEvent", target)}
+}
+
+func NewWheelEvent(target values.Value, ctx context.Context) values.Value {
+  return values.NewInstance(NewWheelEventPrototype(target), ctx)
+}
+
+func (p *WheelEvent) GetParent() (values.Prototype, error) {
+  return NewMouseEventPrototype(p.target), nil
+}
+
+func (p *WheelEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  f := NewNumber(ctx)
+
+  switch key {
+  case "deltaX", "deltaY", "deltaZ":
+    return f, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *WheelEvent) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+
+  return values.NewUnconstructableClass(NewWheelEventPrototype(values.NewAll(ctx)), ctx), nil
+}

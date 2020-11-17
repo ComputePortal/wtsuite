@@ -1,17 +1,41 @@
 package prototypes
 
-var CanvasGradient *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateCanvasGradientPrototype() bool {
-	*CanvasGradient = BuiltinPrototype{
-		"CanvasGradient", nil,
-		map[string]BuiltinFunction{
-			"addColorStop": NewNormal(&And{Number, String}, nil),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type CanvasGradient struct {
+  BuiltinPrototype
 }
 
-var _CanvasGradientOk = generateCanvasGradientPrototype()
+func NewCanvasGradientPrototype() values.Prototype {
+  return &CanvasGradient{newBuiltinPrototype("CanvasGradient")}
+}
+
+func NewCanvasGradient(ctx context.Context) values.Value {
+  return values.NewInstance(NewCanvasGradientPrototype(), ctx)
+}
+
+func IsCanvasGradient(v values.Value) bool {
+  ctx := v.Context()
+
+  checkVal := NewCanvasGradient(ctx)
+
+  return checkVal.Check(v, ctx) == nil
+}
+
+func (p *CanvasGradient) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "addColorStop":
+    return values.NewFunction([]values.Value{NewNumber(ctx), NewString(ctx), nil}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *CanvasGradient) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewCanvasGradientPrototype(), ctx), nil
+}

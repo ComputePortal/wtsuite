@@ -1,124 +1,104 @@
 package prototypes
 
 import (
-	"fmt"
+  "strings"
 
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-type IDBRequestPrototype struct {
-	BuiltinPrototype
+type IDBRequest struct {
+  content values.Value // if nil, then any
+
+  BuiltinPrototype
 }
 
-var IDBRequest *IDBRequestPrototype = allocIDBRequestPrototype()
-
-func allocIDBRequestPrototype() *IDBRequestPrototype {
-	return &IDBRequestPrototype{BuiltinPrototype{
-		"", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}}
+func NewIDBRequestPrototype(content values.Value) values.Prototype {
+  return &IDBRequest{content, newBuiltinPrototype("IDBRequest")}
 }
 
-func (p *IDBRequestPrototype) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return CheckPrototype(p, args, pos, ctx)
+func NewIDBRequest(content values.Value, ctx context.Context) values.Value {
+  return values.NewInstance(NewIDBRequestPrototype(content), ctx)
 }
 
-func (p *IDBRequestPrototype) HasAncestor(other_ values.Interface) bool {
-	if other, ok := other_.(*IDBRequestPrototype); ok {
-		if other == p {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		_, ok = other_.IsImplementedBy(p)
-		return ok
-	}
+func NewEmptyIDBRequest(ctx context.Context) values.Value {
+  return NewIDBRequest(nil, ctx)
 }
 
-func (p *IDBRequestPrototype) CastInstance(v *values.Instance, typeChildren []*values.NestedType, ctx context.Context) (values.Value, error) {
-	newV_, ok := v.ChangeInstanceInterface(p, false, true)
-	if !ok {
-		return nil, ctx.NewError("Error: " + v.TypeName() + " doesn't inherit from " + p.Name())
-	}
+func (p *IDBRequest) Name() string {
+  var b strings.Builder
 
-	newV, ok := newV_.(*values.Instance)
-	if !ok {
-		panic("unexpected")
-	}
+  b.WriteString("IDBRequest")
 
-	if typeChildren == nil {
-		return newV, nil
-	} else {
-		if len(typeChildren) != 1 {
-			return nil, ctx.NewError(fmt.Sprintf("Error: IDBRequest expects 1 type child, got %d", len(typeChildren)))
-		}
+  if p.content != nil {
+    b.WriteString("<")
+    b.WriteString(p.content.TypeName())
+    b.WriteString(">")
+  }
 
-		typeChild := typeChildren[0]
-
-		// now cast all the items
-		props := values.AssertIDBRequestProperties(newV.Properties())
-
-		result := props.Result()
-		var err error
-		result, err = result.Cast(typeChild, ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		newV = NewIDBRequest(result, ctx)
-		return newV, nil
-	}
+  return b.String()
 }
 
-func NewIDBRequest(v values.Value, ctx context.Context) *values.Instance {
-	return values.NewInstance(IDBRequest, values.NewIDBRequestProperties(v, ctx), ctx)
+func (p *IDBRequest) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*IDBRequest); ok {
+    if p.content == nil {
+      return nil
+    } else if other.content == nil {
+      return ctx.NewError("Error: expected IDBRequest<" + p.content.TypeName() + ">, got IDBRequest<any>")
+    } else if p.content.Check(other.content, ctx) != nil {
+      return ctx.NewError("Error: expected IDBRequest<" + p.content.TypeName() + ">, got IDBRequest<" + other.content.TypeName() + ">")
+    } else {
+      return nil
+    }
+  } else if other, ok := other_.(values.Prototype); ok {
+    if otherParent, err := other.GetParent(); err != nil {
+      return err
+    } else if otherParent != nil {
+      if p.Check(otherParent, ctx) != nil {
+        return ctx.NewError("Error: expected IDBRequest, got " + other_.Name())
+      } else {
+        return nil
+      }
+    } else {
+      return ctx.NewError("Error: expected IDBRequest, got " + other_.Name())
+    }
+  } else {
+    return ctx.NewError("Error: expected IDBRequest, got " + other_.Name())
+  }
 }
 
-func generateIDBRequestCallback(eventProto values.Prototype) func(values.Stack, *values.Instance, []values.Value, context.Context) (values.Value, error) {
-	return func(stack values.Stack, this *values.Instance, args []values.Value, ctx context.Context) (values.Value, error) {
-		arg := args[0]
-
-		event := NewAltEvent(eventProto, this, ctx)
-		if err := arg.EvalMethod(stack.Parent(), []values.Value{event}, ctx); err != nil {
-			return nil, err
-		}
-
-		return nil, nil
-	}
+func (p *IDBRequest) getContentValue() values.Value {
+  if p.content == nil {
+    return values.NewAny(context.NewDummyContext())
+  } else {
+    return p.content
+  }
 }
 
-func idbRequestCallback(stack values.Stack, this *values.Instance, args []values.Value,
-	ctx context.Context) (values.Value, error) {
-	arg := args[0]
+func (p *IDBRequest) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  content := values.NewContextValue(p.getContentValue(), ctx)
 
-	event := NewEvent(this, ctx)
-	if err := arg.EvalMethod(stack.Parent(), []values.Value{event}, ctx); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+  switch key {
+  case "result":
+    return content, nil
+  default:
+    return nil, nil
+  }
 }
 
-func generateIDBRequestPrototype() bool {
-	*IDBRequest = IDBRequestPrototype{BuiltinPrototype{
-		"IDBRequest", EventTarget,
-		map[string]BuiltinFunction{
-			"onerror":   NewSetterFunction(&Function{}, idbRequestCallback),
-			"onsuccess": NewSetterFunction(&Function{}, idbRequestCallback),
-			"result": NewGetterFunction(func(stack values.Stack, this *values.Instance,
-				args []values.Value, ctx context.Context) (values.Value, error) {
-				props := values.AssertIDBRequestProperties(this.Properties())
-				return props.Result(), nil
-			}),
-		},
-		nil,
-	}}
+func (p *IDBRequest) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  callback := values.NewFunction([]values.Value{NewEvent(NewIDBRequest(values.NewAny(ctx), ctx), ctx), nil}, ctx)
 
-	return true
+  switch key {
+  case "onerror", "onsuccess":
+    return callback.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: IDBRequest." + key + " not setable")
+  }
 }
 
-var _IDBRequestOk = generateIDBRequestPrototype()
+func (p *IDBRequest) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewIDBRequestPrototype(values.NewAll(ctx)), ctx), nil
+}

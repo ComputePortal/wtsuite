@@ -11,17 +11,22 @@ import (
 type VarStatement struct {
 	varType VarType
 	exprs   []Expression // contains VarExpressions (or Assigns to VarExpressions)
+  typeExprs []*TypeExpression // reference is kept so that names can be resolved
 	TokenData
 }
 
-func NewVarStatement(varType VarType, exprs []Expression,
+func NewVarStatement(varType VarType, exprs []Expression, typeExprs []*TypeExpression,
 	ctx context.Context) (*VarStatement, error) {
+  if len(typeExprs) != len(exprs) {
+    panic("len(typeExprs) != len(exprs)")
+  }
+
 	// check that all expressions are VarExpressions or Assign to VarExpressions
 	for _, expr_ := range exprs {
 		switch expr := expr_.(type) {
 		case *VarExpression:
 			if varType == CONST {
-				expr.ref.SetConstant()
+				expr.variable.SetConstant()
 			}
 		case *Assign:
 			lhs, err := expr.GetLhsVarExpression()
@@ -30,16 +35,15 @@ func NewVarStatement(varType VarType, exprs []Expression,
 			}
 
 			if varType == CONST {
-				lhs.ref.SetConstant()
+				lhs.variable.SetConstant()
 			}
-
 		default:
 			errCtx := expr.Context()
 			return nil, errCtx.NewError("Error: not a VarExpression or Assign to VarExpression")
 		}
 	}
 
-	return &VarStatement{varType, exprs, TokenData{ctx}}, nil
+	return &VarStatement{varType, exprs, typeExprs, TokenData{ctx}}, nil
 }
 
 func (t *VarStatement) GetVariables() map[string]Variable {
@@ -151,14 +155,16 @@ func (t *VarStatement) HoistNames(scope Scope) error {
 }
 
 func (t *VarStatement) ResolveStatementNames(scope Scope) error {
-	setVar := func(name string, ref Variable) error {
+	setVar := func(name string, variable Variable, val values.Value) error {
+    variable.SetValue(val)
+
 		switch t.varType {
 		case LET, CONST:
 			if err := t.assertUnique(scope, name); err != nil {
 				return err
 			}
 
-			if err := scope.SetVariable(name, ref); err != nil {
+			if err := scope.SetVariable(name, variable); err != nil {
 				return err
 			}
 		case VAR:
@@ -172,7 +178,23 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
 		return nil
 	}
 
-	for _, expr_ := range t.exprs {
+	for i, expr_ := range t.exprs {
+    typeExpr := t.typeExprs[i]
+
+    value := values.NewAny(expr_.Context())
+
+    if typeExpr != nil {
+      if err := typeExpr.ResolveExpressionNames(scope); err != nil {
+        return err
+      }
+
+      if typeVal, err := typeExpr.EvalExpression(); err != nil {
+        return err
+      } else {
+        value = typeVal
+      }
+    }
+
 		switch expr := expr_.(type) {
 		case *Assign:
 			lhs, err := expr.GetLhsVarExpression()
@@ -180,7 +202,7 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
 				return err
 			}
 
-			if err := setVar(lhs.Name(), lhs.GetVariable()); err != nil {
+			if err := setVar(lhs.Name(), lhs.GetVariable(), value); err != nil {
 				return err
 			}
 
@@ -188,7 +210,7 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
 				return err
 			}
 		case *VarExpression:
-			if err := setVar(expr.Name(), expr.GetVariable()); err != nil {
+			if err := setVar(expr.Name(), expr.GetVariable(), value); err != nil {
 				return err
 			}
 		default:
@@ -199,11 +221,11 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
 	return nil
 }
 
-func (t *VarStatement) EvalStatement(stack values.Stack) error {
+func (t *VarStatement) EvalStatement() error {
 	for _, expr_ := range t.exprs {
 		switch expr := expr_.(type) {
 		case *Assign:
-			rhsValue, err := expr.rhs.EvalExpression(stack)
+			rhsValue, err := expr.rhs.EvalExpression()
 			if err != nil {
 				return err
 			}
@@ -213,17 +235,14 @@ func (t *VarStatement) EvalStatement(stack values.Stack) error {
 				panic(err)
 			}
 
-			v := nameExpr.GetVariable()
+			variable := nameExpr.GetVariable()
+      lhsValue := variable.GetValue()
 
-			if err := stack.SetValue(v, rhsValue, false, expr.Context()); err != nil {
-				return err
-			}
+      if err := lhsValue.Check(rhsValue, rhsValue.Context()); err != nil {
+        return err
+      }
 		case *VarExpression:
-			ref := expr.GetVariable()
-
-			if err := stack.SetValue(ref, nil, false, expr.Context()); err != nil {
-				return err
-			}
+      // no types to check
 		default:
 			panic("unhandled")
 		}
@@ -232,13 +251,16 @@ func (t *VarStatement) EvalStatement(stack values.Stack) error {
 	return nil
 }
 
-func (t *VarStatement) HoistValues(stack values.Stack) error {
-	return nil
-}
-
 func (t *VarStatement) ResolveStatementActivity(usage Usage) error {
 	for i := len(t.exprs) - 1; i >= 0; i-- {
 		expr_ := t.exprs[i]
+    typeExpr := t.typeExprs[i]
+
+    if typeExpr != nil {
+      if err := typeExpr.ResolveExpressionActivity(usage); err != nil {
+        return err
+      }
+    }
 
 		switch expr := expr_.(type) {
 		case *Assign:
@@ -253,7 +275,7 @@ func (t *VarStatement) ResolveStatementActivity(usage Usage) error {
 					panic("unexpected")
 				}
 
-				if err := usage.Rereference(lhs.ref, lhs.Context()); err != nil {
+				if err := usage.Rereference(lhs.variable, lhs.Context()); err != nil {
 					return err
 				}
 
@@ -280,7 +302,14 @@ func (t *VarStatement) ResolveStatementActivity(usage Usage) error {
 }
 
 func (t *VarStatement) UniversalStatementNames(ns Namespace) error {
-	for _, expr := range t.exprs {
+	for i, expr := range t.exprs {
+    typeExpr := t.typeExprs[i]
+    if typeExpr != nil {
+      if err := typeExpr.UniversalExpressionNames(ns); err != nil {
+        return err
+      }
+    }
+
 		if err := expr.UniversalExpressionNames(ns); err != nil {
 			return err
 		}
@@ -290,7 +319,14 @@ func (t *VarStatement) UniversalStatementNames(ns Namespace) error {
 }
 
 func (t *VarStatement) UniqueStatementNames(ns Namespace) error {
-	for _, expr_ := range t.exprs {
+	for i, expr_ := range t.exprs {
+    typeExpr := t.typeExprs[i]
+    if typeExpr != nil {
+      if err := typeExpr.UniqueExpressionNames(ns); err != nil {
+        return err
+      }
+    }
+
 		switch expr := expr_.(type) {
 		case *Assign:
 			lhs, err := expr.GetLhsVarExpression()
@@ -319,7 +355,14 @@ func (t *VarStatement) UniqueStatementNames(ns Namespace) error {
 }
 
 func (t *VarStatement) Walk(fn WalkFunc) error {
-  for _, expr := range t.exprs {
+  for i, expr := range t.exprs {
+    typeExpr := t.typeExprs[i]
+    if typeExpr != nil {
+      if err := typeExpr.Walk(fn); err != nil {
+        return err
+      }
+    }
+
     if err := expr.Walk(fn); err != nil {
       return err
     }

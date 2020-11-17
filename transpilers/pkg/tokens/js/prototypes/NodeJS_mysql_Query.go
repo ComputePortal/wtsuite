@@ -1,22 +1,28 @@
 package prototypes
 
 import (
-	//"../values"
+  "../values"
 
-	//"../../context"
+  "../../context"
 )
 
-var NodeJS_mysql_Query *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_mysql_QueryPrototype() bool {
-	*NodeJS_mysql_Query = BuiltinPrototype{
-		"mysql.Query", NodeJS_EventEmitter,
-		map[string]BuiltinFunction{
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_mysql_Query struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_mysql_QueryOk = generateNodeJS_mysql_QueryPrototype()
+func NewNodeJS_mysql_QueryPrototype() values.Prototype {
+  return &NodeJS_mysql_Query{newBuiltinPrototype("Query")}
+}
+
+func NewNodeJS_mysql_Query(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_mysql_QueryPrototype(), ctx)
+}
+
+func (p *NodeJS_mysql_Query) GetParent() (values.Prototype, error) {
+  return NewNodeJS_EventEmitterPrototype(), nil
+}
+
+func (p *NodeJS_mysql_Query) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_mysql_QueryPrototype(), ctx), nil
+}

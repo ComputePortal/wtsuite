@@ -22,8 +22,8 @@ func (t *LiteralNull) WriteExpression() string {
 	return "null"
 }
 
-func (t *LiteralNull) EvalExpression(stack values.Stack) (values.Value, error) {
-	return values.NewAllNull(t.Context()), nil
+func (t *LiteralNull) EvalExpression() (values.Value, error) {
+	return values.NewAll(t.Context()), nil
 }
 
 func (t *LiteralNull) Walk(fn WalkFunc) error {

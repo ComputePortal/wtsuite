@@ -3,8 +3,6 @@ package js
 import (
 	"strings"
 
-	"./values"
-
 	"../context"
 )
 
@@ -88,19 +86,9 @@ func (t *Block) HoistAndResolveStatementNames(scope Scope) error {
 	return t.ResolveStatementNames(scope)
 }
 
-func (t *Block) HoistValues(stack values.Stack) error {
-	for _, st := range t.statements {
-		if err := st.HoistValues(stack); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (t *Block) evalStatements(statements []Statement, stack values.Stack) error {
+func (t *Block) evalStatements(statements []Statement) error {
 	for _, st := range statements {
-		err := st.EvalStatement(stack)
+		err := st.EvalStatement()
 		if err != nil {
 			return err
 		}
@@ -109,8 +97,8 @@ func (t *Block) evalStatements(statements []Statement, stack values.Stack) error
 	return nil
 }
 
-func (t *Block) EvalStatement(stack values.Stack) error {
-	return t.evalStatements(t.statements, stack)
+func (t *Block) EvalStatement() error {
+	return t.evalStatements(t.statements)
 }
 
 func (t *Block) ResolveStatementActivity(usage Usage) error {

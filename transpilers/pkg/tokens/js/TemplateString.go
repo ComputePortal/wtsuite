@@ -86,14 +86,14 @@ func (t *TemplateString) ResolveExpressionNames(scope Scope) error {
 	return nil
 }
 
-func (t *TemplateString) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *TemplateString) EvalExpression() (values.Value, error) {
 	for _, ins := range t.ins {
-		v, err := ins.EvalExpression(stack)
+		v, err := ins.EvalExpression()
 		if err != nil {
 			return nil, err
 		}
 
-		if !v.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean) {
+		if !(prototypes.IsString(v) || prototypes.IsNumber(v) || prototypes.IsBoolean(v)) {
 			errCtx := ins.Context()
 			return nil, errCtx.NewError("Error: expected String(able)")
 		}

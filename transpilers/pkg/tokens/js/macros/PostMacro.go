@@ -33,7 +33,7 @@ func (m *PostMacro) writeExpression(fnName string) string {
 	return b.String()
 }
 
-func (m *PostMacro) evalExpression(stack values.Stack, msg values.Value,
+func (m *PostMacro) evalExpression(msg values.Value,
 	classValue values.Value) (values.Value, error) {
 	if !isAnObject(msg) {
 		errCtx := m.Context()
@@ -42,37 +42,21 @@ func (m *PostMacro) evalExpression(stack values.Stack, msg values.Value,
 				msg.TypeName())
 	}
 
-	classProto, ok := classValue.GetClassPrototype()
-	if !ok {
-		errCtx := m.Context()
-		return nil, errCtx.NewError("Error: argument 3 is not a class, got instance of " + classValue.TypeName())
-	}
-
-	resolveValue, err := classProto.GenerateInstance(stack, nil, nil, classValue.Context())
+	resolveValue, err := classValue.EvalConstructor(nil, classValue.Context())
 	if err != nil {
 		context.AppendContextString(err, "Info: needed here", m.Context())
 		return nil, err
 	}
 
-	rejectValue := prototypes.NewInstance(prototypes.Error, m.Context())
+  proto := values.GetPrototype(resolveValue)
+  if proto == nil {
+    panic("expected instance of class")
+  }
 
-	var univErr error = nil
-	resolveValue.LoopNestedPrototypes(func(proto values.Prototype) {
-		if univErr == nil && !proto.IsUniversal() {
-			errCtx := m.Context()
-			univErr = errCtx.NewError("Error: class " + proto.Name() + " is not universal (hint: use 'universe'")
-		}
-	})
+  if !proto.IsUniversal() {
+    errCtx := m.Context()
+    return nil, errCtx.NewError("Error: class " + proto.Name() + " is not universal (hint: use 'universe'")
+  }
 
-	if univErr != nil {
-		return nil, univErr
-	}
-
-	promiseProps := values.NewPromiseProperties(m.Context())
-	if err := promiseProps.SetResolveArgs([]values.Value{resolveValue}, m.Context()); err != nil {
-		return nil, err
-	}
-	promiseProps.SetRejectArgs([]values.Value{rejectValue})
-
-	return values.NewInstance(prototypes.Promise, promiseProps, m.Context()), nil
+  return prototypes.NewPromise(resolveValue, m.Context()), nil
 }

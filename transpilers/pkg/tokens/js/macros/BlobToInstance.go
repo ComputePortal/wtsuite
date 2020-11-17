@@ -35,8 +35,8 @@ func (m *BlobToInstance) WriteExpression() string {
 	return b.String()
 }
 
-func (m *BlobToInstance) EvalExpression(stack values.Stack) (values.Value, error) {
-	args, err := m.evalArgs(stack)
+func (m *BlobToInstance) EvalExpression() (values.Value, error) {
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -47,17 +47,17 @@ func (m *BlobToInstance) EvalExpression(stack values.Stack) (values.Value, error
 		return nil, err
 	}
 
-	if !args[0].IsInstanceOf(prototypes.Blob) {
+	if !prototypes.IsBlob(args[0]) {
 		errCtx := m.args[0].Context()
 		return nil, errCtx.NewError("Error: expected Blob, got " + args[0].TypeName())
 	}
 
-	res, err := m.evalInstancePrototype(stack, args[1], m.Context())
+	res, err := args[1].EvalConstructor(nil, m.Context())
 	if err != nil {
 		return nil, err
 	}
 
-	return prototypes.NewResolvedPromise(res, m.Context())
+	return prototypes.NewPromise(res, m.Context()), nil
 }
 
 func (m *BlobToInstance) ResolveExpressionActivity(usage js.Usage) error {

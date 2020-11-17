@@ -56,43 +56,62 @@ func (t *Index) ResolveExpressionNames(scope Scope) error {
 	return nil
 }
 
-func (t *Index) EvalExpression(stack values.Stack) (values.Value, error) {
-	containerValue, err := t.container.EvalExpression(stack)
+func (t *Index) EvalExpression() (values.Value, error) {
+	containerValue, err := t.container.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	indexValue, err := t.index.EvalExpression(stack)
+	indexValue, err := t.index.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	result, err := containerValue.GetIndex(stack, indexValue, t.Context())
-	if err != nil {
+  fn, err := containerValue.GetMember(".getindex", false, t.Context())
+  if err != nil {
+    return nil, err
+  }
+
+  result, err := fn.EvalFunction([]values.Value{indexValue}, false, t.Context())
+  if err != nil {
 		context.AppendContextString(err, "Info: container", t.container.Context())
 		return nil, err
-	}
+  }
+
+  if result == nil {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: index returns void")
+  }
 
 	return result, nil
 }
 
-func (t *Index) EvalSet(stack values.Stack, rhsValue values.Value,
-	ctx context.Context) error {
-	containerValue, err := t.container.EvalExpression(stack)
+func (t *Index) EvalSet(rhsValue values.Value, ctx context.Context) error {
+	containerValue, err := t.container.EvalExpression()
 	if err != nil {
 		return err
 	}
 
-	indexValue, err := t.index.EvalExpression(stack)
+	indexValue, err := t.index.EvalExpression()
 	if err != nil {
 		return err
 	}
 
-	err = containerValue.SetIndex(stack, indexValue, rhsValue, t.Context())
-	if err != nil {
+  fn, err := containerValue.GetMember(".setindex", false, t.Context())
+  if err != nil {
+    return err
+  }
+
+  ret, err := fn.EvalFunction([]values.Value{indexValue, rhsValue}, true, t.Context())
+  if err != nil {
 		context.AppendContextString(err, "Info: container", t.container.Context())
-		return err
-	}
+    return err
+  }
+
+  if ret != nil {
+    errCtx := t.Context()
+    return errCtx.NewError("Error: unexpected index return value")
+  }
 
 	return nil
 }

@@ -1,98 +1,70 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var Document *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateDocumentPrototype() bool {
-	*Document = BuiltinPrototype{
-		"Document", EventTarget,
-		map[string]BuiltinFunction{
-			"activeElement":  NewGetter(HTMLElement),
-			"body":           NewGetter(HTMLElement),
-			"cookie":         NewGetterSetter(String),
-			"createTextNode": NewNormal(String, Text),
-			"createElement": NewNormalFunction(&And{String, &Opt{Object}},
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-					if str, ok := args[0].LiteralStringValue(); ok {
-						switch str {
-						case "a":
-							return NewInstance(HTMLLinkElement, ctx), nil
-						case "canvas":
-							return NewInstance(HTMLCanvasElement, ctx), nil
-						case "div":
-							return NewInstance(HTMLElement, ctx), nil
-						case "img":
-							return NewInstance(HTMLImageElement, ctx), nil
-						case "input":
-							return NewInstance(HTMLInputElement, ctx), nil
-						}
-					}
-
-					return NewInstance(HTMLElement, ctx), nil
-				}),
-			"documentElement": NewGetter(HTMLElement),
-      "fonts":           NewGetter(FontFaceSet),
-			"getElementById": NewNormalFunction(String,
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-					errCtx := args[0].Context()
-					isMain := false
-					if isMainBool, ok := this.Properties().GetProperty(".main"); ok {
-						mainBoolVal, ok1 := isMainBool.LiteralBooleanValue()
-						if ok1 && mainBoolVal {
-							isMain = true
-						}
-					}
-
-					if str, ok := args[0].LiteralStringValue(); ok && isMain && str != "" {
-						vif := stack.GetViewInterface()
-
-						return vif.GetElemTypeInstance(stack, str, errCtx)
-					} else {
-						return NewInstance(HTMLElement, ctx), nil
-						//return nil, errCtx.NewError("Error: expected literal string")
-					}
-				}),
-			"getVariable": NewNormalFunction(String,
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-					errCtx := args[0].Context()
-					if str, ok := args[0].LiteralStringValue(); ok {
-						vif := stack.GetViewInterface()
-
-						return vif.GetVarTypeInstance(stack, str, errCtx)
-					} else {
-						return nil, errCtx.NewError("Error: expected literal string")
-					}
-				}),
-			"hidden": NewGetter(Boolean),
-			"newElement": NewNormalFunction(String,
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-
-					errCtx := args[0].Context()
-					if str, ok := args[0].LiteralStringValue(); ok {
-						vif := stack.GetViewInterface()
-
-						return vif.GetDefTypeInstance(stack, str, errCtx)
-					} else {
-						return nil, errCtx.NewError("Error: expected literal string")
-					}
-				}),
-			"querySelector": NewNormal(String, HTMLElement),
-			"referrer":      NewGetterSetter(String),
-			"title":         NewGetterSetter(String),
-		},
-		nil,
-	}
-
-	return true
+type Document struct {
+  BuiltinPrototype
 }
 
-var _DocumentOk = generateDocumentPrototype()
+func NewDocumentPrototype() values.Prototype {
+  return &Document{newBuiltinPrototype("Document")}
+}
+
+func NewDocument(ctx context.Context) values.Value {
+  return values.NewInstance(NewDocumentPrototype(), ctx)
+}
+
+func (p *Document) GetParent() (values.Prototype, error) {
+  return NewEventTargetPrototype(), nil
+}
+
+func (p *Document) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  s := NewString(ctx)
+  elem := NewHTMLElement(ctx)
+
+  switch key {
+  case "activeElement", "body", "documentElement":
+    return elem, nil
+  case "cookie", "referrer", "title":
+    return s, nil
+  case "createTextNode":
+    return values.NewFunction([]values.Value{s, NewText(ctx)}, ctx), nil
+  case "createElement":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{NewLiteralString("a", ctx), NewHTMLLinkElement(ctx)},
+      []values.Value{NewLiteralString("canvas", ctx), NewHTMLCanvasElement(ctx)},
+      []values.Value{NewLiteralString("img", ctx), NewHTMLImageElement(ctx)},
+      []values.Value{NewLiteralString("input", ctx), NewHTMLInputElement(ctx)},
+      []values.Value{s, elem}, // must come last, because first valid overload is used
+    }, ctx), nil
+  case "fonts":
+    return NewFontFaceSet(ctx), nil
+  case "getElementById", "querySelector":
+    return values.NewFunction([]values.Value{s, elem}, ctx), nil
+  case "hidden":
+    return b, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Document) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  s := NewString(ctx)
+
+  switch key {
+  case "cookie", "referrer", "title":
+    return s.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: document." + key + " not setable")
+  }
+}
+
+func (p *Document) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewDocumentPrototype(), ctx), nil
+}

@@ -1,18 +1,41 @@
 package prototypes
 
-var NodeJS_crypto_Decipher *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateNodeJS_crypto_DecipherPrototype() bool {
-	*NodeJS_crypto_Decipher = BuiltinPrototype{
-		"crypto.Decipher", NodeJS_EventEmitter,
-		map[string]BuiltinFunction{
-      "final":  NewNormal(String, String),
-      "update": NewNormal(&And{String, &And{String, String}}, String),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type NodeJS_crypto_Decipher struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_crypto_DecipherOk = generateNodeJS_crypto_DecipherPrototype()
+func NewNodeJS_crypto_DecipherPrototype() values.Prototype {
+  return &NodeJS_crypto_Decipher{newBuiltinPrototype("Decipher")}
+}
+
+func NewNodeJS_crypto_Decipher(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_crypto_DecipherPrototype(), ctx)
+}
+
+func (p *NodeJS_crypto_Decipher) GetParent() (values.Prototype, error) {
+  return NewNodeJS_EventEmitterPrototype(), nil
+}
+
+func (p *NodeJS_crypto_Decipher) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  s := NewString(ctx)
+
+  switch key {
+  case "final":
+    return values.NewFunction([]values.Value{s, s}, ctx), nil
+  case "update":
+    return values.NewFunction([]values.Value{s, s, s, s}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_crypto_Decipher) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_crypto_DecipherPrototype(), ctx), nil
+}

@@ -1,17 +1,52 @@
 package prototypes
 
-var IDBFactory *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateIDBFactoryPrototype() bool {
-	*IDBFactory = BuiltinPrototype{
-		"IDBFactory", nil,
-		map[string]BuiltinFunction{
-			"open": NewNormal(&And{String, &Opt{Int}}, IDBOpenDBRequest),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type IDBFactory struct {
+  BuiltinPrototype
 }
 
-var _IDBFactoryOk = generateIDBFactoryPrototype()
+func NewIDBFactoryPrototype() values.Prototype {
+  return &IDBFactory{newBuiltinPrototype("IDBFactory")}
+}
+
+func NewIDBFactory(ctx context.Context) values.Value {
+  return values.NewInstance(NewIDBFactoryPrototype(), ctx)
+}
+
+func (p *IDBFactory) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
+  req := NewIDBOpenDBRequest(ctx)
+
+  switch key {
+  case "databases":
+    return values.NewFunction([]values.Value{
+      NewPromise(NewArray(NewObject(map[string]values.Value{
+        "name": s,
+        "version": i,
+      }, ctx), ctx), ctx),
+    }, ctx), nil
+  case "deleteDatabase":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, req},
+      // []values.Value{s, o, req}, // not yet standardized
+    }, ctx), nil
+  case "open":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, req},
+      []values.Value{s, i, req},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *IDBFactory) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewIDBFactoryPrototype(), ctx), nil
+}

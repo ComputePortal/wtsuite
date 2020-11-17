@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"./prototypes"
-	"./values"
 
 	"../context"
 )
@@ -68,20 +67,18 @@ func (t *While) ResolveStatementNames(scope Scope) error {
 	return t.Block.ResolveStatementNames(subScope)
 }
 
-func (t *While) EvalStatement(stack values.Stack) error {
-	condVal, err := t.cond.EvalExpression(stack)
+func (t *While) EvalStatement() error {
+	condVal, err := t.cond.EvalExpression()
 	if err != nil {
 		return err
 	}
 
-	if !condVal.IsInstanceOf(prototypes.Boolean) {
+	if !prototypes.IsBoolean(condVal) {
 		errCtx := condVal.Context()
 		return errCtx.NewError("Error: expected boolean condition")
 	}
 
-	subStack := NewBranchStack(stack)
-
-	return t.Block.EvalStatement(subStack)
+	return t.Block.EvalStatement()
 }
 
 func (t *While) ResolveStatementActivity(usage Usage) error {

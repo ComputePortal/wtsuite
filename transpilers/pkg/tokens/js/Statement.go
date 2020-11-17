@@ -1,8 +1,6 @@
 package js
 
-import (
-	"./values"
-)
+import ()
 
 type Statement interface {
 	Token
@@ -15,10 +13,7 @@ type Statement interface {
 
 	ResolveStatementNames(scope Scope) error
 
-	// only needed for function statements
-	HoistValues(stack values.Stack) error
-
-	EvalStatement(stack values.Stack) error
+	EvalStatement() error
 
 	// usage is resolved in reverse order, so that unused 'mutations' (i.e. variable assignments) can be detected
 	ResolveStatementActivity(usage Usage) error

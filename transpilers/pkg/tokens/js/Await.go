@@ -22,10 +22,6 @@ func (t *Await) Args() []Token {
 	return []Token{t.expr}
 }
 
-func (t *Await) Precedence() int {
-	return _preUnaryPrecedenceMap["await"]
-}
-
 func (t *Await) Dump(indent string) string {
 	var b strings.Builder
 
@@ -77,114 +73,47 @@ func (t *Await) ResolveStatementNames(scope Scope) error {
 	return t.ResolveExpressionNames(scope)
 }
 
-func (t *Await) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-func (t *Await) evalInternal(stack values.Stack) (values.Value, error) {
-	exprValue, err := t.expr.EvalExpression(stack)
+func (t *Await) evalInternal() (values.Value, error) {
+	promise, err := t.expr.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
 	// expecting a Promise
-	if !exprValue.IsInstanceOf(prototypes.Promise) {
+	if !prototypes.IsPromise(promise) {
 		errCtx := t.Context()
-		return nil, errCtx.NewError("Error: expected a Promise, got a " + exprValue.TypeName())
+		return nil, errCtx.NewError("Error: expected a Promise, got a " + promise.TypeName())
 	}
 
-	return exprValue, nil
+	return promise.GetMember(".resolve", false, t.Context())
 }
 
-func (t *Await) EvalStatement(stack values.Stack) error {
-	if res, ok, err := stack.ResolveAwait(t); ok {
-		if err != nil {
-			return err
-		}
+func (t *Await) EvalExpression() (values.Value, error) {
+  res, err := t.evalInternal()
+  if err != nil {
+    return nil, err
+  }
 
-		if res != nil {
-			errCtx := t.Context()
-			return errCtx.NewError("Error: unexpected return value (hint: use void)")
-		}
-		return nil
-	} else if err != nil {
+  if res == nil {
+    errCtx := t.Context()
+    return nil,  errCtx.NewError("Error: promise resolves to void")
+  }
+
+  return res, nil
+}
+
+func (t *Await) EvalStatement() error {
+	res, err := t.evalInternal()
+	if err != nil {
 		return err
 	}
 
-	exprValue, err := t.evalInternal(stack)
-	if err != nil {
-		return err
-	}
+  if res != nil {
+    errCtx := t.Context()
+    return errCtx.NewError("Error: promise returns non-void (hint: use void)")
+  }
 
-	fn, err := exprValue.GetMember(stack, ".awaitMethod", false, t.Context())
-	if err != nil {
-		panic(err)
-	}
-
-	err = fn.EvalMethod(stack, []values.Value{}, t.Context())
-	if err != nil {
-		if ar, ok := err.(*prototypes.AsyncRequest); ok {
-			ar.SetAwait(t)
-			return ar
-		} else {
-			return err
-		}
-	} else {
-		return nil
-	}
-}
-
-func (t *Await) EvalExpression(stack values.Stack) (values.Value, error) {
-	if res, ok, err := stack.ResolveAwait(t); ok {
-		if err != nil {
-			return nil, err
-		}
-
-		if res == nil {
-			errCtx := t.Context()
-			return nil, errCtx.NewError("Error: expected a return value, got nothing")
-		}
-		return res, nil
-	} else if err != nil {
-		return nil, err
-	}
-
-	exprValue, err := t.evalInternal(stack)
-	if err != nil {
-		return nil, err
-	}
-
-	// if underlying object is AllNull (eg. uninitialized global object), then we cant be sure of anything
-	if values.IsAllNull(exprValue) {
-		return exprValue, nil
-	}
-
-	//if exprValue.IsNull() {
-	//errCtx := t.Context()
-	//panic(errCtx.NewError("Error: returned Promise can't be null"))
-	//}
-
-	fn, err := exprValue.GetMember(stack, ".awaitFunction", false, t.Context())
-	if err != nil {
-		panic(err)
-	}
-
-	if values.IsAllNull(fn) {
-		errCtx := t.Context()
-		panic(errCtx.NewError("Error: .awaitFunction can't be null"))
-	}
-
-	res, err := fn.EvalFunction(stack, []values.Value{}, t.Context())
-	if err != nil {
-		if ar, ok := err.(*prototypes.AsyncRequest); ok {
-			ar.SetAwait(t)
-			return nil, ar
-		} else {
-			return nil, err
-		}
-	} else {
-		return res, nil
-	}
+  return nil
 }
 
 func (t *Await) ResolveExpressionActivity(usage Usage) error {

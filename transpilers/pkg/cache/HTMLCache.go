@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"../files"
-	"../tokens/js"
 	"../tokens/patterns"
 	"../tree/styles"
 )
@@ -38,7 +37,6 @@ type HTMLCache struct {
 	IndexMap     map[string]string         // abspath -> target abspath
 	Data         map[string]HTMLCacheEntry // abs src path as key
 	CssRules     map[string]CSSCacheEntry
-	ViewInterfs  map[string]js.ViewInterface // only for index files
 }
 
 func globalVarsNotEqual(gv1, gv2 map[string]string) bool {
@@ -127,7 +125,6 @@ func LoadHTMLCache(indexMap map[string]string,
 		make(map[string]string),
 		make(map[string]HTMLCacheEntry),
 		make(map[string]CSSCacheEntry),
-		make(map[string]js.ViewInterface),
 	}
 
 	if !forceBuild {
@@ -173,7 +170,6 @@ func LoadHTMLCache(indexMap map[string]string,
 						indexMap,
 						make(map[string]HTMLCacheEntry),
 						make(map[string]CSSCacheEntry),
-						make(map[string]js.ViewInterface),
 					}
 				} else {
 					// remove any views that are no longer used,
@@ -376,40 +372,6 @@ func (c *HTMLCache) RequiresUpdate(fname string) bool {
 	m := make(map[string]bool)
 
 	return c.requiresUpdate(fname, targetAge, m)
-}
-
-func SetHTMLViewInterface(fname string, vif *js.ViewInterface) {
-	if vif == nil {
-		panic("view interface cannot be nil")
-	}
-
-	c, ok := _cache.(*HTMLCache)
-	if !ok {
-		panic("unexpected")
-	}
-
-	c.ViewInterfs[fname] = *vif
-}
-
-func GetHTMLViewInterfaces() map[string]*js.ViewInterface {
-	c, ok := _cache.(*HTMLCache)
-	if !ok {
-		panic("unexpected")
-	}
-
-	result := make(map[string]*js.ViewInterface)
-
-	for k, entry := range c.ViewInterfs {
-		vif := js.ViewInterface{}
-		vif = entry
-		result[k] = &vif
-
-		if result[k] == nil {
-			panic("view interface cant be nil")
-		}
-	}
-
-	return result
 }
 
 // rules need to be kept together

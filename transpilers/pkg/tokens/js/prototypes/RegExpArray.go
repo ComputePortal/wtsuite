@@ -1,18 +1,43 @@
 package prototypes
 
-var RegExpArray *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateRegExpArray() bool {
-	*RegExpArray = BuiltinPrototype{
-		"RegExpArray", Array,
-		map[string]BuiltinFunction{
-			"index": NewGetter(Int),
-			"input": NewGetter(String),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type RegExpArray struct {
+  BuiltinPrototype
 }
 
-var _RegExpArrayOk = generateRegExpArray()
+func NewRegExpArrayPrototype() values.Prototype {
+  return &RegExpArray{newBuiltinPrototype("RegExpArray")}
+}
+
+func NewRegExpArray(ctx context.Context) values.Value {
+  return values.NewInstance(NewRegExpArrayPrototype(), ctx)
+}
+
+func (p *RegExpArray) GetParent() (values.Prototype, error) {
+  return NewArrayPrototype(NewString(p.Context())), nil
+}
+
+func (p *RegExpArray) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "index":
+    return i, nil
+  case "input":
+    return s, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *RegExpArray) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+
+  return values.NewUnconstructableClass(NewRegExpArrayPrototype(), ctx), nil
+}

@@ -64,7 +64,7 @@ func (p *JSParser) buildTryCatchStatement(ts []raw.Token) (*js.TryCatch, []raw.T
 					return nil, nil, errCtx.NewError("Error: no catch argument specified (hint: leave out parens)")
 				}
 
-				catchArg, err = p.buildFunctionArgument(condField, false, false)
+				catchArg, err = p.buildFunctionArgument(condField, false)
 				if err != nil {
 					return nil, nil, err
 				}

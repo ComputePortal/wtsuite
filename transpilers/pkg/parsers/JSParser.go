@@ -393,27 +393,3 @@ func (p *JSParser) DumpTokens() {
 
 	fmt.Println(m.Dump())
 }
-
-var _jsTypeExpressionBuilderOk = js.SetTypeExpressionBuilder(func(str string) *js.TypeExpression {
-	// tokenize the string
-	p, err := NewRawJSParser(str, context.NewDummyContext())
-	if err != nil {
-		panic(err)
-	}
-
-	ts, err := p.tokenize()
-	if err != nil {
-		panic(err)
-	}
-
-	if len(ts) < 1 || len(ts) > 2 {
-		panic("bad type string " + str)
-	}
-
-	te, err := p.buildTypeExpression(ts, false)
-	if err != nil {
-		panic(err)
-	}
-
-	return te
-})

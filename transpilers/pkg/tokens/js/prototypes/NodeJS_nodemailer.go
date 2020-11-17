@@ -1,24 +1,30 @@
 package prototypes
 
 import (
-	//"../values"
+  "../values"
 
-	//"../../context"
+  "../../context"
 )
 
-var NodeJS_nodemailer *BuiltinPrototype = allocBuiltinPrototype()
+func FillNodeJS_nodemailerPackage(pkg values.Package) {
+  pkg.AddPrototype(NewNodeJS_nodemailer_SMTPTransportPrototype())
 
-func generateNodeJS_nodemailerprototype() bool {
-	*NodeJS_nodemailer = BuiltinPrototype{
-		"nodemailer", nil,
-		map[string]BuiltinFunction{
-      "createTransport": NewStatic(Object, NodeJS_nodemailer_SMTPTransport),
-      "SMTPTransport": NewStaticClassGetter(NodeJS_nodemailer_SMTPTransport),
-		},
-		nil,
-	}
+  ctx := context.NewDummyContext()
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  s := NewString(ctx)
 
-	return true
+  opt := NewConfigObject(map[string]values.Value{
+    "host": s,
+    "port": i,
+    "secure": b,
+    "auth": NewObject(map[string]values.Value{
+      "user": s,
+      "pass": s,
+    }, ctx),
+  }, ctx)
+
+  pkg.AddValue("createTransport", values.NewFunction([]values.Value{
+    opt, NewNodeJS_nodemailer_SMTPTransport(ctx),
+  }, ctx))
 }
-
-var _NodeJS_nodemailerOk = generateNodeJS_nodemailerprototype()

@@ -1,57 +1,93 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var Number *BuiltinPrototype = allocBuiltinPrototype()
+type Number struct {
+  BuiltinPrototype
+}
+
+func NewNumberPrototype() values.Prototype {
+  return &Number{newBuiltinPrototype("Number")}
+}
 
 func NewNumber(ctx context.Context) values.Value {
-	return values.NewInstance(Number, values.NewNumberProperties(false, 0.0, ctx), ctx)
+  return values.NewInstance(NewNumberPrototype(), ctx)
 }
 
-func NewLiteralNumber(v float64, ctx context.Context) values.Value {
-	return values.NewInstance(Number, values.NewNumberProperties(true, v, ctx), ctx)
+func IsNumber(v values.Value) bool {
+  ctx := context.NewDummyContext()
+
+  numberCheck := NewNumber(ctx)
+
+  return numberCheck.Check(v, ctx) == nil
 }
 
-func generateNumberPrototype() bool {
-	*Number = BuiltinPrototype{
-		"Number", nil,
-		map[string]BuiltinFunction{
-			"EPSILON":           NewStaticGetter(Number),
-			"MAX_SAFE_INTEGER":  NewStaticGetter(Int),
-			"MAX_VALUE":         NewStaticGetter(Number),
-			"MIN_SAFE_INTEGER":  NewStaticGetter(Int),
-			"MIN_VALUE":         NewStaticGetter(Number),
-			"NaN":               NewStaticGetter(Number),
-			"NEGATIVE_INFINITY": NewStaticGetter(Number),
-			"POSITIVE_INFINITY": NewStaticGetter(Number),
-
-			"isFinite":      NewStatic(&Any{}, Boolean),
-			"isInteger":     NewStatic(&Any{}, Boolean),
-			"isNaN":         NewStatic(&Any{}, Boolean),
-			"isSafeInteger": NewStatic(&Any{}, Boolean),
-			"parseFloat":    NewStatic(&Or{Number, String}, Number),
-			"parseInt":      NewStatic(&And{&Or{Number, String}, &Opt{Int}}, Int),
-			"toExponential": NewNormal(&Opt{Int}, String),
-			"toFixed":       NewNormal(&Opt{Int}, String),
-			"toLocalString": NewNormal(&Rest{&Any{}}, String),
-			"toPrecision":   NewNormal(&Opt{Int}, String),
-			"toString":      NewNormal(&Opt{Int}, String),
-		},
-		NewConstructorGenerator(&Or{Number, String}, Number,
-			func(stack values.Stack, keys []string, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				if keys != nil || args != nil {
-					return nil, ctx.NewError("Error: unexpected content types")
-				}
-				return NewInstance(Number, ctx), nil
-			}),
-	}
-
-	return true
+func (p *Number) IsUniversal() bool {
+  return true
 }
 
-var _NumberOk = generateNumberPrototype()
+func (p *Number) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  s := NewString(ctx)
+  i := NewInt(ctx)
+
+  switch key {
+  case "toExponential", "toFixed", "toPrecision", "toString":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s},
+      []values.Value{i, s},
+    }, ctx), nil
+  case "toLocaleString":
+    opt := NewLocaleOptions(ctx)
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s},
+      []values.Value{s, s},
+      []values.Value{s, opt, s},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Number) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  a := values.NewAny(ctx)
+  b := NewBoolean(ctx)
+  f := NewNumber(ctx)
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "EPSILON", "MAX_VALUE", "MIN_VALUE", "NaN", "NEGATIVE_INFINITY", "POSITIVE_INFINITY":
+    return f, nil
+  case "MAX_SAFE_INTEGER", "MIN_SAFE_INTEGER":
+    return i, nil
+  case "isFinite", "isInteger", "isNaN", "isSafeInteger":
+    return values.NewFunction([]values.Value{a, b}, ctx), nil
+  case "parseFloat":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{f, f},
+      []values.Value{s, f},
+    }, ctx), nil
+  case "parseInt":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{f, i},
+      []values.Value{s, i},
+      []values.Value{f, i, i},
+      []values.Value{s, i, i},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Number) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+
+  return values.NewClass([][]values.Value{
+    []values.Value{NewNumber(ctx)},
+    []values.Value{NewString(ctx)},
+  }, NewNumberPrototype(), ctx), nil
+}

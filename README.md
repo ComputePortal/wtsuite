@@ -36,3 +36,9 @@ Run `make install-vim` to install the relevant syntax/indentation files.
 
 # License
 [GPLv3](./LICENSE.txt)
+
+# TODO
+* Simplify js values
+* Can interfaces that refer to prototypes be removed?
+* This means that all members must be registered on the value
+* How to do inheritance n 

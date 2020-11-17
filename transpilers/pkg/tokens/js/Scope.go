@@ -15,6 +15,7 @@ type Scope interface {
 	IsBreakable() bool
 	IsContinueable() bool
 	IsAsync() bool
+  GetFunction() *Function
 }
 
 // eg. used by GlobalScope
@@ -96,4 +97,12 @@ func (s *ScopeData) IsContinueable() bool {
 
 func (s *ScopeData) IsAsync() bool {
 	return false
+}
+
+func (s *ScopeData) GetFunction() *Function {
+  if s.parent != nil {
+    return s.parent.GetFunction()
+  } else {
+    return nil
+  }
 }

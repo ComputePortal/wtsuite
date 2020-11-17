@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"./prototypes"
-	"./values"
 
 	"../context"
 )
@@ -75,7 +74,7 @@ func (t *TryCatch) Dump(indent string) string {
 		b.WriteString("Catch")
 		if t.arg != nil {
 			b.WriteString("(")
-			b.WriteString(strings.Replace(t.arg.Write(false), "\n", "", -1))
+			b.WriteString(strings.Replace(t.arg.Write(), "\n", "", -1))
 			b.WriteString(")")
 		}
 		b.WriteString("\n")
@@ -114,7 +113,7 @@ func (t *TryCatch) WriteStatement(indent string) string {
 		b.WriteString("catch")
 		if t.arg != nil {
 			b.WriteString("(")
-			b.WriteString(t.arg.Write(false))
+			b.WriteString(t.arg.Write())
 			b.WriteString(")")
 		}
 		writeBlock(t.catch)
@@ -167,7 +166,7 @@ func (t *TryCatch) ResolveStatementNames(scope Scope) error {
 	if t.catch != nil {
 		subScope := NewBranchScope(scope)
 		if t.arg != nil {
-			if err := t.arg.ResolveNames(scope, subScope); err != nil {
+			if err := t.arg.ResolveNames(subScope); err != nil {
 				return err
 			}
 		}
@@ -190,46 +189,34 @@ func (t *TryCatch) ResolveStatementNames(scope Scope) error {
 	return nil
 }
 
-func (t *TryCatch) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-func (t *TryCatch) EvalStatement(stack values.Stack) error {
-	subStack := NewBranchStack(stack)
-	if err := t.Block.evalStatements(t.try, subStack); err != nil {
+func (t *TryCatch) EvalStatement() error {
+	if err := t.Block.evalStatements(t.try); err != nil {
 		return err
 	}
 
 	if t.catch != nil {
-		subStack := NewBranchStack(stack)
-
 		if t.arg != nil && t.arg.Name() != "_" {
 			ctx := t.arg.Context()
-			arg := values.NewAllNull(ctx)
-			if t.arg.constraint != nil {
-				var err error
-				arg, err = t.arg.GenerateArgInstance(stack, ctx)
-				if err != nil {
-					return err
-				}
-			}
+      arg, err := t.arg.GetValue()
+      if err != nil {
+        return err
+      }
 
-			if !arg.IsInstanceOf(prototypes.Error) {
+			if !prototypes.IsError(arg) {
 				return ctx.NewError("Error: expected Error, got " + arg.TypeName())
 			}
 
-			subStack.SetValue(t.arg.name.GetVariable(), arg, false, ctx)
+      variable := t.arg.GetVariable()
+      variable.SetValue(arg)
 		}
 
-		if err := t.Block.evalStatements(t.catch, subStack); err != nil {
+		if err := t.Block.evalStatements(t.catch); err != nil {
 			return err
 		}
 	}
 
 	if t.finally != nil {
-		subStack := NewBranchStack(stack)
-
-		if err := t.Block.evalStatements(t.finally, subStack); err != nil {
+		if err := t.Block.evalStatements(t.finally); err != nil {
 			return err
 		}
 	}

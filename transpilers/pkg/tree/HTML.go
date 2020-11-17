@@ -311,7 +311,7 @@ func (t *HTML) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.In
 	return nil
 }
 
-func (t *HTML) ApplyControl(control string, viewInterface *js.ViewInterface, jsUrl string) error {
+func (t *HTML) ApplyControl(control string, jsUrl string) error {
 	head, body, err := t.getHeadBody()
 	if err != nil {
 		return err
@@ -323,13 +323,7 @@ func (t *HTML) ApplyControl(control string, viewInterface *js.ViewInterface, jsU
 
 	// write the loader content
 	var b strings.Builder
-	/*b.WriteString("var a = ")
-	b.WriteString(viewInterface.WriteVariables())
-	b.WriteString(";var b = ")
-	b.WriteString(viewInterface.WriteDefs())
-	b.WriteString(";")*/
 	b.WriteString(js.HashControl(control))
-	//b.WriteString("(a, b);")
 	b.WriteString("();")
 	loaderContent := b.String()
 
@@ -339,25 +333,6 @@ func (t *HTML) ApplyControl(control string, viewInterface *js.ViewInterface, jsU
 	}
 
 	body.AppendChild(loaderScript)
-
-	return nil
-}
-
-func (t *HTML) ApplyAnimation(scenes []int) error {
-	if len(scenes) > 0 {
-		_, body, err := t.getHeadBody()
-		if err != nil {
-			return err
-		}
-
-		animationLoader := WriteAnimationLoader(scenes)
-		loaderScript, err := NewLoaderScript(animationLoader, body.Context())
-		if err != nil {
-			return err
-		}
-
-		body.AppendChild(loaderScript)
-	}
 
 	return nil
 }

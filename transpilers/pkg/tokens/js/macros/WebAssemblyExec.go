@@ -37,10 +37,10 @@ func (m *WebAssemblyExec) WriteExpression() string {
 	return b.String()
 }
 
-func (m *WebAssemblyExec) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *WebAssemblyExec) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -49,20 +49,15 @@ func (m *WebAssemblyExec) EvalExpression(stack values.Stack) (values.Value, erro
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
 
-	if !args[0].IsInstanceOf(prototypes.String) {
+	if !prototypes.IsString(args[0]) {
 		errCtx := m.args[0].Context()
 		return nil, errCtx.NewError("Error: expected string, got " + args[0].TypeName())
 	}
 
-	if !args[1].IsInstanceOf(prototypes.WebAssemblyEnv) {
+	if !prototypes.IsWebAssemblyEnv(args[1]) {
 		errCtx := m.args[1].Context()
 		return nil, errCtx.NewError("Error: expected WebAssemblyEnv, got " + args[1].TypeName() + " (hint: wrap WebAssemblyFS by WebAssemblyEnv)")
 	}
 
-	promiseProps := values.NewPromiseProperties(ctx)
-	if err := promiseProps.SetResolveArgs([]values.Value{}, ctx); err != nil {
-		return nil, err
-	}
-	promiseProps.SetRejectArgs([]values.Value{prototypes.NewError(ctx)})
-	return values.NewInstance(prototypes.Promise, promiseProps, ctx), nil
+	return prototypes.NewVoidPromise(ctx), nil
 }

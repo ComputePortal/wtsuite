@@ -1,8 +1,6 @@
 package js
 
 import (
-	"./values"
-
 	"../context"
 )
 
@@ -22,38 +20,23 @@ func (t *ForIn) WriteStatement(indent string) string {
 	return t.ForInOf.writeStatement(indent, "", "in")
 }
 
-func (t *ForIn) EvalStatement(stack values.Stack) error {
-	rhsValue, err := t.rhs.EvalExpression(stack)
+func (t *ForIn) EvalStatement() error {
+	rhsValue, err := t.rhs.EvalExpression()
 	if err != nil {
 		return err
 	}
 
-	indexCtx := t.lhs.Context()
+  inValue, err := rhsValue.GetMember(".getin", false, t.Context())
+  if err != nil {
+    return err
+  }
 
-	// Objects always must be looped explicitely
-	evalInner := func(v values.Value) error {
-		subStack := NewBranchStack(stack)
+  variable := t.lhs.GetVariable()
 
-		if t.varType == VAR {
-			if err := stack.SetValue(t.lhs.GetVariable(), v, true,
-				indexCtx); err != nil {
-				return err
-			}
-		} else {
-			if err := subStack.SetValue(t.lhs.GetVariable(), v, true,
-				indexCtx); err != nil {
-				return err
-			}
-		}
+  variable.SetValue(inValue)
+  variable.SetConstant()
 
-		return t.Block.EvalStatement(subStack)
-	}
-
-	if err := rhsValue.LoopForIn(evalInner, t.Context()); err != nil {
-		return err
-	}
-
-	return nil
+  return t.Block.EvalStatement()
 }
 
 func (t *ForIn) Walk(fn WalkFunc) error { 

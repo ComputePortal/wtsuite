@@ -1,17 +1,47 @@
 package prototypes
 
-var Console *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateConsolePrototype() bool {
-	*Console = BuiltinPrototype{
-		"Console", nil,
-		map[string]BuiltinFunction{
-			"log": NewNormal(&Rest{&Any{}}, nil),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type Console struct {
+  BuiltinPrototype
 }
 
-var _ConsoleOk = generateConsolePrototype()
+func NewConsolePrototype() values.Prototype {
+  return &Console{newBuiltinPrototype("Console")}
+}
+
+func NewConsole(ctx context.Context) values.Value {
+  return values.NewInstance(NewConsolePrototype(), ctx)
+}
+
+func (p *Console) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  a := values.NewAny(ctx)
+
+  switch key {
+  case "log":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{a, nil},
+      []values.Value{a, a, nil},
+      []values.Value{a, a, a, nil},
+      []values.Value{a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, nil}, // should be enough
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Console) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewConsolePrototype(), ctx), nil
+}

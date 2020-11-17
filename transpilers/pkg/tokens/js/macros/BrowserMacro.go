@@ -16,12 +16,12 @@ func newBrowserMacro(args []js.Expression, ctx context.Context) BrowserMacro {
 	return BrowserMacro{newMacro(args, ctx)}
 }
 
-func (m *BrowserMacro) evalArgs(stack values.Stack, ctx context.Context) ([]values.Value, error) {
+func (m *BrowserMacro) evalArgs(ctx context.Context) ([]values.Value, error) {
 	if js.TARGET != "browser" {
 		return nil, ctx.NewError("Error: illegal if TARGET==" + js.TARGET)
 	}
 
-	return m.Macro.evalArgs(stack)
+	return m.Macro.evalArgs()
 }
 
 func (m *BrowserMacro) ResolveExpressionActivity(usage js.Usage) error {

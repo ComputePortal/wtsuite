@@ -1,17 +1,24 @@
 package prototypes
 
-import ()
+import (
+  "../values"
 
-var WebAssembly *BuiltinPrototype = allocBuiltinPrototype()
+  "../../context"
+)
 
-func generateWebAssemblyPrototype() bool {
-	*WebAssembly = BuiltinPrototype{
-		"WebAssembly", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
-
-	return true
+type WebAssembly struct {
+  BuiltinPrototype
 }
 
-var _WebAssemblyOk = generateWebAssemblyPrototype()
+func NewWebAssemblyPrototype() values.Prototype {
+  return &WebAssembly{newBuiltinPrototype("WebAssembly")}
+}
+
+func NewWebAssembly(ctx context.Context) values.Value {
+  return values.NewInstance(NewWebAssemblyPrototype(), ctx)
+}
+
+func (p *WebAssembly) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWebAssemblyPrototype(), ctx), nil
+}

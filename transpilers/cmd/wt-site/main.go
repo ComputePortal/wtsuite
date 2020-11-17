@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime/pprof"
+  "sort"
 	"strconv"
 	"strings"
 
@@ -40,7 +41,6 @@ type CmdArgs struct {
 	autoHref      bool
 	profFile      string
 	xml           bool
-	serial        bool
 	noCaching     bool
 	animationFile string
 
@@ -68,7 +68,6 @@ Options:
 	-y, --exclude-control         Exclude control group or control file. Cannot be combined with -j
 	--math-font-url               Math font url (font name is always FreeSerifMath)
 	-v[v[v[v...]]]                Verbosity
-	--serial                      Don't parallelize the eval types step
 	--no-caching                  Don't cache js class and function results
 	--animation <animation-config>  Apply page animation scripts to a list of views (activated during browsing by pressing PrintScreen)
 `)
@@ -101,7 +100,6 @@ func parseArgs() CmdArgs {
 		autoHref:      false,
 		profFile:      "",
 		xml:           false,
-		serial:        false,
 		noCaching:     false,
 		animationFile: "",
 		verbosity:     0,
@@ -189,12 +187,6 @@ func parseArgs() CmdArgs {
 					printMessageAndExit("Error: "+arg+" already specified", true)
 				} else {
 					cmdArgs.xml = true
-				}
-			case "--serial":
-				if cmdArgs.serial {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.serial = true
 				}
 			case "--no-caching":
 				if cmdArgs.noCaching {
@@ -403,10 +395,6 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 		directives.RegisterDefine(k, v)
 	}
 
-	if cmdArgs.serial {
-		js.SERIAL = true
-	}
-
 	if cmdArgs.noCaching {
 		values.ALLOW_CACHING = false
 	}
@@ -425,14 +413,13 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 	scripts.VERBOSITY = cmdArgs.verbosity
 }
 
-func buildHTMLFile(src, url, dst string, control string, animationScenes []int, cssUrl string, jsUrl string) (*js.ViewInterface, error) {
+func buildHTMLFile(src, url, dst string, control string, cssUrl string, jsUrl string) error {
 	cache.StartRootUpdate(src)
 
 	directives.SetActiveURL(url)
 
 	// must come before AddViewControl
-	// viewInterface cannot contain auto uids
-	r, cssBundleRules, viewInterface, err := directives.NewRoot(src, url, control, cssUrl, jsUrl)
+	r, cssBundleRules, err := directives.NewRoot(src, url, control, cssUrl, jsUrl)
 
 	directives.UnsetActiveURL()
 
@@ -445,12 +432,6 @@ func buildHTMLFile(src, url, dst string, control string, animationScenes []int, 
 		cache.AddCssEntry(rules, src)
 	}
 
-	if len(animationScenes) > 0 {
-		if err := r.ApplyAnimation(animationScenes); err != nil {
-			return nil, err
-		}
-	}
-
 	output := r.Write("", tree.NL, tree.TAB)
 
 	// src is just for info
@@ -458,7 +439,7 @@ func buildHTMLFile(src, url, dst string, control string, animationScenes []int, 
 		return nil, err
 	}
 
-	return viewInterface, nil
+	return nil
 }
 
 func copyFile(src, dst string) error {
@@ -497,7 +478,7 @@ func buildProjectFiles(cfg *config.Config, cmdArgs CmdArgs) error {
 	return nil
 }
 
-func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs, animationCfg *config.Animation) (map[string]*js.ViewInterface, []string, error) {
+func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 	// collect the controls for each view
 	viewControls := make(map[string]string)
 	for view, _ := range cfg.GetViews() {
@@ -518,19 +499,6 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs, animationCfg *config
 		}
 	}
 
-	viewAnimationScenes := make(map[string][]int)
-	for view, _ := range cfg.GetViews() {
-		// start with no scenes
-		viewAnimationScenes[view] = []int{}
-	}
-
-	if animationCfg != nil {
-		for view, _ := range cfg.GetViews() {
-			// returns empty int list if view doesnt appear in the animationCfg
-			viewAnimationScenes[view] = animationCfg.GetViewScenes(view)
-		}
-	}
-
 	cache.LoadHTMLCache(cfg.GetViews(), viewControls,
 		cfg.CssUrl, cfg.JsUrl, cfg.PxPerRem, cmdArgs.OutputDir, GitCommit,
 		cmdArgs.compactOutput, cmdArgs.GlobalVars, cmdArgs.forceBuild)
@@ -541,16 +509,18 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs, animationCfg *config
 		styles.MATH_FONT_URL = cfg.MathFontUrl
 	}
 
-	updatedViews := make([]string, 0)
 
 	cache.SyncHTMLLastModifiedTimes()
 
-	// TODO: view should be sorted
+  // sort views for consistent behaviour
+	updatedViews := make([]string, 0)
 	for src, _ := range cfg.GetViews() {
 		if cache.RequiresUpdate(src) {
 			updatedViews = append(updatedViews, src)
 		}
 	}
+
+  sort.Strings(updatedViews)
 
 	for _, src := range updatedViews {
 		dst := cfg.GetViews()[src]
@@ -562,26 +532,16 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs, animationCfg *config
 
 		url := dst[len(cmdArgs.OutputDir):]
 
-		animationScenes := viewAnimationScenes[src]
-
-		viewInterface, err := buildHTMLFile(src, url, dst, control,
-			animationScenes, cfg.CssUrl, cfg.JsUrl)
+		err := buildHTMLFile(src, url, dst, control, cfg.CssUrl, cfg.JsUrl)
 
 		if err != nil {
 			context.AppendString(err, "Info: error encountered in \""+src+"\"")
-			panic(err)
 
 			// remove src from the cache and write the cache up till that point
 			cache.RollbackUpdate(src)
 			cache.SaveHTMLCache(cmdArgs.OutputDir)
 
-			return nil, nil, err
-		}
-
-		if viewInterface != nil {
-			cache.SetHTMLViewInterface(src, viewInterface)
-		} else if control != "" {
-			panic("viewinterface should be set if control!=''")
+			return err
 		}
 	}
 
@@ -606,22 +566,29 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs, animationCfg *config
 		cache.SaveCSSBundle(cfg.GetCssDst(), cfg.MathFontUrl, cfg.GetMathFontDst())
 	}
 
-	return cache.GetHTMLViewInterfaces(), updatedViews, nil
+	return nil
 }
 
-func buildProjectControls(cfg *config.Config, cmdArgs CmdArgs, viewInterfaces map[string]*js.ViewInterface, updatedViews []string) error {
-	cache.LoadControlCache(cfg.GetControls(), cfg.GetJsDst(), viewInterfaces, cmdArgs.compactOutput, cmdArgs.forceBuild)
+func buildProjectControls(cfg *config.Config, cmdArgs CmdArgs) error {
+	allControls := make([]string, 0)
+	for control, _ := range cfg.GetControls() { // we don't need the info of which views are handled by which controls here
+    allControls = append(allControls, control)
+	}
 
-	updatedControls := make([]string, 0)
-	for control, _ := range cfg.GetControls() {
+  sort.Strings(allControls)
+
+	cache.LoadControlCache(allControls, cfg.GetJsDst(), cmdArgs.compactOutput, cmdArgs.forceBuild)
+
+  // sort controls for consistent behaviour
+  anyUpdated := false
+	for _, control := range allControls { 
 		if cache.RequiresUpdate(control) {
-			updatedControls = append(updatedControls, control)
+      anyUpdated = true
 		}
 	}
 
 	// whole bundle is updated or none of the bundle
-	// but only some of the bundle needs EvalType checking
-	if len(updatedControls) > 0 {
+	if anyUpdated {
 		if cmdArgs.compactOutput {
 			js.NL = ""
 			js.TAB = ""
@@ -633,10 +600,13 @@ func buildProjectControls(cfg *config.Config, cmdArgs CmdArgs, viewInterfaces ma
 
 		bundle := scripts.NewFileBundle(cmdArgs.GlobalVars)
 
-		for control, views := range cfg.GetControls() {
-			cache.AddControl(control, views, viewInterfaces)
+		for _, control := range allControls {
+      // each control acts as a separate entry point
+      // so the cache differs from the js-project Cache
+			cache.AddControl(control)
 
-			controlScript, err := scripts.NewControlFileScript(control, "", views)
+      // files.StartCacheUpdate() called internally when creating new ControlFileScript
+			controlScript, err := scripts.NewControlFileScript(control, "")
 			if err != nil {
 				return err
 			}
@@ -644,7 +614,7 @@ func buildProjectControls(cfg *config.Config, cmdArgs CmdArgs, viewInterfaces ma
 			bundle.Append(controlScript)
 		}
 
-		if err := bundle.FinalizeControls(viewInterfaces, updatedViews, updatedControls); err != nil {
+		if err := bundle.Finalize(); err != nil {
 			return err
 		}
 
@@ -669,63 +639,12 @@ func buildProjectControls(cfg *config.Config, cmdArgs CmdArgs, viewInterfaces ma
 	return nil
 }
 
-func buildAnimationControls(cmdArgs CmdArgs, viewInterfaces map[string]*js.ViewInterface, animationCfg *config.Animation) error {
-	if cmdArgs.compactOutput {
-		// compact output might make the load times a little better for screen casts
-		js.NL = ""
-		js.TAB = ""
-		js.COMPACT_NAMING = true
-		macros.COMPACT = true
-	}
-
-	js.TARGET = "browser"
-
-	for i, scene := range animationCfg.Scenes {
-		view := scene.View
-		control := scene.Control
-
-		controlScript, err := scripts.NewControlFileScript(control, "", []string{view})
-		if err != nil {
-			return err
-		}
-
-		bundle := scripts.NewFileBundle(cmdArgs.GlobalVars)
-		bundle.Append(controlScript)
-
-		if err := bundle.FinalizeControls(viewInterfaces, []string{view}, []string{control}); err != nil {
-			return err
-		}
-
-		content, err := bundle.Write()
-		if err != nil {
-			return err
-		}
-
-		content += controlScript.Hash() + "();"
-
-		// TODO: name prefix specified in config file
-		dstName := "scene" + strconv.Itoa(i) + ".js"
-		dstFile := filepath.Join(cmdArgs.OutputDir, dstName)
-
-		if VERBOSITY >= 2 {
-			fmt.Fprintf(os.Stdout, "writing js scene %s\n", dstFile)
-		}
-
-		if err := ioutil.WriteFile(dstFile, []byte(content), 0644); err != nil {
-			return errors.New("Error: " + err.Error())
-		}
-	}
-
-	return nil
-}
-
-func buildProject(cmdArgs CmdArgs, cfg *config.Config, animationCfg *config.Animation) error {
+func buildProject(cmdArgs CmdArgs, cfg *config.Config) error {
 	if err := buildProjectFiles(cfg, cmdArgs); err != nil {
 		return err
 	}
 
-	viewInterfaces, updatedViews, err := buildProjectViews(cfg, cmdArgs, animationCfg)
-	if err != nil {
+	if err := buildProjectViews(cfg, cmdArgs); err != nil {
 		return err
 	}
 
@@ -735,14 +654,7 @@ func buildProject(cmdArgs CmdArgs, cfg *config.Config, animationCfg *config.Anim
 		fmt.Println("Info: views built")
 	}
 
-	// build animation controls first, so as to catch those errors sooner
-	if animationCfg != nil {
-		if err := buildAnimationControls(cmdArgs, viewInterfaces, animationCfg); err != nil {
-			return err
-		}
-	}
-
-	if err := buildProjectControls(cfg, cmdArgs, viewInterfaces, updatedViews); err != nil {
+	if err := buildProjectControls(cfg, cmdArgs); err != nil {
 		return err
 	}
 
@@ -760,14 +672,6 @@ func main() {
 
 	setUpEnv(cmdArgs, cfg)
 
-	var animationCfg *config.Animation = nil
-	if cmdArgs.animationFile != "" {
-		animationCfg, err = config.ReadAnimationFile(cmdArgs.animationFile)
-		if err != nil {
-			printMessageAndExit(err.Error()+"\n", false)
-		}
-	}
-
 	if cmdArgs.profFile != "" {
 		fProf, err := os.Create(cmdArgs.profFile)
 		if err != nil {
@@ -778,7 +682,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	if err := buildProject(cmdArgs, cfg, animationCfg); err != nil {
+	if err := buildProject(cmdArgs, cfg); err != nil {
 		printSyntaxErrorAndExit(err)
 	}
 

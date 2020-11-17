@@ -1,55 +1,43 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var EventTarget *BuiltinPrototype = allocBuiltinPrototype()
+type EventTarget struct {
+  BuiltinPrototype
+}
 
-func AddEventListener(stack values.Stack, this *values.Instance,
-	args []values.Value, ctx context.Context) (values.Value, error) {
-	eventProto := Event
-	if str, ok := args[0].LiteralStringValue(); ok {
-		switch str {
-		case "click", "dblclick", "mousedown", "mouseup", "mousemove", "mouseover", "mouseleave", "mouseenter":
-			eventProto = MouseEvent
-		case "keydown", "keyup":
-			eventProto = KeyboardEvent
-		case "wheel":
-			eventProto = WheelEvent
-		case "hashchange":
-			eventProto = HashChangeEvent
-		}
-	}
+func NewEventTargetPrototype() values.Prototype {
+  return &EventTarget{newBuiltinPrototype("EventTarget")}
+}
 
-	target := this
-	if this.IsInstanceOf(Window) {
-		target = NewInstance(HTMLElement, ctx)
-	}
+func NewEventTarget(ctx context.Context) values.Value {
+  return values.NewInstance(NewEventTargetPrototype(), ctx)
+}
 
-	event := NewAltEvent(eventProto, target, ctx)
+func (p *EventTarget) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  a := values.NewAny(ctx)
+  b := NewBoolean(ctx)
+  s := NewString(ctx)
 
-  if err := args[1].EvalMethod(stack.Parent(), []values.Value{event},
-    ctx); err != nil {
-    return nil, err
+  switch key {
+  case "addEventListener":
+    // more specific events are possible
+    return values.NewFunction([]values.Value{
+      s, 
+      values.NewFunction([]values.Value{NewEvent(a, ctx), nil}, ctx),
+    }, ctx), nil
+  case "dispatchEvent":
+    return values.NewFunction([]values.Value{NewEvent(a, ctx), b}, ctx), nil
+  default:
+    return nil, nil
   }
-
-	return nil, nil
 }
 
-func generateEventTargetPrototype() bool {
-	*EventTarget = BuiltinPrototype{
-		"EventTarget", nil,
-		map[string]BuiltinFunction{
-			"dispatchEvent":    NewMethodLikeNormal(Event, Boolean),
-			"addEventListener": NewNormalFunction(&And{String, &Function{}}, AddEventListener),
-		},
-		nil,
-	}
-
-	return true
+func (p *EventTarget) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewEventTargetPrototype(), ctx), nil
 }
-
-var _EventTargetOk = generateEventTargetPrototype()

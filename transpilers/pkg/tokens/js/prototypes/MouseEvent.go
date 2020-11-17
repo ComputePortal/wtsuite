@@ -1,22 +1,38 @@
 package prototypes
 
-var MouseEvent *EventPrototype = allocEventPrototype()
+import (
+  "../values"
 
-func generateMouseEventPrototype() bool {
-	*MouseEvent = EventPrototype{BuiltinPrototype{
-		"MouseEvent", Event,
-		map[string]BuiltinFunction{
-			"altKey":   NewGetter(Boolean),
-			"clientX":  NewGetter(Number),
-			"clientY":  NewGetter(Number),
-			"ctrlKey":  NewGetter(Boolean),
-			"metaKey":  NewGetter(Boolean),
-			"shiftKey": NewGetter(Boolean),
-		},
-		nil,
-	}}
+  "../../context"
+)
 
-	return true
+type MouseEvent struct {
+  AbstractEvent
 }
 
-var _MouseEventOk = generateMouseEventPrototype()
+func NewMouseEventPrototype(target values.Value) values.Prototype {
+  return &MouseEvent{newAbstractEventPrototype("MouseEvent", target)}
+}
+
+func NewMouseEvent(target values.Value, ctx context.Context) values.Value {
+  return values.NewInstance(NewMouseEventPrototype(target), ctx)
+}
+
+func (p *MouseEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  f := NewNumber(ctx)
+
+  switch key {
+  case "altKey", "ctrlKey", "metaKey", "shiftKey":
+    return b, nil
+  case "clientX", "clientY":
+    return f, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *MouseEvent) GetClassValue() (*values.Class, error) {
+  ctx := context.NewDummyContext()
+  return values.NewUnconstructableClass(NewMouseEventPrototype(values.NewAll(ctx)), ctx), nil
+}

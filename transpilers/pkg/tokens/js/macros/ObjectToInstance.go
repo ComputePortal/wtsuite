@@ -3,11 +3,12 @@ package macros
 import (
 	"strings"
 
-	"../"
+  "../prototypes"
 
 	"../values"
 
 	"../../context"
+	"../../js"
 )
 
 type ObjectToInstance struct {
@@ -34,9 +35,8 @@ func (m *ObjectToInstance) WriteExpression() string {
 	return b.String()
 }
 
-func (m *ObjectToInstance) EvalExpression(stack values.Stack) (values.Value, error) {
-
-	args, err := m.evalArgs(stack)
+func (m *ObjectToInstance) EvalExpression() (values.Value, error) {
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -47,9 +47,12 @@ func (m *ObjectToInstance) EvalExpression(stack values.Stack) (values.Value, err
 		return nil, err
 	}
 
-	// XXX: arg[0] can be any, or should it at least be Object type?
+  objectCheck := prototypes.NewObject(nil, args[0].Context())
+  if err := objectCheck.Check(args[0], args[0].Context()); err != nil {
+    return nil, err
+  }
 
-	return m.evalInstancePrototype(stack, args[1], m.Context())
+	return args[1].EvalConstructor(nil, m.Context())
 }
 
 func (m *ObjectToInstance) ResolveExpressionActivity(usage js.Usage) error {

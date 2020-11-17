@@ -1,97 +1,95 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var Window *BuiltinPrototype = allocBuiltinPrototype()
-
-// also usable for setInterval and requestIdleCallback
-func WindowSetTimeout(stack values.Stack, this *values.Instance,
-	args []values.Value, ctx context.Context) (values.Value, error) {
-	// keep this CheckInputs, so it is available outside the prototype
-	if err := CheckInputs(&And{&Function{}, &Opt{Number}}, args, ctx); err != nil {
-		return nil, err
-	}
-
-	if err := args[0].EvalMethod(stack, []values.Value{}, ctx); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+type Window struct {
+  BuiltinPrototype
 }
 
-func WindowRequestIdleCallback(stack values.Stack, this *values.Instance,
-	args []values.Value, ctx context.Context) (values.Value, error) {
-	// keep this CheckInputs, so it is available outside the prototype
-	if err := CheckInputs(&And{&Function{}, &Opt{Object}}, args, ctx); err != nil {
-		return nil, err
-	}
-
-	// TODO: should we check that the Object contains the timeout key?
-
-	if err := args[0].EvalMethod(stack, []values.Value{}, ctx); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+func NewWindowPrototype() values.Prototype {
+  return &Window{newBuiltinPrototype("Window")}
 }
 
-func WindowFetch(stack values.Stack, this *values.Instance,
-	args []values.Value, ctx context.Context) (values.Value, error) {
-	// keep this CheckInputs, so it is available outside the prototype
-	if err := CheckInputs(String, args, ctx); err != nil {
-		return nil, err
-	}
-
-	return NewResolvedPromise(NewInstance(Response, ctx), ctx)
+func NewWindow(ctx context.Context) values.Value {
+  return values.NewInstance(NewWindowPrototype(), ctx)
 }
 
-func generateWindowPrototype() bool {
-	*Window = BuiltinPrototype{
-		"Window", EventTarget,
-		map[string]BuiltinFunction{
-			"atob":             NewNormal(String, String),
-			"btoa":             NewNormal(String, String),
-			"blur":             NewNormal(&None{}, nil),
-			"close":            NewNormal(&None{}, nil),
-			"devicePixelRatio": NewGetter(Number),
-			"fetch":            NewNormalFunction(String, WindowFetch),
-			"focus":            NewNormal(&None{}, nil),
-			"getComputedStyle": NewNormal(HTMLElement, CSSStyleDeclaration),
-			"indexedDB":        NewGetter(IDBFactory),
-			"innerHeight":      NewGetter(Number),
-			"innerWidth":       NewGetter(Number),
-			"localStorage":     NewGetter(Storage),
-			"location":         NewGetter(Location),
-			"open":             NewMethodLikeNormal(&And{String, &Opt{String}}, Window),
-			"requestAnimationFrame": NewNormalFunction(&Function{},
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-
-					timeStamp := NewInstance(Number, ctx)
-
-					if err := args[0].EvalMethod(stack, []values.Value{timeStamp},
-						ctx); err != nil {
-						return nil, err
-					}
-
-					return nil, nil
-				}),
-			"requestIdleCallback": NewNormalFunction(&And{&Function{}, &Opt{Object}}, WindowRequestIdleCallback),
-			"scrollTo":            NewNormal(&And{Number, Number}, nil),
-			"scrollX":             NewGetter(Number),
-			"scrollY":             NewGetter(Number),
-			"sessionStorage":      NewGetter(Storage),
-			"setInterval":         NewNormalFunction(&And{&Function{}, &Opt{Number}}, WindowSetTimeout),
-			"setTimeout":          NewNormalFunction(&And{&Function{}, &Opt{Number}}, WindowSetTimeout),
-		},
-		nil,
-	}
-
-	return true
+func (p *Window) GetParent() (values.Prototype, error) {
+  return NewEventTargetPrototype(), nil
 }
 
-var _WindowOk = generateWindowPrototype()
+func NewFetchFunction(ctx context.Context) values.Value {
+  s := NewString(ctx)
+
+  return values.NewFunction([]values.Value{s, NewPromise(NewResponse(ctx), ctx)}, ctx)
+}
+
+func NewSetTimeoutFunction(ctx context.Context) values.Value {
+  fn := values.NewFunction([]values.Value{nil}, ctx)
+
+  return values.NewOverloadedFunction([][]values.Value{
+    []values.Value{fn, nil},
+    []values.Value{fn, NewNumber(ctx), nil},
+  }, ctx) 
+}
+
+func NewRequestIdleCallbackFunction(ctx context.Context) values.Value {
+  fn := values.NewFunction([]values.Value{nil}, ctx)
+
+  opt := NewConfigObject(map[string]values.Value{
+    "timeout": NewNumber(ctx),
+  }, ctx)
+
+  return values.NewOverloadedFunction([][]values.Value{
+    []values.Value{fn, nil},
+    []values.Value{fn, opt, nil},
+  }, ctx)
+}
+
+func (p *Window) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  f := NewNumber(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "atob", "btoa":
+    return values.NewFunction([]values.Value{s, s}, ctx), nil
+  case "blur", "close", "focus":
+    return values.NewFunction([]values.Value{nil}, ctx), nil
+  case "devicePixelRatio", "innerHeight", "innerWidth", "scrollX", "scrollY":
+    return f, nil
+  case "fetch":
+    return NewFetchFunction(ctx), nil
+  case "getComputedStyle":
+    return values.NewFunction([]values.Value{NewHTMLElement(ctx), NewCSSStyleDeclaration(ctx)}, ctx), nil
+  case "indexedDB":
+    return NewIDBFactory(ctx), nil
+  case "localStorage", "sessionStorage":
+    return NewStorage(ctx), nil
+  case "open":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, NewWindow(ctx)},
+      []values.Value{s, s, NewWindow(ctx)},
+    }, ctx), nil
+  case "requestAnimationFrame":
+    fn := values.NewFunction([]values.Value{f, nil}, ctx)
+
+    return values.NewFunction([]values.Value{fn, nil}, ctx), nil
+  case "requestIdleCallback":
+    return NewRequestIdleCallbackFunction(ctx), nil
+  case "scrollTo":
+    return values.NewFunction([]values.Value{f, f, nil}, ctx), nil
+  case "setInterval", "setTimeout":
+    return NewSetTimeoutFunction(ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Window) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWindowPrototype(), ctx), nil
+}

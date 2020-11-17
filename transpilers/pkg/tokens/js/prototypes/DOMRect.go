@@ -1,24 +1,35 @@
 package prototypes
 
-var DOMRect *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateDOMRectPrototype() bool {
-	*DOMRect = BuiltinPrototype{
-		"DOMRect", nil,
-		map[string]BuiltinFunction{
-			"bottom": NewGetter(Number),
-			"height": NewGetter(Number),
-			"left":   NewGetter(Number),
-			"right":  NewGetter(Number),
-			"top":    NewGetter(Number),
-			"width":  NewGetter(Number),
-			"x":      NewGetter(Number),
-			"y":      NewGetter(Number),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type DOMRect struct {
+  BuiltinPrototype
 }
 
-var _DOMRectOk = generateDOMRectPrototype()
+func NewDOMRectPrototype() values.Prototype {
+  return &DOMRect{newBuiltinPrototype("DOMRect")}
+}
+
+func NewDOMRect(ctx context.Context) values.Value {
+  return values.NewInstance(NewDOMRectPrototype(), ctx)
+}
+
+func (p *DOMRect) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  s := NewString(ctx)
+
+  switch key {
+  case "bottom", "height", "left", "right", "top", "width", "x", "y":
+    return s.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: DOMRect." + key + " not setable")
+  }
+}
+
+func (p *DOMRect) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewDOMRectPrototype(), ctx), nil
+}

@@ -1,31 +1,38 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var NodeJS_EventEmitter *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_EventEmitterPrototype() bool {
-	*NodeJS_EventEmitter = BuiltinPrototype{
-		"EventEmitter", nil,
-		map[string]BuiltinFunction{
-			"addListener": NewNormalFunction(&And{String, &Function{}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					if err := args[1].EvalMethod(stack.Parent(), []values.Value{}, ctx); err != nil {
-						return nil, err
-					}
-
-					return nil, nil
-				}),
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_EventEmitter struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_EventEmitterOk = generateNodeJS_EventEmitterPrototype()
+func NewNodeJS_EventEmitterPrototype() values.Prototype {
+  return &NodeJS_EventEmitter{newBuiltinPrototype("EventEmitter")}
+}
+
+func NewNodeJS_EventEmitter(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_EventEmitterPrototype(), ctx)
+}
+
+func (p *NodeJS_EventEmitter) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  s := NewString(ctx)
+
+  switch key {
+  case "addListener":
+    return values.NewFunction([]values.Value{
+      s,
+      values.NewFunction([]values.Value{nil}, ctx),
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_EventEmitter) GetClassValue() (*values.Class, error) {
+  ctx := context.NewDummyContext()
+  return values.NewUnconstructableClass(NewNodeJS_EventEmitterPrototype(), ctx), nil
+}

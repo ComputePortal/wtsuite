@@ -1,65 +1,89 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var IDBObjectStore *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateIDBObjectStorePrototype() bool {
-	*IDBObjectStore = BuiltinPrototype{
-		"IDBObjectStore", nil,
-		map[string]BuiltinFunction{
-			"add": NewNormalFunction(&Any{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					// an autoincrement key is always an int
-					return NewIDBRequest(NewInstance(Int, ctx), ctx), nil
-				}),
-			"clear": NewNormalFunction(&None{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(nil, ctx), nil
-				}),
-			"count": NewNormalFunction(&None{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(NewInstance(Int, ctx), ctx), nil
-				}),
-			"createIndex": NewMethodLikeNormalFunction(&And{String, &And{String, &Opt{Object}}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					// TODO check content of object
-					return NewInstance(IDBIndex, ctx), nil
-				}),
-			"delete": NewNormalFunction(&Or{Int, String},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(nil, ctx), nil
-				}),
-			"get": NewNormalFunction(&Or{Int, String},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(NewInstance(Object, ctx), ctx), nil
-				}),
-			"index": NewNormal(String, IDBIndex),
-			"openCursor": NewNormalFunction(&And{&Opt{&Or{Int, IDBKeyRange}}, &Opt{String}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(NewIDBCursorWithValue(NewInstance(Object, ctx), ctx), ctx), nil
-				}),
-			"put": NewNormalFunction(&And{&Any{}, &Opt{&Or{Int, String}}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(nil, ctx), nil
-				}),
-		},
-		nil,
-	}
-
-	return true
+type IDBObjectStore struct {
+  BuiltinPrototype
 }
 
-var _IDBObjectStoreOk = generateIDBObjectStorePrototype()
+func NewIDBObjectStorePrototype() values.Prototype {
+  return &IDBObjectStore{newBuiltinPrototype("IDBObjectStore")}
+}
+
+func NewIDBObjectStore(ctx context.Context) values.Value {
+  return values.NewInstance(NewIDBObjectStorePrototype(), ctx)
+}
+
+func (p *IDBObjectStore) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  o := NewObject(nil, ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "add":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{o, NewIDBRequest(i, ctx)},
+    }, ctx), nil
+  case "clear":
+    return values.NewFunction([]values.Value{NewEmptyIDBRequest(ctx)}, ctx), nil
+  case "count":
+    return values.NewFunction([]values.Value{NewIDBRequest(i, ctx)}, ctx), nil
+  case "createIndex":
+    idx := NewIDBIndex(ctx)
+    opt := NewConfigObject(map[string]values.Value{
+      "unique": b,
+      "multiEntry": b,
+      "locale": s,
+    }, ctx)
+
+    return values.NewOverloadedMethodLikeFunction([][]values.Value{
+      []values.Value{s, s, idx},
+      []values.Value{s, s, opt, idx},
+    }, ctx), nil
+  case "delete":
+    req := NewEmptyIDBRequest(ctx)
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{i, req},
+      []values.Value{s, req},
+    }, ctx), nil
+  case "get":
+    req := NewIDBRequest(o, ctx)
+
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{i, req},
+      []values.Value{s, req},
+    }, ctx), nil
+  case "index":
+    idx := NewIDBIndex(ctx)
+
+    return values.NewFunction([]values.Value{s, idx}, ctx), nil
+  case "openCursor":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{NewIDBCursorWithValue(ctx)},
+      []values.Value{i, NewIDBCursorWithValue(ctx)},
+      []values.Value{NewIDBKeyRange(ctx), NewIDBCursorWithValue(ctx)},
+      []values.Value{i, s, NewIDBCursorWithValue(ctx)},
+      []values.Value{NewIDBKeyRange(ctx), s, NewIDBCursorWithValue(ctx)},
+    }, ctx), nil
+  case "put":
+    req := NewEmptyIDBRequest(ctx)
+
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{o, req},
+      []values.Value{o, i, req},
+      []values.Value{o, s, req},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *IDBObjectStore) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewIDBObjectStorePrototype(), ctx), nil
+}

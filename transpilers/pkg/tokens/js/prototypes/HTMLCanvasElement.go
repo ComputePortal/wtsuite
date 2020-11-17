@@ -1,53 +1,87 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var HTMLCanvasElement *BuiltinPrototype = allocBuiltinPrototype()
-
-func NewHTMLCanvasElement(ctx context.Context) *values.Instance {
-	return NewInstance(HTMLCanvasElement, ctx)
+type HTMLCanvasElement struct {
+  BuiltinPrototype
 }
 
-func generateHTMLCanvasElementPrototype() bool {
-	*HTMLCanvasElement = BuiltinPrototype{
-		"HTMLCanvasElement", HTMLElement,
-		map[string]BuiltinFunction{
-			"getContext": NewNormalFunction(&And{String, &Opt{Object}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					str, ok := args[0].LiteralStringValue()
-					if !ok {
-						return nil, ctx.NewError("Error: expected literal string value as argument")
-					}
-
-					switch str {
-					case "2d":
-						return NewInstance(CanvasRenderingContext2D, ctx), nil
-					case "webgl":
-						return NewInstance(WebGLRenderingContext, ctx), nil
-					default:
-						return nil, ctx.NewError("Error: expected '2d' or 'webgl', got '" + str + "'")
-					}
-				}),
-			"height":    NewGetterSetter(Int),
-			"toDataURL": NewNormal(&And{&Opt{String}, &Opt{Number}}, String), // defaults: type="image/png", quality=0.92
-			"width":     NewGetterSetter(Int),
-		},
-		NewConstructorGeneratorFunction(nil,
-			func(stack values.Stack, keys []string, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				if keys != nil || args != nil {
-					return nil, ctx.NewError("Error: unexpected content types")
-				}
-				return NewInstance(HTMLCanvasElement, ctx), nil
-			}),
-	}
-
-	return true
+func NewHTMLCanvasElementPrototype() values.Prototype {
+  return &HTMLCanvasElement{newBuiltinPrototype("HTMLCanvasElement")}
 }
 
-var _HTMLCanvasElementOk = generateHTMLCanvasElementPrototype()
+func NewHTMLCanvasElement(ctx context.Context) values.Value {
+  return values.NewInstance(NewHTMLCanvasElementPrototype(), ctx)
+}
+
+func (p *HTMLCanvasElement) GetParent() (values.Prototype, error) {
+  return NewHTMLElementPrototype(), nil
+}
+
+func (p *HTMLCanvasElement) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  f := NewNumber(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "getContext":
+    o2d := NewConfigObject(map[string]values.Value{
+      "alpha": b,
+      "desynchronized": b,
+    }, ctx)
+
+    ogl := NewConfigObject(map[string]values.Value{
+      "alpha": b,
+      "desynchronized": b,
+      "antialias": b,
+      "depth": b,
+      "failIfMajorPerformanceCaveat": b,
+      "powerPreference": s,
+      "premultipliedAlpha": b,
+      "preserveDrawingBuffer": b,
+      "stencil": b,
+    }, ctx)
+
+    canvas := NewCanvasRenderingContext2D(ctx)
+    webgl := NewWebGLRenderingContext(ctx)
+
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{NewLiteralString("2d", ctx), canvas},
+      []values.Value{NewLiteralString("2d", ctx), o2d, canvas},
+      []values.Value{NewLiteralString("webgl", ctx), webgl},
+      []values.Value{NewLiteralString("webgl", ctx), ogl, webgl},
+      []values.Value{s, canvas},
+      []values.Value{s, o2d, canvas},
+    }, ctx), nil
+  case "height", "width":
+    return f, nil
+  case "toDataURL":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s}, // defaults: type="image/png", quality=0.92
+      []values.Value{s, s},
+      []values.Value{s, f, s},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *HTMLCanvasElement) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  f := NewNumber(ctx)
+
+  switch key {
+  case "height", "width":
+    return f.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: HTMLCanvasElement." + key + " not setable")
+  }
+}
+
+func (p *HTMLCanvasElement) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewHTMLCanvasElementPrototype(), ctx), nil
+}

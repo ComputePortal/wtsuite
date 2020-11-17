@@ -1,152 +1,89 @@
 package prototypes
 
 import (
-	"fmt"
+  "../values"
 
-	"../values"
-
-	"../../context"
+  "../../context"
 )
 
-type SetPrototype struct {
-	BuiltinPrototype
+type Set struct {
+  content values.Value // if nil, then any
+
+  BuiltinPrototype
 }
 
-var Set *SetPrototype = allocSetPrototype()
-
-func allocSetPrototype() *SetPrototype {
-	return &SetPrototype{BuiltinPrototype{
-		"", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}}
+func NewSetPrototype(content values.Value) values.Prototype {
+  return &Set{content, newBuiltinPrototype("Set")}
 }
 
-func (p *SetPrototype) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return CheckPrototype(p, args, pos, ctx)
+func NewSet(content values.Value, ctx context.Context) values.Value {
+  return values.NewInstance(NewSetPrototype(content), ctx)
 }
 
-func (p *SetPrototype) HasAncestor(other_ values.Interface) bool {
-	if other, ok := other_.(*SetPrototype); ok {
-		if other == p {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		_, ok = other_.IsImplementedBy(p)
-		return ok
-	}
+// what if other inherits from set?
+func (p *Set) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*Set); ok {
+    if p.content == nil {
+      return nil
+    } else if other.content == nil {
+      return ctx.NewError("Error: expected Set<" + p.content.TypeName() + ">, got Set<any>")
+    } else if p.content.Check(other.content, ctx) != nil {
+      return ctx.NewError("Error: expected Set<" + p.content.TypeName() + ">, got Set<" + other.content.TypeName() + ">")
+    } else {
+      return nil
+    }
+  } else if other, ok := other_.(values.Prototype); ok {
+    if otherParent, err := other.GetParent(); err != nil {
+      return err
+    } else if otherParent != nil {
+      if p.Check(otherParent, ctx) != nil {
+        return ctx.NewError("Error: expected Set, got " + other_.Name())
+      } else {
+        return nil
+      }
+    } else {
+      return ctx.NewError("Error: expected Set, got " + other_.Name())
+    }
+  } else {
+    return ctx.NewError("Error: expected Set, got " + other_.Name())
+  }
 }
 
-func (p *SetPrototype) CastInstance(v *values.Instance, typeChildren []*values.NestedType, ctx context.Context) (values.Value, error) {
-	newV_, ok := v.ChangeInstanceInterface(p, false, true)
-	if !ok {
-		return nil, ctx.NewError("Error: " + v.TypeName() + " doesn't inherit from " + p.Name())
-	}
-
-	newV, ok := newV_.(*values.Instance)
-	if !ok {
-		panic("unexpected")
-	}
-
-	if typeChildren == nil {
-		return newV, nil
-	} else {
-		if len(typeChildren) != 1 {
-			return nil, ctx.NewError(fmt.Sprintf("Error: Set expects 1 type child, got %d", len(typeChildren)))
-		}
-
-		typeChild := typeChildren[0]
-
-		// now cast all the items
-		props := values.AssertSetProperties(newV.Properties())
-		items := props.GetItems()
-		newVProps := values.NewSetProperties(ctx)
-		newV = values.NewInstance(Set, newVProps, ctx)
-		for _, item := range items {
-			newItem, err := item.Cast(typeChild, ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			newVProps.AppendItem(newItem)
-		}
-
-		return newV, nil
-	}
+func (p *Set) getContentValue() values.Value {
+  if p.content == nil {
+    return values.NewAny(context.NewDummyContext())
+  } else {
+    return p.content
+  }
 }
 
-func NewSet(items []values.Value, ctx context.Context) values.Value {
-	props := values.NewSetProperties(ctx)
+func (p *Set) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  content := values.NewContextValue(p.getContentValue(), ctx)
+  self := values.NewInstance(p, ctx)
 
-	for _, item := range items {
-		props.AppendItem(item)
-	}
-
-	return values.NewInstance(Set, props, ctx)
+  switch key {
+  case ".content":
+    return content, nil
+  case "add":
+    return values.NewMethodLikeFunction([]values.Value{content, self}, ctx), nil
+  case "delete":
+    return values.NewMethodLikeFunction([]values.Value{content, b}, ctx), nil
+  case "has":
+    return values.NewFunction([]values.Value{content, b}, ctx), nil
+  case "size":
+    return i, nil
+  default:
+    return nil, nil
+  }
 }
 
-func (p *SetPrototype) LoopForOf(this *values.Instance, fn func(values.Value) error,
-	ctx context.Context) error {
-	if this == nil {
-		return nil
-	}
+func (p *Set) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
 
-	props := values.AssertSetProperties(this.Properties())
-
-	items := props.GetItems()
-
-	return fn(values.NewMulti(items, ctx))
+  return values.NewClass(
+    [][]values.Value{
+      []values.Value{},
+    }, NewSetPrototype(values.NewAll(ctx)), ctx), nil
 }
-
-func generateSetPrototype() bool {
-	hasDeleteFn := func(stack values.Stack, this *values.Instance, args []values.Value,
-		ctx context.Context) (values.Value, error) {
-		return NewBoolean(ctx), nil
-	}
-
-	*Set = SetPrototype{BuiltinPrototype{
-		"Set", nil,
-		map[string]BuiltinFunction{
-			"add": NewMethodLikeNormalFunction(&Any{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-
-					props := values.AssertSetProperties(this.Properties())
-
-					props.AppendItem(args[0])
-
-					return this, nil
-				}),
-			"delete": NewMethodLikeNormalFunction(&Any{}, hasDeleteFn),
-			"has":    NewNormalFunction(&Any{}, hasDeleteFn),
-			"size":   NewGetter(Int),
-		},
-		NewConstructorGeneratorFunction(func(stack values.Stack, args []values.Value,
-			ctx context.Context) (values.Value, error) {
-			if len(args) != 0 {
-				return nil, ctx.NewError("Error: expected 0 arguments")
-			}
-
-			return values.NewInstance(Set, values.NewSetProperties(ctx), ctx), nil
-		}, func(stack values.Stack, keys []string, args []values.Value,
-			ctx context.Context) (values.Value, error) {
-			if keys != nil {
-				return nil, ctx.NewError("Error: unexpected keyed content type for Set")
-			}
-
-			if args == nil {
-				return NewSet([]values.Value{}, ctx), nil
-			} else if len(args) == 1 {
-				return NewSet(args, ctx), nil
-			} else {
-				return nil, ctx.NewError("Error: expected single content typed entry for Set")
-			}
-		}),
-	}}
-
-	return true
-}
-
-var _SetOk = generateSetPrototype()

@@ -5,19 +5,32 @@ import (
 )
 
 type Interface interface {
-	Name() string
+  Name() string
 
-	// ignore this
-	HasMember(this *Instance, key string, includePrivate bool) bool
+  Context() context.Context
 
-	HasAncestor(interf Interface) bool
+  Check(other Interface, ctx context.Context) error
 
-	// the return strings states whatever is missing/differs
-	IsImplementedBy(proto Prototype) (string, bool)
+  // get extended interfaces in case of js.Interface, get implements interfaces in case of js.Class
+  GetInterfaces() ([]Interface, error)
 
-	// leave type assertion Value->Instance to implementation
-	CastInstance(v *Instance, ntypes []*NestedType, ctx context.Context) (Value, error)
+  // get all prototypes that implement this interface (actual prototypes dont need include themselves) (used by InstanceOf.Write())
+  GetPrototypes() ([]Prototype, error)
 
-	// generate instance using content typing only
-	GenerateInstance(stack Stack, keys []string, args []Value, ctx context.Context) (Value, error)
+  // returns nil if it doesnt exist
+  GetInstanceMember(key string, includePrivate bool, ctx context.Context) (Value, error)
+
+  SetInstanceMember(key string, includePrivate bool, arg Value, ctx context.Context) error
+}
+
+// returns nil if not an Instance with an Interface
+func GetInterface(v_ Value) Interface {
+  v_ = UnpackContextValue(v_)
+
+  switch v := v_.(type) {
+  case *Instance:
+    return v.GetInterface()
+  default:
+    return nil
+  }
 }

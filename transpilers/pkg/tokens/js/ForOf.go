@@ -1,8 +1,6 @@
 package js
 
 import (
-	"./values"
-
 	"../context"
 )
 
@@ -32,37 +30,22 @@ func (t *ForOf) WriteStatement(indent string) string {
 	return t.ForInOf.writeStatement(indent, extra, "of")
 }
 
-func (t *ForOf) EvalStatement(stack values.Stack) error {
-	rhsValue, err := t.rhs.EvalExpression(stack)
+func (t *ForOf) EvalStatement() error {
+	rhsValue, err := t.rhs.EvalExpression()
 	if err != nil {
 		return err
 	}
 
-	valueCtx := t.lhs.Context()
+  ofValue, err := rhsValue.GetMember(".getof", false, t.Context())
+  if err != nil {
+    return err
+  }
 
-	evalInner := func(v values.Value) error {
-		subStack := NewBranchStack(stack)
+  variable := t.lhs.GetVariable()
+  variable.SetValue(ofValue)
+  variable.SetConstant()
 
-		if t.varType == VAR {
-			if err := stack.SetValue(t.lhs.GetVariable(), v, true,
-				valueCtx); err != nil {
-				return err
-			}
-		} else {
-			if err := subStack.SetValue(t.lhs.GetVariable(), v, true,
-				valueCtx); err != nil {
-				return err
-			}
-		}
-
-		return t.Block.EvalStatement(subStack)
-	}
-
-	if err := rhsValue.LoopForOf(evalInner, t.rhs.Context()); err != nil {
-		return err
-	}
-
-	return nil
+  return t.Block.EvalStatement()
 }
 
 func (t *ForOf) Walk(fn WalkFunc) error {

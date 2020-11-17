@@ -1,16 +1,24 @@
 package prototypes
 
-// not yet supported by most browsers
-var Path2D *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generatePath2DPrototype() bool {
-	*Path2D = BuiltinPrototype{
-		"Path2D", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type Path2D struct {
+  BuiltinPrototype
 }
 
-var _Path2DOk = generatePath2DPrototype()
+func NewPath2DPrototype() values.Prototype {
+  return &Path2D{newBuiltinPrototype("Path2D")}
+}
+
+func NewPath2D(ctx context.Context) values.Value {
+  return values.NewInstance(NewPath2DPrototype(), ctx)
+}
+
+func (p *Path2D) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewPath2DPrototype(), ctx), nil
+}

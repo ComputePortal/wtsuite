@@ -1,74 +1,66 @@
 package prototypes
 
 import (
-	"math"
-	"strconv"
-
 	"../values"
 
 	"../../context"
 )
 
-var Int *BuiltinPrototype = allocBuiltinPrototype()
+type Int struct {
+  BuiltinPrototype
+}
+
+func NewIntPrototype() values.Prototype {
+  return &Int{newBuiltinPrototype("Int")}
+}
 
 func NewInt(ctx context.Context) values.Value {
-	return values.NewInstance(Int, values.NewIntProperties(false, 0, ctx), ctx)
+  return values.NewInstance(NewIntPrototype(), ctx)
 }
 
-func NewLiteralInt(value int, ctx context.Context) values.Value {
-	return values.NewInstance(Int, values.NewIntProperties(true, value, ctx), ctx)
+func NewLiteralInt(v int, ctx context.Context) values.Value {
+  return values.NewLiteralIntInstance(NewIntPrototype(), v, ctx)
 }
 
-func generateIntPrototype() bool {
-	*Int = BuiltinPrototype{
-		"Int", Number,
-		map[string]BuiltinFunction{
-			"toString": NewNormalFunction(&Opt{Int},
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-					if len(args) == 0 {
-						// TODO: handle different radixes
-						if litInt, ok := this.LiteralIntValue(); ok {
-							return NewLiteralString(strconv.Itoa(litInt), ctx), nil
-						}
-					}
+func IsInt(v values.Value) bool {
+  ctx := context.NewDummyContext()
 
-					return NewString(ctx), nil
-				}),
-		},
-		NewConstructorGeneratorFunction(
-			func(stack values.Stack, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				// XXX: conversion of literals
-				if err := CheckInputs(&Or{String, &Or{Int, Number}}, args, ctx); err != nil {
-					return nil, err
-				}
+  intCheck := NewInt(ctx)
 
-				if s, ok := args[0].LiteralStringValue(); ok {
-					i, err := strconv.Atoi(s)
-					if err != nil {
-						errCtx := args[0].Context()
-						return nil, errCtx.NewError("Error: can't convert " + s + " to int")
-					}
-
-					return NewLiteralInt(i, ctx), nil
-				} else if f, ok := args[0].LiteralNumberValue(); ok {
-					// TODO: check consistency with javascript
-					i := int(math.Round(f))
-					return NewLiteralInt(i, ctx), nil
-				} else {
-					return NewInt(ctx), nil
-				}
-			}, func(stack values.Stack, keys []string, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				if keys != nil || args != nil {
-					return nil, ctx.NewError("Error: unexpected content types")
-				}
-				return NewInt(ctx), nil
-			}),
-	}
-
-	return true
+  return intCheck.Check(v, ctx) == nil
 }
 
-var _IntOk = generateIntPrototype()
+func (p *Int) GetParent() (values.Prototype, error) {
+  return NewNumberPrototype(), nil
+}
+
+func (p *Int) IsUniversal() bool {
+  return true
+}
+
+func (p *Int) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "toString":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s},
+      []values.Value{i, s},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Int) GetClassValue() (*values.Class, error) {
+  ctx := context.NewDummyContext()
+  f := NewNumber(ctx)
+  s := NewString(ctx)
+
+  return values.NewClass(
+    [][]values.Value{
+      []values.Value{f},
+      []values.Value{s},
+    }, NewIntPrototype(), ctx), nil
+}

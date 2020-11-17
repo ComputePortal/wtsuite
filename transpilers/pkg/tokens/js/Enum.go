@@ -17,43 +17,72 @@ type EnumMember struct {
 
 // enum is a statement (and also a Class!)
 type Enum struct {
-	clType        *TypeExpression
-	extends       *TypeExpression // Int, String or something else, never nil
-	cachedExtends values.Prototype
-  members       []*EnumMember
+	nameExpr   *TypeExpression
+	parentExpr *TypeExpression // Int, String or something else, never nil
+  members    []*EnumMember
 	TokenData
 }
 
-func NewEnum(clType *TypeExpression, extends *TypeExpression, keys []*Word,
+func NewEnum(nameExpr *TypeExpression, parentExpr *TypeExpression, keys []*Word,
 	vs []Expression, ctx context.Context) (*Enum, error) {
   members := make([]*EnumMember, len(keys))
   for i, key := range keys {
+    if key.Value() == "values" || key.Value() == "value" || key.Value() == "keys" || key.Value() == "key" {
+      errCtx := key.Context()
+      return nil, errCtx.NewError("Error: forbidden name for enum member")
+    }
+
     members[i] = &EnumMember{key, vs[i]}
   }
 
 	return &Enum{
-		clType,
-		extends,
-		nil, // evaluated later
+		nameExpr,
+		parentExpr,
     members,
 		TokenData{ctx},
 	}, nil
 }
 
 func (t *Enum) Name() string {
-	return t.clType.Name()
+	return t.nameExpr.Name()
 }
 
-func (t *Enum) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return prototypes.CheckPrototype(t, args, pos, ctx)
+func (t *Enum) GetPrototypes() ([]values.Prototype, error) {
+  // doesn't need to return self
+  return []values.Prototype{}, nil
 }
 
-func (t *Enum) GetParent() values.Prototype {
-	return t.cachedExtends
+func (t *Enum) GetParent() (values.Prototype, error) {
+  if t.parentExpr == nil {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: enum needs to extend something")
+  }
+
+  proto := t.parentExpr.GetPrototype()
+
+  if proto != nil {
+    return proto, nil
+  } else {
+    errCtx := t.parentExpr.Context()
+    return nil, errCtx.NewError("Error: not a prototype")
+  }
+}
+
+func (t *Enum) GetInterfaces() ([]values.Interface, error) {
+  return []values.Interface{}, nil
 }
 
 func (t *Enum) GetVariable() Variable {
-	return t.clType.GetVariable()
+	return t.nameExpr.GetVariable()
+}
+
+// can never be directly constructed
+func (t *Enum) GetClassValue() (*values.Class, error) {
+  return nil, nil
+}
+
+func (t *Enum) GetEnumValue() (*values.Enum, error) {
+  return values.NewEnum(t, t.Context()), nil
 }
 
 func (t *Enum) AddStatement(st Statement) {
@@ -65,9 +94,9 @@ func (t *Enum) Dump(indent string) string {
 
 	b.WriteString(indent)
 	b.WriteString("Enum(")
-	b.WriteString(t.clType.Dump(""))
+	b.WriteString(t.nameExpr.Dump(""))
 	b.WriteString(") extends ")
-	b.WriteString(t.extends.Dump(""))
+	b.WriteString(t.parentExpr.Dump(""))
 	b.WriteString("\n")
 
 	for _, member := range t.members {
@@ -81,12 +110,12 @@ func (t *Enum) Dump(indent string) string {
 func (t *Enum) WriteStatement(indent string) string {
 	var b strings.Builder
 
-	name := t.clType.WriteExpression()
+	name := t.nameExpr.WriteExpression()
 	b.WriteString(indent)
 	b.WriteString("class ")
 	b.WriteString(name)
 	b.WriteString(" extends ")
-	b.WriteString(t.extends.Name())
+	b.WriteString(t.parentExpr.Name())
 	b.WriteString("{")
 
 	b.WriteString(NL)
@@ -150,7 +179,7 @@ func (t *Enum) WriteStatement(indent string) string {
 	// the name getter is probably not used in high performance code, so we can use the simplistic approach
 	b.WriteString(NL)
 	b.WriteString(indent + TAB)
-	b.WriteString("static name(v){for(var i=0;i<")
+	b.WriteString("static key(v){for(var i=0;i<")
 	b.WriteString(name)
 	b.WriteString(".keys.length;i++){")
 	b.WriteString("if(v==")
@@ -179,13 +208,7 @@ func (t *Enum) ResolveStatementNames(scope Scope) error {
 		err.AppendContextString("Info: defined here ", other.Context())
 		return err
 	} else {
-		if err := t.extends.ResolveExpressionNames(scope); err != nil {
-			return err
-		}
-
-		var err error
-		t.cachedExtends, err = getExtendsClass(t.extends.GetVariable(), t.extends.Context())
-		if err != nil {
+		if err := t.parentExpr.ResolveExpressionNames(scope); err != nil {
 			return err
 		}
 
@@ -206,46 +229,72 @@ func (t *Enum) ResolveStatementNames(scope Scope) error {
 
 }
 
-/*func (t *Enum) cacheExtends(stack values.Stack) error {
-	var err error
-	t.cachedExtends, err = cacheClassExtends(stack, t.extends, t.Context())
-	if err != nil {
-		return err
-	}
+func (t *Enum) evalInternal() error {
+  parent, err := t.GetParent()
+  if err != nil {
+    return err
+  }
 
-	return nil
-}*/
+  parentClassVal, err := parent.GetClassValue()
+  if err != nil {
+    return err
+  }
 
-func (t *Enum) HoistValues(stack values.Stack) error {
-	return nil
+  parentVal, err := parentClassVal.EvalConstructor(nil, t.Context())
+  if err != nil {
+    return err
+  }
+  // now evaluate each member, and check that they respect the parent
+
+  for _, member := range t.members {
+    mVal, err := member.Eval()
+    if err != nil {
+      return err
+    }
+
+    if err := parentVal.Check(mVal, member.Context()); err != nil {
+      return err
+    }
+  }
+
+  return nil
 }
 
-func (t *Enum) EvalStatement(stack values.Stack) error {
-	//if err := t.cacheExtends(stack); err != nil {
-	//return err
-	//}
+func (m *EnumMember) Context() context.Context {
+  return m.key.Context()
+}
 
-	if _, err := t.GenerateInstance(stack, nil, nil, t.Context()); err != nil {
-		return err
-	}
+func (m *EnumMember) Eval() (values.Value, error) {
+  return m.val.EvalExpression()
+}
 
-	// class cannot be used for inheriting
-	val := values.NewClass(t, t.Context())
+// XXX: should enums be available as expressions
+func (t *Enum) EvalStatement() error {
+  if err := t.evalInternal(); err != nil {
+    return err
+  }
 
-	return stack.SetValue(t.GetVariable(), val, false, t.Context())
+  variable := t.GetVariable()
+
+  val, err := t.GetEnumValue()
+  if err != nil {
+    return err
+  }
+
+  variable.SetValue(val)
+
+  return nil
 }
 
 func (t *Enum) ResolveStatementActivity(usage Usage) error {
-	if parent, ok := t.cachedExtends.(*Class); ok {
-		if err := parent.ResolveStatementActivity(usage); err != nil {
-			return err
-		}
-	}
+  if err := t.parentExpr.ResolveExpressionActivity(usage); err != nil {
+    return err
+  }
 
 	if usage.InFunction() {
-		clVar := t.clType.GetVariable()
+		nameVar := t.nameExpr.GetVariable()
 
-		if err := usage.Rereference(clVar, t.Context()); err != nil {
+		if err := usage.Rereference(nameVar, t.Context()); err != nil {
 			return err
 		}
 	}
@@ -268,7 +317,7 @@ func (t *Enum) ResolveStatementActivity(usage Usage) error {
 }
 
 func (t *Enum) UniversalStatementNames(ns Namespace) error {
-	if err := t.extends.UniversalExpressionNames(ns); err != nil {
+	if err := t.parentExpr.UniversalExpressionNames(ns); err != nil {
 		return err
 	}
 
@@ -283,11 +332,11 @@ func (t *Enum) UniversalStatementNames(ns Namespace) error {
 
 func (t *Enum) UniqueStatementNames(ns Namespace) error {
 	// enums aren't actually instances of enum classes (they remain instances of String or Int), so universal classname isn't necessary
-	if err := ns.ClassName(t.clType.GetVariable()); err != nil {
+	if err := ns.ClassName(t.nameExpr.GetVariable()); err != nil {
 		return err
 	}
 
-	if err := t.extends.UniqueExpressionNames(ns); err != nil {
+	if err := t.parentExpr.UniqueExpressionNames(ns); err != nil {
 		return err
 	}
 
@@ -301,11 +350,11 @@ func (t *Enum) UniqueStatementNames(ns Namespace) error {
 }
 
 func (t *Enum) Walk(fn WalkFunc) error {
-  if err := t.clType.Walk(fn); err != nil {
+  if err := t.nameExpr.Walk(fn); err != nil {
     return err
   }
 
-  if err := t.extends.Walk(fn); err != nil {
+  if err := t.parentExpr.Walk(fn); err != nil {
     return err
   }
 
@@ -330,196 +379,68 @@ func (m *EnumMember) Walk(fn WalkFunc) error {
   return fn(m)
 }
 
-func (t *Enum) IsImplementedBy(proto values.Prototype) (string, bool) {
-	return "", false
-}
-
-func (t *Enum) HasAncestor(interf values.Interface) bool {
-	if _, ok := interf.IsImplementedBy(t); ok {
-		return true
-	} else if _, ok := interf.(*values.AllPrototype); ok {
-		return true
-	} else if t == interf {
-		return true
-	} else {
-		return t.cachedExtends.HasAncestor(interf)
-	}
-}
-
-func (t *Enum) CastInstance(v *values.Instance, typeChildren []*values.NestedType, ctx context.Context) (values.Value, error) {
-	if typeChildren != nil {
-		return nil, ctx.NewError("Error: enum can't have content types")
-	}
-
-	newV, ok := v.ChangeInstanceInterface(t, false, true)
-	if !ok {
-		return nil, ctx.NewError("Error: " + v.TypeName() + " doesn't inherit from " + t.Name())
-	}
-
-	return newV, nil
-}
-
-func (t *Enum) EvalConstructor(stack values.Stack, args []values.Value,
-	childProto values.Prototype, ctx context.Context) (values.Value, error) {
-	return nil, ctx.NewError("Error: enum cannot be constructed")
-}
-
-func (t *Enum) generateValue(stack values.Stack, i int) (values.Value, error) {
-	expr := t.members[i].val
-	v, err := expr.EvalExpression(stack)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := v.ChangeInstancePrototype(t, true); !ok {
-		errCtx := expr.Context()
-		return nil, errCtx.NewError("Error: not an instance")
-	}
-
-	return v, nil
-}
-
-func (t *Enum) generateValues(stack values.Stack, ctx context.Context) ([]values.Value, error) {
-	vs := make([]values.Value, 0)
-
-	for i, _ := range t.members {
-		v, err := t.generateValue(stack, i)
-		if err != nil {
-			return nil, err
-		}
-
-		vs = append(vs, v)
-	}
-
-	return vs, nil
-}
-
-func (t *Enum) generateKeys(stack values.Stack, ctx context.Context) ([]values.Value, error) {
-	ks := make([]values.Value, 0)
-	for _, member := range t.members {
-    key := member.key
-		kStr := key.Value()
-
-		k := prototypes.NewLiteralString(kStr, ctx)
-
-		ks = append(ks, k)
-	}
-
-	return ks, nil
-}
-
-func (t *Enum) GenerateInstance(stack values.Stack, keys []string, args []values.Value, ctx context.Context) (values.Value, error) {
-	if keys != nil || args != nil {
-		return nil, ctx.NewError("Error: parametric enums not yet supported")
-	}
-
-	vs, err := t.generateValues(stack, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return values.NewMulti(vs, ctx), nil
-}
-
-func (t *Enum) EvalAsEntryPoint(stack values.Stack, ctx context.Context) error {
-	_, err := t.GenerateInstance(stack, nil, nil, ctx)
-
-	return err
+func (t *Enum) Check(other_ values.Interface, ctx context.Context) error {
+  // only exact match is possible
+  if other, ok := other_.(*Enum); ok {
+    if other == t {
+      return nil
+    } else {
+      return ctx.NewError("Error: expected enum " + t.Name() + ", got enum " + other.Name())
+    }
+  } else {
+    return ctx.NewError("Error: not an enum")
+  }
 }
 
 func (t *Enum) IsUniversal() bool {
-	//if !patterns.JS_UNIVERSAL_CLASS_NAME_REGEXP.MatchString(t.Name()) {
-	//return ctx.NewError("Error: " + t.Name() + " is an invalid name for a universal enum")
-	//}
+  parent, err := t.GetParent()
+  if err != nil {
+    panic("should've been caught before")
+  }
 
-	//t.isUniversal = true
-	return t.cachedExtends.IsUniversal()
+	return parent.IsUniversal()
 }
 
-func (t *Enum) HasMember(this *values.Instance, key string, includePrivate bool) bool {
-	// key can be any of the members, values, value, keys, name
-	switch key {
-	case "values", "value", "keys", "name":
-		return true
-	default:
-		for _, member := range t.members {
-			if member.key.Value() == key {
-				return true
-			}
-		}
+func (t *Enum) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  parent, err := t.GetParent()
+  if err != nil {
+    return nil, err
+  }
 
-		return t.cachedExtends.HasMember(this, key, includePrivate)
-	}
+  return parent.GetInstanceMember(key, includePrivate, ctx)
 }
 
-func (t *Enum) GetMember(stack values.Stack, this *values.Instance, key string, includePrivate bool, ctx context.Context) (values.Value, error) {
-	if this == nil {
-		switch key {
-		case "values":
-			values, err := t.generateValues(stack, ctx)
-			if err != nil {
-				return nil, err
-			}
-			return prototypes.NewLiteralArray(values, ctx), nil
-		case "keys":
-			keys, err := t.generateKeys(stack, ctx)
-			if err != nil {
-				return nil, err
-			}
-			return prototypes.NewLiteralArray(keys, ctx), nil
-		case "value":
-			return values.NewFunctionFunction(func(stack_ values.Stack,
-				this_ *values.Instance, args_ []values.Value,
-				ctx_ context.Context) (values.Value, error) {
-				if err := prototypes.CheckInputs(prototypes.String, args_, ctx_); err != nil {
-					return nil, err
-				}
-				// TODO: wrap in own prototype
-				return t.GenerateInstance(stack, nil, nil, ctx_)
-			}, stack, this, ctx), nil
-		case "name":
-			return values.NewFunctionFunction(func(stack_ values.Stack,
-				this_ *values.Instance, args_ []values.Value,
-				ctx_ context.Context) (values.Value, error) {
-				if err := prototypes.CheckInputs(t, args_, ctx_); err != nil {
-					return nil, err
-				}
+func (t *Enum) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  parent, err := t.GetParent()
+  if err != nil {
+    return err
+  }
 
-				return prototypes.NewString(ctx_), nil
-			}, stack, this, ctx), nil
-		default:
-			for i, member := range t.members {
-				if member.key.Value() == key {
-					return t.generateValue(stack, i)
-				}
-			}
-
-			//return nil, ctx.NewError("Error: enum doesnt have static method " + key)
-			return t.cachedExtends.GetMember(stack, nil, key, includePrivate, ctx)
-		}
-	} else {
-		return t.cachedExtends.GetMember(stack, this, key, includePrivate, ctx)
-	}
+  return parent.SetInstanceMember(key, includePrivate, arg, ctx)
 }
 
-func (t *Enum) SetMember(stack values.Stack, this *values.Instance, key string, arg values.Value, includePrivate bool, ctx context.Context) error {
-	return t.cachedExtends.SetMember(stack, this, key, arg, includePrivate, ctx)
-}
+func (t *Enum) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "values":
+    return prototypes.NewArray(values.NewInstance(t, ctx), ctx), nil
+  case "keys":
+    return prototypes.NewArray(prototypes.NewString(ctx), ctx), nil
+  case "value":
+    return values.NewFunction([]values.Value{prototypes.NewString(ctx), values.NewInstance(t, ctx)}, ctx), nil
+  case "key":
+    return values.NewFunction([]values.Value{values.NewInstance(t, ctx), prototypes.NewString(ctx)}, ctx), nil
+  default:
+    for _, member := range t.members {
+      if member.key.Value() == key {
+        return values.NewInstance(t, ctx), nil
+      }
+    }
 
-func (t *Enum) GetIndex(stack values.Stack, this *values.Instance, index values.Value,
-	ctx context.Context) (values.Value, error) {
-	return t.cachedExtends.GetIndex(stack, this, index, ctx)
-}
+    parent, err := t.GetParent()
+    if err != nil {
+      return nil, err
+    }
 
-func (t *Enum) SetIndex(stack values.Stack, this *values.Instance, index values.Value,
-	arg values.Value, ctx context.Context) error {
-	return t.cachedExtends.SetIndex(stack, this, index, arg, ctx)
-}
-
-func (t *Enum) LoopForIn(this *values.Instance, fn func(values.Value) error, ctx context.Context) error {
-	return t.cachedExtends.LoopForIn(this, fn, ctx)
-}
-
-func (t *Enum) LoopForOf(this *values.Instance, fn func(values.Value) error, ctx context.Context) error {
-	return t.cachedExtends.LoopForOf(this, fn, ctx)
+    return parent.GetClassMember(key, includePrivate, ctx)
+  }
 }

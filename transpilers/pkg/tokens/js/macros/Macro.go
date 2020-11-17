@@ -69,11 +69,11 @@ func (m *Macro) UniqueExpressionNames(ns js.Namespace) error {
 	return nil
 }
 
-func (m *Macro) evalArgs(stack values.Stack) ([]values.Value, error) {
+func (m *Macro) evalArgs() ([]values.Value, error) {
 	res := make([]values.Value, len(m.args))
 
 	for i, expr := range m.args {
-		arg, err := expr.EvalExpression(stack)
+		arg, err := expr.EvalExpression()
 		if err != nil {
 			return nil, err
 		}

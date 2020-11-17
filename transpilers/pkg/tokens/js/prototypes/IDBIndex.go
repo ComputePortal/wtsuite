@@ -1,38 +1,48 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var IDBIndex *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateIDBIndex() bool {
-	*IDBIndex = BuiltinPrototype{
-		"IDBIndex", nil,
-		map[string]BuiltinFunction{
-			"getAll": NewNormalFunction(&And{&Opt{IDBKeyRange}, &Opt{Int}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(NewArray([]values.Value{NewObject(nil, ctx)}, ctx), ctx), nil
-				}),
-			"getAllKeys": NewNormalFunction(&And{&Opt{IDBKeyRange}, &Opt{Int}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					// why would we be interested in the Int keys?
-					return NewIDBRequest(NewArray([]values.Value{NewInt(ctx)}, ctx), ctx), nil
-				}),
-			"openCursor": NewNormalFunction(&And{&Opt{&Or{Int, IDBKeyRange}}, &Opt{String}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewIDBRequest(NewIDBCursorWithValue(NewInstance(Object, ctx), ctx), ctx), nil
-				}),
-		},
-		nil,
-	}
-
-	return true
+type IDBIndex struct {
+  BuiltinPrototype
 }
 
-var _IDBIndexOk = generateIDBIndex()
+func NewIDBIndexPrototype() values.Prototype {
+  return &IDBIndex{newBuiltinPrototype("IDBIndex")}
+}
+
+func NewIDBIndex(ctx context.Context) values.Value {
+  return values.NewInstance(NewIDBIndexPrototype(), ctx)
+}
+
+func (p *IDBIndex) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+
+  switch key {
+  case "advance":
+    return values.NewFunction([]values.Value{i, nil}, ctx), nil
+  case "continue":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{nil}, 
+      []values.Value{i, nil},
+    }, ctx), nil
+  case "continuePrimaryKey":
+    return values.NewFunction([]values.Value{i, i, nil}, ctx), nil
+  case "delete":
+    return values.NewFunction([]values.Value{NewEmptyIDBRequest(ctx)}, ctx), nil
+  case "key":
+    return i, nil
+  case "update":
+    return values.NewFunction([]values.Value{NewObject(nil, ctx), NewEmptyIDBRequest(ctx)}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *IDBIndex) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewIDBIndexPrototype(), ctx), nil
+}

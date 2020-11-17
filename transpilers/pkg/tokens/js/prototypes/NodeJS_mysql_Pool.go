@@ -1,34 +1,42 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var NodeJS_mysql_Pool *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_mysql_PoolPrototype() bool {
-	*NodeJS_mysql_Pool = BuiltinPrototype{
-		"mysql.Pool", NodeJS_mysql_Connection,
-		map[string]BuiltinFunction{
-      "getConnection": NewNormalFunction(&Function{}, 
-        func(stack values.Stack, this *values.Instance, args []values.Value,
-          ctx context.Context) (values.Value, error) {
-          if err := args[0].EvalMethod(stack, []values.Value{
-            NewInstance(NodeJS_mysql_Error, ctx),
-            NewInstance(NodeJS_mysql_Connection, ctx),
-          }, ctx); err != nil {
-            return nil, err
-          }
-
-          return nil, nil
-        }),
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_mysql_Pool struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_mysql_PoolOk = generateNodeJS_mysql_PoolPrototype()
+func NewNodeJS_mysql_PoolPrototype() values.Prototype {
+  return &NodeJS_mysql_Pool{newBuiltinPrototype("Pool")}
+}
+
+func NewNodeJS_mysql_Pool(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_mysql_PoolPrototype(), ctx)
+}
+
+func (p *NodeJS_mysql_Pool) GetParent() (values.Prototype, error) {
+  return NewNodeJS_mysql_ConnectionPrototype(), nil
+}
+
+func (p *NodeJS_mysql_Pool) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "getConnection":
+    callback := values.NewFunction([]values.Value{
+      NewNodeJS_mysql_Error(ctx),
+      NewNodeJS_mysql_Connection(ctx),
+    }, ctx)
+
+    return values.NewFunction([]values.Value{callback, nil}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_mysql_Pool) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_mysql_PoolPrototype(), ctx), nil
+}

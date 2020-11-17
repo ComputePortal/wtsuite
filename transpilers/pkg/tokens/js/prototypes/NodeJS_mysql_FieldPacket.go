@@ -1,29 +1,38 @@
 package prototypes
 
 import (
-	//"../values"
+  "../values"
 
-	//"../../context"
+  "../../context"
 )
 
-var NodeJS_mysql_FieldPacket *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_mysql_FieldPacketPrototype() bool {
-	*NodeJS_mysql_FieldPacket = BuiltinPrototype{
-		"mysql.FieldPacket", nil,
-		map[string]BuiltinFunction{
-      "catalog": NewGetter(String),
-      "db": NewGetter(String),
-      "table": NewGetter(String),
-      "name": NewGetter(String),
-      "length": NewGetter(Int),
-      "type": NewGetter(Int),
-      "flags": NewGetter(Int),
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_mysql_FieldPacket struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_mysql_FieldPacketOk = generateNodeJS_mysql_FieldPacketPrototype()
+func NewNodeJS_mysql_FieldPacketPrototype() values.Prototype {
+  return &NodeJS_mysql_FieldPacket{newBuiltinPrototype("FieldPacket")}
+}
+
+func NewNodeJS_mysql_FieldPacket(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_mysql_FieldPacketPrototype(), ctx)
+}
+
+func (p *NodeJS_mysql_FieldPacket) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "catalog", "db", "table", "name":
+    return s, nil
+  case "length", "flags", "type":
+    return i, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_mysql_FieldPacket) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_mysql_FieldPacketPrototype(), ctx), nil
+}

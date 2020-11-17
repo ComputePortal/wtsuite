@@ -1,123 +1,126 @@
 package prototypes
 
 import (
-	"fmt"
+  "strings"
 
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-type EventPrototype struct {
-	BuiltinPrototype
+type AbstractEvent struct {
+  target values.Value // if nil, then any target
+
+  BuiltinPrototype
 }
 
-var Event *EventPrototype = allocEventPrototype()
-
-func allocEventPrototype() *EventPrototype {
-	return &EventPrototype{BuiltinPrototype{
-		"", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}}
+type Event struct {
+  AbstractEvent
 }
 
-func (p *EventPrototype) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return CheckPrototype(p, args, pos, ctx)
+func newAbstractEventPrototype(name string, target values.Value) AbstractEvent {
+  return AbstractEvent{target, newBuiltinPrototype(name)}
 }
 
-func (p *EventPrototype) HasAncestor(other_ values.Interface) bool {
-	if other, ok := other_.(*EventPrototype); ok {
-		if other == p {
-			return true
-		} else {
-			parent := p.GetParent()
-			if parent != nil {
-				return parent.HasAncestor(other_)
-			} else {
-				return false
-			}
-		}
-	} else {
-		_, ok = other_.IsImplementedBy(p)
-		return ok
-	}
+func NewEventPrototype(target values.Value) values.Prototype {
+  return &Event{newAbstractEventPrototype("Event", target)}
 }
 
-// TODO: do other Events also need this function?
-func (p *EventPrototype) CastInstance(v *values.Instance, typeChildren []*values.NestedType, ctx context.Context) (values.Value, error) {
-	newV_, ok := v.ChangeInstanceInterface(p, false, true)
-	if !ok {
-		return nil, ctx.NewError("Error: " + v.TypeName() + " doesn't inherit from " + p.Name())
-	}
-
-	newV, ok := newV_.(*values.Instance)
-	if !ok {
-		panic("unexpected")
-	}
-
-	if typeChildren == nil {
-		return newV, nil
-	} else {
-		if len(typeChildren) != 1 {
-			return nil, ctx.NewError(fmt.Sprintf("Error: Event expects 1 type child, got %d", len(typeChildren)))
-		}
-
-		typeChild := typeChildren[0]
-
-		// now cast all the items
-		props := values.AssertEventProperties(newV.Properties())
-
-		target := props.Target()
-		var err error
-		target, err = target.Cast(typeChild, ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		newV = NewEvent(target, ctx)
-		return newV, nil
-	}
+func NewEvent(target values.Value, ctx context.Context) values.Value {
+  return values.NewInstance(NewEventPrototype(target), ctx)
 }
 
-func NewEvent(target values.Value, ctx context.Context) *values.Instance {
-	return values.NewInstance(Event, values.NewEventProperties(target, ctx), ctx)
+func (p *AbstractEvent) Name() string {
+  var b strings.Builder
+
+  b.WriteString(p.name)
+
+  if p.target != nil {
+    b.WriteString("<")
+    b.WriteString(p.target.TypeName())
+    b.WriteString(">")
+  }
+
+  return b.String()
 }
 
-func NewAltEvent(proto values.Prototype, target values.Value,
-	ctx context.Context) *values.Instance {
-	return values.NewInstance(proto, values.NewEventProperties(target, ctx), ctx)
+func (p *Event) GetParent() (values.Prototype, error) {
+  return nil, nil
 }
 
-func generateEventPrototype() bool {
-	*Event = EventPrototype{BuiltinPrototype{
-		"Event", nil,
-		map[string]BuiltinFunction{
-			"preventDefault":           NewNormal(&None{}, nil),
-			"stopPropagation":          NewNormal(&None{}, nil),
-			"stopImmediatePropagation": NewNormal(&None{}, nil),
-			"target": NewGetterFunction(func(stack values.Stack, this *values.Instance,
-				args []values.Value, ctx context.Context) (values.Value, error) {
-				props := values.AssertEventProperties(this.Properties())
-
-				target := props.Target()
-				if target == nil {
-					return nil, ctx.NewError("Error: event.target unset")
-				}
-				return target, nil
-			}),
-		},
-		NewConstructorFunction(func(stack values.Stack, args []values.Value,
-			ctx context.Context) (values.Value, error) {
-			if err := CheckInputs(&And{String, &Opt{Object}}, args, ctx); err != nil {
-				return nil, err
-			}
-
-			return NewEvent(nil, ctx), nil
-		}),
-	}}
-
-	return true
+func (p *AbstractEvent) GetParent() (values.Prototype, error) {
+  return NewEventPrototype(p.target), nil
 }
 
-var _EventOk = generateEventPrototype()
+func (p *AbstractEvent) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*AbstractEvent); ok {
+    if p.target == nil {
+      return nil
+    } else if other.target == nil{
+      return ctx.NewError("Error: expected " + p.Name() + ", got " + other.Name())
+    } else if p.target.Check(other.target, ctx) != nil {
+      return ctx.NewError("Error: expected " + p.Name() + ", got " + other.Name())
+    } else {
+      return nil
+    }
+  } else if other, ok := other_.(values.Prototype); ok {
+    if otherParent, err := other.GetParent(); err != nil {
+      return err
+    } else if otherParent != nil {
+      if p.Check(otherParent, ctx) != nil {
+        return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
+      } else {
+        return nil
+      }
+    } else {
+      return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
+    }
+  } else {
+    return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
+  }
+}
+
+func (p *AbstractEvent) getTargetValue() values.Value {
+  if p.target == nil {
+    return values.NewAny(p.Context())
+  } else {
+    return p.target
+  }
+}
+
+func (p *AbstractEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "target":
+    target := p.getTargetValue()
+    return values.NewContextValue(target, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Event) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "preventDefault", "stopPropagation", "stopImmediatePropagation":
+    return values.NewFunction([]values.Value{nil}, ctx), nil
+  default:
+    return p.AbstractEvent.GetInstanceMember(key, includePrivate, ctx)
+  }
+}
+
+func (p *Event) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  a := values.NewAny(ctx)
+  b := NewBoolean(ctx)
+  s := NewString(ctx)
+  o := NewConfigObject(map[string]values.Value{
+    "bubbles": b,
+    "cancelable": b,
+    "composed": b,
+  }, ctx)
+
+  return values.NewClass(
+    [][]values.Value{
+      []values.Value{s},
+      []values.Value{s, o},
+    }, NewEventPrototype(a), ctx), nil
+}

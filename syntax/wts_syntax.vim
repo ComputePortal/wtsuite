@@ -27,7 +27,7 @@ syn keyword Operator delete instanceof typeof
 syn keyword Type Array Boolean Date Error Function Int Map Math Number Object Promise Set String RegExp 
 " types that appear so often that it is worthwhile to highlight them
 syn keyword Type Uint8Array Uint16Array Uint32Array Int32Array Float32Array Float64Array Blob
-syn keyword Type Element HTMLElement HTMLImageElement HTMLInputElement HTMLTextAreaElement HTMLCanvasElement HTMLSelectElement
+syn keyword Type Element HTMLElement HTMLImageElement HTMLInputElement HTMLTextAreaElement HTMLCanvasElement HTMLSelectElement HTMLLinkElement HTMLIFrameElement
 syn keyword Type Event MouseEvent WheelEvent KeyboardEvent
 syn keyword Type WebGLRenderingContext WebGLProgram CanvasRenderingContext2D
 syn keyword Type WebAssembly WebAssemblyEnv 

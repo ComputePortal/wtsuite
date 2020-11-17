@@ -1,113 +1,148 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var TypedArray *BuiltinPrototype = allocBuiltinPrototype()
+type TypedArray interface {
+  values.Prototype
 
-func genTypedArrayConstructor(proto values.Prototype, itemProto values.Prototype) EvalConstructorType {
-	return func(stack values.Stack, args []values.Value,
-		ctx context.Context) (values.Value, error) {
+  isUnsigned() bool
 
-		if err := CheckInputs(&Or{Int, &Or{Array, ArrayBuffer}}, args, ctx); err != nil {
-			return nil, err
-		}
+  numBits() int
 
-		if args[0].IsInstanceOf(Array) {
-			if item, err := args[0].GetIndex(stack, NewInt(ctx), ctx); err == nil {
-				if !item.IsInstanceOf(itemProto) {
-					return nil, ctx.NewError("Error: input array doesn't contain just Ints")
-				}
-			} else {
-				panic("unexpected")
-			}
-		}
-
-		content := NewInstance(itemProto, ctx)
-		return NewAltArray(proto, []values.Value{content}, ctx), nil
-	}
+  getContent() values.Value
 }
 
-func genTypedArrayMemberMap(proto values.Prototype, itemProto values.Prototype) map[string]BuiltinFunction {
-	return map[string]BuiltinFunction{
-		"slice": NewNormalFunction(&And{&Opt{Int}, &Opt{Int}},
-			func(stack values.Stack, this *values.Instance,
-				args []values.Value, ctx context.Context) (values.Value, error) {
-				item, err := this.GetIndex(stack, NewInt(ctx), ctx)
-				if err != nil {
-					panic("unexpected")
-				}
+type AbstractTypedArray struct {
+  unsigned bool
 
-				return NewAltArray(proto, []values.Value{item}, ctx), nil
-			}),
-		"from": NewStaticFunction(&Or{Set, Array},
-			func(stack values.Stack, this *values.Instance, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				args_ := values.UnpackMulti(args)
-				arg, ok := args_[0].(*values.Instance)
-				if !ok {
-					return nil, ctx.NewError("Error: unable to create array from something with unknown content")
-				}
+  nBits int
 
-				if arg.IsInstanceOf(Set) {
-					props := values.AssertSetProperties(arg.Properties())
-					items := props.GetItems()
-					for _, item := range items {
-						if !item.IsInstanceOf(itemProto) {
-							return nil, ctx.NewError("Error: expected Set<" + itemProto.Name() + ">" +
-								", got Set <" + item.TypeName() + ">")
-						}
-					}
+  content values.Value
 
-					return NewAltArray(proto, items, ctx), nil
-				} else if arg.IsInstanceOf(Array) {
-					props := values.AssertArrayProperties(arg.Properties())
-
-					item := props.GetItem()
-					if !item.IsInstanceOf(itemProto) {
-						return nil, ctx.NewError("Error: expected Array<" + itemProto.Name() + ">" +
-							", got Array<" + item.TypeName() + ">")
-					}
-
-					return NewAltArray(proto, []values.Value{item}, ctx), nil
-				} else {
-					panic("expected Set or Array")
-				}
-			}),
-	}
+  BuiltinPrototype
 }
 
-func generateTypedArrayPrototype() bool {
-	*TypedArray = BuiltinPrototype{
-		"TypedArray", Array,
-		map[string]BuiltinFunction{
-			// TODO: check that content is same type
-			"buffer": NewGetter(ArrayBuffer),
-			"set":    NewNormal(&And{Array, &Opt{Int}}, nil),
-			"subarray": NewNormalFunction(&And{&Opt{Int}, &Opt{Int}}, // faster than slice
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					dummyIdx := NewInt(ctx)
-					item, err := this.GetIndex(stack, dummyIdx, ctx)
-					if err != nil {
-						panic(err)
-					}
-
-					proto, ok := this.GetInstancePrototype()
-					if !ok {
-						panic("unexpected")
-					}
-					return NewAltArray(proto, []values.Value{item}, ctx), nil
-				}),
-			"BYTES_PER_ELEMENT": NewGetter(Int),
-		},
-		nil,
-	}
-
-	return true
+func (p *AbstractTypedArray) isUnsigned() bool {
+  return p.unsigned
 }
 
-var _TypedArrayOk = generateTypedArrayPrototype()
+func (p *AbstractTypedArray) numBits() int {
+  return p.nBits
+}
+
+func (p *AbstractTypedArray) getContent() values.Value {
+  return p.content
+}
+
+func newAbstractTypedArrayPrototype(name string, unsigned bool, nBits int, content values.Value) AbstractTypedArray {
+  if content == nil {
+    panic("content can't be nil (unlike Array)")
+  }
+
+  return AbstractTypedArray{unsigned, nBits, content, newBuiltinPrototype(name)}
+}
+
+func NewTypedArray(ctx context.Context) values.Value {
+  proto := newAbstractTypedArrayPrototype("TypedArray", false, 0, NewNumber(ctx))
+  return values.NewInstance(&proto, ctx)
+}
+
+func IsTypedArray(v values.Value) bool {
+  ctx := context.NewDummyContext()
+  
+  typedArrayCheck := NewTypedArray(ctx)
+
+  return typedArrayCheck.Check(v, ctx) == nil
+}
+
+func (p *AbstractTypedArray) GetParent() (values.Prototype, error) {
+  return NewArrayPrototype(p.content), nil
+}
+
+func (p *AbstractTypedArray) IsUniversal() bool {
+  return true
+}
+
+func CheckTypedArray(p TypedArray, other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(TypedArray); ok {
+    thisContent := p.getContent()
+    otherContent := other.getContent()
+
+    if p.numBits() == 0 {
+      return nil
+    }
+
+    if thisContent.Check(otherContent, ctx) != nil || p.numBits() != other.numBits() || p.isUnsigned() != other.isUnsigned() {
+      return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
+    }
+
+    return nil
+  } else {
+    return ctx.NewError("Error: expected TypedArray, got " + other_.Name())
+  }
+}
+
+func GetTypedArrayInstanceMember(p TypedArray, key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  arr := NewArray(p.getContent(), ctx)
+  self := values.NewInstance(p, ctx)
+
+  switch key {
+  case "BYTES_PER_ELEMENT":
+    return i, nil
+  case "buffer":
+    return NewArrayBuffer(ctx), nil
+  case "set":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{arr, nil},
+      []values.Value{arr, i, nil},
+    }, ctx), nil
+  case "slice":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{self},
+      []values.Value{i, self},
+      []values.Value{i, i, self},
+    }, ctx), nil
+  case "subarray":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{self},
+      []values.Value{i, self},
+      []values.Value{i, i, self},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func GetTypedArrayClassMember(p TypedArray, key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  self := values.NewInstance(p, ctx)
+  content := p.getContent()
+
+  switch key {
+  case "from":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{NewSet(content, ctx), self},
+      []values.Value{NewArray(content, ctx), self},
+    }, ctx), nil
+  default: 
+    return nil, nil
+  }
+}
+
+func GetTypedArrayClassValue(p TypedArray) (*values.Class, error) {
+  ctx := p.Context()
+
+  i := NewInt(ctx)
+  content := p.getContent()
+
+  return values.NewClass([][]values.Value{
+    []values.Value{i},
+    []values.Value{NewArray(content, ctx)},
+    []values.Value{NewArrayBuffer(ctx)},
+  }, p, ctx), nil
+}
+

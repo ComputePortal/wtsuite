@@ -1,169 +1,169 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var String *StringPrototype = allocStringPrototype()
-
-type StringPrototype struct {
-	BuiltinPrototype
+type String struct {
+  BuiltinPrototype
 }
 
-func allocStringPrototype() *StringPrototype {
-	return &StringPrototype{BuiltinPrototype{
-		"", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}}
-}
-
-// exactly the same as BuiltinPrototype.Check, but with *StringPrototype receiver
-func (p *StringPrototype) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return CheckPrototype(p, args, pos, ctx)
-}
-
-func (p *StringPrototype) HasAncestor(other_ values.Interface) bool {
-	if other, ok := other_.(*StringPrototype); ok {
-		if other == p {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return p == other_
-	}
-}
-
-func (p *StringPrototype) CastInstance(v *values.Instance, typeChildren []*values.NestedType, ctx context.Context) (values.Value, error) {
-	if typeChildren != nil {
-		return nil, ctx.NewError("Error: " + p.Name() + " can't have content types")
-	}
-
-	newV, ok := v.ChangeInstanceInterface(p, false, true)
-	if !ok {
-		return nil, ctx.NewError("Error: " + v.TypeName() + " doesn't inherit from " + p.Name())
-	}
-
-	return newV, nil
+func NewStringPrototype() values.Prototype {
+  return &String{newBuiltinPrototype("String")}
 }
 
 func NewString(ctx context.Context) values.Value {
-	return values.NewInstance(String, values.NewStringProperties(false, "", ctx), ctx)
+  return values.NewInstance(NewStringPrototype(), ctx)
 }
 
-func NewLiteralString(value string, ctx context.Context) values.Value {
-	return values.NewInstance(String, values.NewStringProperties(true, value, ctx), ctx)
+func NewLiteralString(v string, ctx context.Context) values.Value {
+  return values.NewLiteralStringInstance(NewStringPrototype(), v, ctx)
 }
 
-func (p *StringPrototype) GetIndex(stack values.Stack, this *values.Instance,
-	index values.Value, ctx context.Context) (values.Value, error) {
-	str, okS := this.LiteralStringValue()
-	idx, okI := this.LiteralIntValue()
+func IsString(v values.Value) bool {
+  ctx := context.NewDummyContext()
 
-	if okS && okI {
-		if idx < 0 || idx > len(str)-1 {
-			return nil, ctx.NewError("Error: index out of range")
-		}
+  stringCheck := NewString(ctx)
 
-		return NewLiteralString(str[idx:idx+1], ctx), nil
-	} else {
-		return NewString(ctx), nil
-	}
+  return stringCheck.Check(v, ctx) == nil
 }
 
-func (p *StringPrototype) SetIndex(stack values.Stack, this *values.Instance,
-	index values.Value, arg values.Value, ctx context.Context) error {
-	return ctx.NewError("Error: can't set string character via indexing")
+func IsStringable(v values.Value) bool {
+  return IsString(v) || IsNumber(v) || IsBoolean(v)
 }
 
-func (p *StringPrototype) LoopForIn(this *values.Instance, fn func(values.Value) error,
-	ctx context.Context) error {
-	return ctx.NewError("Error: can't iterate over String using 'in' (hint: use regular 'for', or 'for of' if you are only interested in the chars")
+func (p *String) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  re := NewRegExp(ctx)
+  s := NewString(ctx)
+  ss := NewArray(s, ctx)
+
+  switch key {
+  case ".getindex", "charAt":
+    return values.NewFunction([]values.Value{i, s}, ctx), nil
+  case ".getof":
+    return s, nil
+  case "charCodeAt", "codePointAt":
+    return values.NewFunction([]values.Value{i, i}, ctx), nil
+  case "concat":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, s},
+      []values.Value{s, s, s},
+      []values.Value{s, s, s, s},
+      []values.Value{s, s, s, s, s},
+    }, ctx), nil
+  case "endsWith", "includes", "startsWith":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, b},
+      []values.Value{s, i, b},
+    }, ctx), nil
+  case "indexOf", "lastIndexOf":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, i},
+      []values.Value{s, i, i},
+    }, ctx), nil
+  case "length":
+    return i, nil
+  case "localeCompare":
+    opt := NewLocaleOptions(ctx)
+
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, i},
+      []values.Value{s, s, i},
+      []values.Value{s, s, opt, i},
+    }, ctx), nil
+  case "match":
+    return values.NewFunction([]values.Value{NewRegExp(ctx), ss}, ctx), nil
+  case "normalize":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s},
+      []values.Value{s, s},
+    }, ctx), nil
+  case "padEnd", "padStart":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{i, s},
+      []values.Value{i, s, s},
+    }, ctx), nil
+  case "repeat":
+    return values.NewFunction([]values.Value{i, s}, ctx), nil
+  case "replace":
+    // non regexp functions
+    fn1 := values.NewFunction([]values.Value{s, s}, ctx)
+    fn2 := values.NewFunction([]values.Value{s, i, s}, ctx)
+    fn3 := values.NewFunction([]values.Value{s, i, s, s}, ctx)
+
+    fn4 := values.NewFunction([]values.Value{s, s, i, s, s}, ctx)
+    fn5 := values.NewFunction([]values.Value{s, s, s, i, s, s}, ctx)
+    fn6 := values.NewFunction([]values.Value{s, s, s, s, i, s, s}, ctx) // 3 capture groups should be enough
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, s, s},
+      []values.Value{s, fn1, s},
+      []values.Value{s, fn2, s},
+      []values.Value{s, fn3, s},
+      []values.Value{re, s, s},
+      []values.Value{re, fn1, s},
+      []values.Value{re, fn2, s},
+      []values.Value{re, fn3, s},
+      []values.Value{re, fn4, s},
+      []values.Value{re, fn5, s},
+      []values.Value{re, fn6, s},
+    }, ctx), nil
+  case "search":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, i},
+      []values.Value{re, i},
+    }, ctx), nil
+  case "slice", "substring":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{i, s},
+      []values.Value{i, i, s},
+    }, ctx), nil
+  case "split":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, ss},
+      []values.Value{s, i, ss},
+      []values.Value{re, ss},
+      []values.Value{re, i, ss},
+    }, ctx), nil
+  case "toLocaleLowerCase", "toLocaleUpperCase":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s},
+      []values.Value{s, s},
+      []values.Value{ss, s},
+    }, ctx), nil
+  case "toLowerCase", "toUpperCase", "trim", "trimLeft", "trimRight":
+    return values.NewFunction([]values.Value{s}, ctx), nil
+  default:
+    return nil, nil
+  }
 }
 
-func (p *StringPrototype) LoopForOf(this *values.Instance, fn func(values.Value) error,
-	ctx context.Context) error {
-	if this == nil {
-		return fn(NewString(ctx))
-	}
+func (p *String) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
 
-	props := values.AssertStringProperties(this.Properties())
-
-	if str, ok := props.LiteralValue(); ok {
-		for i := 0; i < len(str); i++ {
-			if err := fn(NewLiteralString(str[i:i+1], ctx)); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	} else {
-		return fn(NewString(ctx))
-	}
+  switch key {
+  case "fromCharCode", "fromCodePoint":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{i, s},
+      []values.Value{i, i, s},
+      []values.Value{i, i, i, s},
+      []values.Value{i, i, i, i, s},
+      []values.Value{i, i, i, i, i, s},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
 }
 
-func generateStringPrototype() bool {
-	*String = StringPrototype{BuiltinPrototype{
-		"String", nil,
-		map[string]BuiltinFunction{
-			"charAt":        NewNormal(Int, String),
-			"charCodeAt":    NewNormal(Int, Int),
-			"codePointAt":   NewNormal(Int, Int),
-			"concat":        NewNormal(&Rest{String}, String),
-			"endsWith":      NewNormal(&And{String, &Opt{Int}}, Boolean),
-			"fromCharCode":  NewStatic(&Rest{Int}, String),
-			"fromCodePoint": NewStatic(&Rest{Int}, String),
-			"includes":      NewNormal(&And{String, &Opt{Int}}, String),
-			"indexOf":       NewNormal(&And{String, &Opt{Int}}, Int),
-			"lastIndexOf":   NewNormal(&And{String, &Opt{Int}}, Int),
-			"length":        NewGetter(Int),
-			"localeCompare": NewNormal(&Rest{&Any{}}, Int),
-			"match": NewNormalFunction(RegExp,
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-					content := NewString(ctx)
-					return NewArray([]values.Value{content}, ctx), nil
-				}),
-			"normalize": NewNormal(&Opt{String}, String),
-			"padEnd":    NewNormal(&And{Int, &Opt{String}}, String),
-			"padStart":  NewNormal(&And{Int, &Opt{String}}, String),
-			"repeat":    NewNormal(Int, String),
-			"replace":   NewNormal(&And{&Or{RegExp, String}, &Or{String, &Function{}}}, String),
-			"search":    NewNormal(&Or{RegExp, String}, Int),
-			"slice":     NewNormal(&And{Int, &Opt{Int}}, String),
-			"split": NewNormalFunction(&And{&Or{RegExp, String}, &Opt{Int}},
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
+func (p *String) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  a := values.NewAny(ctx)
 
-					content := NewString(ctx)
-					return NewArray([]values.Value{content}, ctx), nil
-				}),
-			"startsWith":        NewNormal(&And{String, &Opt{Int}}, Boolean),
-			"substring":         NewNormal(&And{Int, &Opt{Int}}, String),
-			"toLocaleLowerCase": NewNormal(&Rest{&Any{}}, String),
-			"toLocaleUpperCase": NewNormal(&Rest{&Any{}}, String),
-			"toLowerCase":       NewNormal(&None{}, String),
-			"toString":          NewNormal(&None{}, String),
-			"toUpperCase":       NewNormal(&None{}, String),
-			"trim":              NewNormal(&None{}, String),
-			"trimLeft":          NewNormal(&None{}, String),
-			"trimRight":         NewNormal(&None{}, String),
-		},
-		NewConstructorGenerator(&Any{}, String,
-			func(stack values.Stack, keys []string, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				if keys != nil || args != nil {
-					return nil, ctx.NewError("Error: unexpected content types")
-				}
-				return NewString(ctx), nil
-			}),
-	},
-	}
-
-	return true
+  return values.NewClass([][]values.Value{
+    []values.Value{a},
+  }, NewStringPrototype(), ctx), nil
 }
-
-var _StringOk = generateStringPrototype()

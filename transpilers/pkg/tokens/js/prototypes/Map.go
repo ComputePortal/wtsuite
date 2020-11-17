@@ -1,199 +1,145 @@
 package prototypes
 
 import (
-	"fmt"
+  "strings"
 
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var Map *MapPrototype = allocMapPrototype()
+type Map struct {
+  key values.Value // can be nil, then any
+  item values.Value // can be nil, then any
 
-type MapPrototype struct {
-	BuiltinPrototype
+  BuiltinPrototype
 }
 
-func allocMapPrototype() *MapPrototype {
-	return &MapPrototype{BuiltinPrototype{
-		"", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}}
+func NewMapPrototype(key values.Value, item values.Value) values.Prototype {
+  return &Map{key, item, newBuiltinPrototype("Map")}
 }
 
-func (p *MapPrototype) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return CheckPrototype(p, args, pos, ctx)
+func NewMap(key values.Value, item values.Value, ctx context.Context) values.Value {
+  return values.NewInstance(NewMapPrototype(key, item), ctx)
 }
 
-func (p *MapPrototype) HasAncestor(other_ values.Interface) bool {
-	if other, ok := other_.(*MapPrototype); ok {
-		if other == p {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
+func (p *Map) getKeyValue(ctx context.Context) values.Value {
+  if p.key == nil {
+    return values.NewAny(ctx)
+  } else {
+    return values.NewContextValue(p.key, ctx)
+  }
 }
 
-func (p *MapPrototype) CastInstance(v *values.Instance, typeChildren []*values.NestedType, ctx context.Context) (values.Value, error) {
-	newV_, ok := v.ChangeInstanceInterface(p, false, true)
-	if !ok {
-		return nil, ctx.NewError("Error: " + v.TypeName() + " doesn't inherit from " + p.Name())
-	}
-
-	newV, ok := newV_.(*values.Instance)
-	if !ok {
-		panic("unexpected")
-	}
-
-	if typeChildren == nil {
-		return newV, nil
-	} else {
-		if len(typeChildren) != 2 {
-			return nil, ctx.NewError(fmt.Sprintf("Error: Map expects 2 type children, got %d", len(typeChildren)))
-		}
-
-		keyType := typeChildren[0]
-		itemType := typeChildren[1]
-
-		// now cast all the items
-		props := values.AssertMapProperties(newV.Properties())
-
-		newVProps := values.NewMapProperties(ctx)
-		newV = values.NewInstance(Map, newVProps, ctx)
-
-		keys := props.GetKeys()
-		for _, key := range keys {
-			newKey, err := key.Cast(keyType, ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			newVProps.AppendKey(newKey)
-		}
-
-		items := props.GetItems()
-		for _, item := range items {
-			newItem, err := item.Cast(itemType, ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			newVProps.AppendItem(newItem)
-		}
-
-		return newV, nil
-	}
+func (p *Map) getItemValue(ctx context.Context) values.Value {
+  if p.item == nil {
+    return values.NewAny(ctx)
+  } else {
+    return values.NewContextValue(p.item, ctx)
+  }
 }
 
-func (p *MapPrototype) LoopForIn(this *values.Instance, fn func(values.Value) error,
-	ctx context.Context) error {
-	return ctx.NewError("Error: for in doesnt work for map")
-	/*props := values.AssertMapProperties(this.Properties())
+func (p *Map) Name() string {
+  var b strings.Builder
 
-	key := props.GetKey()
+  b.WriteString("Map")
 
-	return fn(key)*/
-}
+  if p.key != nil || p.item != nil {
+    b.WriteString("<")
 
-func (p *MapPrototype) LoopForOf(this *values.Instance, fn func(values.Value) error,
-	ctx context.Context) error {
-	props := values.AssertMapProperties(this.Properties())
+    if p.key == nil {
+      b.WriteString("any")
+    } else {
+      b.WriteString(p.key.TypeName())
+    }
+    
+    b.WriteString(",")
 
-	key := props.GetKey()
-	item := props.GetItem()
+    if p.item == nil {
+      b.WriteString("any")
+    } else {
+      b.WriteString(p.item.TypeName())
+    }
 
-	return fn(NewLiteralArray([]values.Value{key, item}, ctx))
-}
-
-func NewMap(keys []values.Value, items []values.Value, ctx context.Context) values.Value {
-  props := values.NewMapProperties(ctx)
-
-  for _, key := range keys {
-    props.AppendKey(key)
+    b.WriteString(">")
   }
 
-  for _, item := range items {
-    props.AppendItem(item)
-  }
-
-  return values.NewInstance(Map, props, ctx)
+  return b.String()
 }
 
-func generateMapPrototype() bool {
-	getHasFn := func(stack values.Stack, this *values.Instance, args []values.Value,
-		ctx context.Context) (values.Value, values.Value, error) {
-		props := values.AssertMapProperties(this.Properties())
-		return props.GetKey(), props.GetItem(), nil
-	}
-
-	*Map = MapPrototype{BuiltinPrototype{
-		"Map", nil,
-		map[string]BuiltinFunction{
-			"clear":  NewNormal(&None{}, nil),
-			"delete": NewMethodLikeNormal(&Any{}, Boolean),
-			"get": NewNormalFunction(&Any{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					_, item, err := getHasFn(stack, this, args, ctx)
-					if err != nil {
-						return nil, err
-					}
-
-					return item.Copy(values.NewCopyCache()), nil
-				}),
-			"set": NewNormalFunction(&And{&Any{}, &Any{}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-
-					props := values.AssertMapProperties(this.Properties())
-
-					props.AppendKey(args[0])
-					props.AppendItem(args[1])
-
-					return nil, nil
-				}),
-
-			"has": NewNormalFunction(&Any{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					if _, _, err := getHasFn(stack, this, args, ctx); err != nil {
-						return nil, err
-					}
-
-					return NewInstance(Boolean, ctx), nil
-				}),
-			"size": NewGetter(Int),
-		},
-		NewConstructorGeneratorFunction(func(stack values.Stack, args []values.Value,
-			ctx context.Context) (values.Value, error) {
-
-			if len(args) != 0 {
-				return nil, ctx.NewError("Error: expected 0 arguments")
-			}
-
-			return NewInstance(Map, ctx), nil
-		}, func(stack values.Stack, keys []string, args []values.Value,
-      ctx context.Context) (values.Value, error) {
-      if keys != nil {
-        return nil, ctx.NewError("Error: unexpected keyed content type for Map")
+func (p *Map) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*Map); ok {
+    if p.key == nil && p.item == nil {
+      return nil
+    } else if other.key == nil && other.item == nil {
+      return ctx.NewError("Error: expected " + p.Name() + ", got Map<any, any>")
+    } else {
+      if p.key != nil {
+        if other.key == nil {
+          return ctx.NewError("Error: expected " + p.Name() + ", got " + other.Name())
+        } else if err := p.key.Check(other.key, ctx); err != nil {
+          return err
+        }
       }
 
-      if args == nil {
-        return NewMap([]values.Value{}, []values.Value{}, ctx), nil
-      } else if len(args) == 2 {
-        return NewMap([]values.Value{args[0]}, []values.Value{args[1]}, ctx), nil
+      if p.item != nil {
+        if other.item == nil {
+          return ctx.NewError("Error: expected " + p.Name() + ", got " + other.Name())
+        } else if err := p.item.Check(other.item, ctx); err != nil {
+          return err
+        } else {
+          return nil
+        }
       } else {
-        return nil, ctx.NewError("Error: expected 2 type arguments for Map")
+        return nil
       }
-    }),
-	},
-	}
-
-	return true
+    }
+  } else if other, ok := other_.(values.Prototype); ok {
+    if otherParent, err := other.GetParent(); err != nil {
+      return err
+    } else if otherParent != nil {
+      if p.Check(otherParent, ctx) != nil {
+        return ctx.NewError("Error: expected Map, got " + other_.Name())
+      } else {
+        return nil
+      }
+    } else {
+      return ctx.NewError("Error: expected Map, got " + other_.Name())
+    }
+  } else {
+    return ctx.NewError("Error: expected Map, got " + other_.Name())
+  }
 }
 
-var _MapOk = generateMapPrototype()
+func (p *Map) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  k := p.getKeyValue(ctx)
+  item := p.getItemValue(ctx)
+
+  switch key {
+  case "clear":
+    return values.NewFunction([]values.Value{nil}, ctx), nil
+  case "delete":
+    return values.NewMethodLikeFunction([]values.Value{k, b}, ctx), nil
+  case "get":
+    return values.NewFunction([]values.Value{k, item}, ctx), nil
+  case "set":
+    return values.NewFunction([]values.Value{k, item, nil}, ctx), nil
+  case "has":
+    return values.NewFunction([]values.Value{k, b}, ctx), nil
+  case "size":
+    return i, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Map) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+
+  return values.NewClass(
+    [][]values.Value{
+      []values.Value{},
+    }, NewMapPrototype(values.NewAll(ctx), values.NewAll(ctx)), ctx), nil
+}

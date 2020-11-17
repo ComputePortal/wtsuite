@@ -1,33 +1,58 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var RegExp *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateRegExpPrototype() bool {
-	*RegExp = BuiltinPrototype{
-		"RegExp", nil,
-		map[string]BuiltinFunction{
-			"exec": NewNormalFunction(String,
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-					return NewAltArray(RegExpArray, []values.Value{NewString(ctx)}, ctx), nil
-				}),
-			"global":     NewGetter(Boolean),
-			"ignoreCase": NewGetter(Boolean),
-			"lastIndex":  NewGetter(Int),
-			"multiline":  NewGetter(Boolean),
-			"source":     NewGetter(String),
-			"test":       NewNormal(String, Boolean),
-		},
-		NewConstructor(&And{String, &Opt{String}}, RegExp),
-	}
-
-	return true
+type RegExp struct {
+  BuiltinPrototype
 }
 
-var _RegExpOk = generateRegExpPrototype()
+func NewRegExpPrototype() values.Prototype {
+  return &RegExp{newBuiltinPrototype("RegExp")}
+}
+
+func NewRegExp(ctx context.Context) values.Value {
+  return values.NewInstance(NewRegExpPrototype(), ctx)
+}
+
+func IsRegExp(v values.Value) bool {
+  ctx := context.NewDummyContext()
+
+  regexpCheck := NewRegExp(ctx)
+
+  return regexpCheck.Check(v, ctx) == nil
+}
+
+func (p *RegExp) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "exec":
+    return values.NewFunction([]values.Value{s, NewRegExpArray(ctx)}, ctx), nil
+  case "global", "ignoreCase", "multiline":
+    return b, nil
+  case "lastIndex":
+    return i, nil
+  case "source":
+    return s, nil
+  case "test":
+    return values.NewFunction([]values.Value{s, b}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *RegExp) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  s := NewString(ctx)
+
+  return values.NewClass([][]values.Value{
+    []values.Value{s},
+    []values.Value{s, s},
+  }, NewRegExpPrototype(), ctx), nil
+}

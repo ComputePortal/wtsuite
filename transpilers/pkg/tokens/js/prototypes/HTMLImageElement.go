@@ -1,38 +1,55 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var HTMLImageElement *BuiltinPrototype = allocBuiltinPrototype()
-
-func imageOnloadCallback(stack values.Stack, this *values.Instance, args []values.Value,
-	ctx context.Context) (values.Value, error) {
-	arg := args[0]
-
-	event := NewEvent(this, ctx)
-	if err := arg.EvalMethod(stack.Parent(), []values.Value{event}, ctx); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+type HTMLImageElement struct {
+  BuiltinPrototype
 }
 
-func generateHTMLImageElementPrototype() bool {
-	*HTMLImageElement = BuiltinPrototype{
-		"HTMLImageElement", HTMLElement,
-		map[string]BuiltinFunction{
-			"height": NewGetterSetter(Int),
-			"width":  NewGetterSetter(Int),
-			"onload": NewSetterFunction(&Function{}, imageOnloadCallback),
-			"src":    NewSetter(String),
-		},
-		NewNoContentGenerator(HTMLImageElement),
-	}
-
-	return true
+func NewHTMLImageElementPrototype() values.Prototype {
+  return &HTMLImageElement{newBuiltinPrototype("HTMLImageElement")}
 }
 
-var _HTMLImageElementOk = generateHTMLImageElementPrototype()
+func NewHTMLImageElement(ctx context.Context) values.Value {
+  return values.NewInstance(NewHTMLImageElementPrototype(), ctx)
+}
+
+func (p *HTMLImageElement) GetParent() (values.Prototype, error) {
+  return NewHTMLElementPrototype(), nil
+}
+
+func (p *HTMLImageElement) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+
+  switch key {
+  case "height", "width":
+    return i, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *HTMLImageElement) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  s := NewString(ctx)
+  self := values.NewInstance(p, ctx)
+
+  switch key {
+  case "onload":
+    callback := values.NewFunction([]values.Value{NewEvent(self, ctx), nil}, ctx)
+
+    return callback.Check(arg, ctx)
+  case "src":
+    return s.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: HTMLImageElement." + key + " not setable")
+  }
+}
+
+func (p *HTMLImageElement) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewHTMLImageElementPrototype(), ctx), nil
+}

@@ -3,7 +3,6 @@ package js
 import (
 	"strings"
 
-	"./prototypes"
 	"./values"
 
 	"../context"
@@ -11,7 +10,7 @@ import (
 
 // simply prints the variable name
 type VarExpression struct {
-	ref Variable // might be overwritten during ResolveNames
+	variable Variable // might be overwritten during ResolveNames
   origName string // used for refactoring
   pkgRef *Package // used for refactoring
 	TokenData
@@ -33,15 +32,35 @@ func NewConstantVarExpression(name string, ctx context.Context) *VarExpression {
 }
 
 func (t *VarExpression) Name() string {
-	if t.ref == nil {
+	if t.variable == nil {
 		panic("ref shouldn't be nil")
 	}
 
-	return t.ref.Name()
+	return t.variable.Name()
 }
 
 func (t *VarExpression) GetVariable() Variable {
-	return t.ref
+	return t.variable
+}
+
+func (t *VarExpression) GetInterface() values.Interface {
+  obj_ := t.GetVariable().GetObject()
+  obj, ok := obj_.(values.Interface)
+  if ok {
+    return obj
+  } else {
+    return nil
+  }
+}
+
+func (t *VarExpression) GetPrototype() values.Prototype {
+  obj_ := t.GetVariable().GetObject()
+  obj, ok := obj_.(values.Prototype)
+  if ok {
+    return obj
+  } else {
+    return nil
+  }
 }
 
 func (t *VarExpression) Dump(indent string) string {
@@ -64,43 +83,6 @@ func (t *VarExpression) resolvePackageMember(scope Scope, parts []string) error 
 	pkg_, err := scope.GetVariable(base)
 	if err != nil {
 		panic(err)
-	}
-
-	pkgObject := pkg_.GetObject()
-	if pkgObject != nil {
-		nodejsModule, maybeNodeJSModule := pkgObject.(*prototypes.BuiltinPrototype)
-		if maybeNodeJSModule {
-			origName := nodejsModule.Name()
-
-			if _, isNodeJSModule := GetNodeJSModule(origName); isNodeJSModule {
-				// these tend to only go one level
-				if len(parts) != 2 {
-					errCtx := t.Context()
-					return errCtx.NewError("Error: nodejs module  members are of form module.member")
-				}
-
-				// member must be a class
-				dummyStack := NewDummyStack()
-				value_, err := nodejsModule.GetMember(dummyStack, nil, parts[1], false, t.Context())
-				if err != nil {
-					return err
-				}
-
-				// value_ must be values.Class
-				valueClass, ok := value_.GetClassPrototype()
-				if !ok {
-					errCtx := t.Context()
-					return errCtx.NewError("Error: nodejs module member " + parts[1] + " is not a class")
-				}
-
-				// use the builtin name as reference
-				classVariable, ok := GetNodeJSClassVariable(valueClass.Name())
-				if ok {
-					t.ref = classVariable
-					return nil
-				}
-			}
-		}
 	}
 
 	pkg, ok := pkg_.(*Package)
@@ -133,15 +115,16 @@ func (t *VarExpression) resolvePackageMember(scope Scope, parts []string) error 
 		return errCtx.NewError("Error: can't use package like a variable")
 	}
 
-	t.ref = member
+	t.variable = member
 	return nil
 }
+
 
 func (t *VarExpression) ResolveExpressionNames(scope Scope) error {
 	name := t.Name()
 
 	// variables that begin with a period might be interal hidden vars
-	// (eg. variables created by the Parser.importDefault() macro
+	// (eg. variables created by the import() macro
 	parts := strings.Split(name, ".")
 	if len(parts) > 1 && !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, ".") {
 		return t.resolvePackageMember(scope, parts)
@@ -154,81 +137,43 @@ func (t *VarExpression) ResolveExpressionNames(scope Scope) error {
 	}
 
 	var err error
-	t.ref, err = scope.GetVariable(name)
+	t.variable, err = scope.GetVariable(name)
 	if err != nil {
 		return err
 	}
 
-	if t.ref == nil {
+	if t.variable == nil {
 		panic("nil variable")
 	}
 
 	return nil
 }
 
-func (t *VarExpression) PackageContext() context.Context {
-  name := t.origName
-
-  parts := strings.Split(name, ".")
-
-  ctx := t.Context()
-
-  if len(parts) > 1 && !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, ".") {
-    subN := len(parts[0]) // so from start to this
-    return ctx.NewContext(0, subN)
-  } else {
-    return ctx
-  }
-}
-
-func (t *VarExpression) NonPackageContext() context.Context {
-  name := t.origName
-
-  parts := strings.Split(name, ".")
-
-  ctx := t.Context()
-
-  if len(parts) > 1 && !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, ".") {
-    startN := len(parts[0]) + 1 // without the dot
-
-    return ctx.NewContext(startN, len(name))
-  } else {
-    return ctx
-  }
-}
-
 // as rhs
-func (t *VarExpression) EvalExpression(stack values.Stack) (values.Value, error) {
-	if t.ref == nil {
+func (t *VarExpression) EvalExpression() (values.Value, error) {
+	if t.variable == nil {
 		panic("ref is still nil")
 	}
 
-	if _, isPkg := t.ref.(*Package); isPkg {
-		errCtx := t.Context()
-		return nil, errCtx.NewError("Error: package can't be used as a variable")
-	}
-
-	res, err := stack.GetValue(t.ref, t.Context())
-	if err != nil {
-		return nil, err
-	}
-
-	if res == nil {
-		errCtx := t.Context()
-		err := errCtx.NewError("Error: ref value is nil")
-		return nil, err
-	}
+  // note that both Object and Value must be set for builtin classes/interfaces
+  res := t.variable.GetValue()
 
 	return values.NewContextValue(res, t.Context()), nil
 }
 
-func (t *VarExpression) ResolveExpressionActivity(usage Usage) error {
-	if _, isPkg := t.ref.(*Package); isPkg {
-		errCtx := t.Context()
-		return errCtx.NewError("Error: package can't be used as a variable")
-	}
+// as lhs
+func (t *VarExpression) EvalSet(v values.Value, ctx context.Context) error {
+  if t.variable.Constant() {
+    return ctx.NewError("Error: can't assign to const")
+  }
 
-	return usage.Use(t.ref, t.Context())
+  thisVal := t.variable.GetValue()
+
+  return thisVal.Check(v, ctx)
+}
+
+func (t *VarExpression) ResolveExpressionActivity(usage Usage) error {
+	return usage.Use(t.variable, t.Context())
 }
 
 func (t *VarExpression) UniversalExpressionNames(ns Namespace) error {
@@ -248,9 +193,9 @@ func (t *VarExpression) Walk(fn WalkFunc) error {
 func (t *VarExpression) uniqueDeclarationName(ns Namespace, varType VarType) error {
   switch varType {
   case CONST, LET:
-    ns.LetName(t.ref)
+    ns.LetName(t.variable)
   case VAR:
-    ns.VarName(t.ref)
+    ns.VarName(t.variable)
   default:
     panic("unexpected")
   }
@@ -274,6 +219,39 @@ func (t *VarExpression) PackagePath() string {
   }
 }
 
+// use by refactoring tools
+func (t *VarExpression) PackageContext() context.Context {
+  name := t.origName
+
+  parts := strings.Split(name, ".")
+
+  ctx := t.Context()
+
+  if len(parts) > 1 && !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, ".") {
+    subN := len(parts[0]) // so from start to this
+    return ctx.NewContext(0, subN)
+  } else {
+    return ctx
+  }
+}
+
+// use by refactoring tools
+func (t *VarExpression) NonPackageContext() context.Context {
+  name := t.origName
+
+  parts := strings.Split(name, ".")
+
+  ctx := t.Context()
+
+  if len(parts) > 1 && !strings.HasPrefix(name, ".") && !strings.HasSuffix(name, ".") {
+    startN := len(parts[0]) + 1 // without the dot
+
+    return ctx.NewContext(startN, len(name))
+  } else {
+    return ctx
+  }
+}
+
 func IsVarExpression(t Expression) bool {
 	_, ok := t.(*VarExpression)
 	return ok
@@ -287,3 +265,4 @@ func AssertVarExpression(t Token) (*VarExpression, error) {
 		return nil, errCtx.NewError("Error: expected variable word")
 	}
 }
+

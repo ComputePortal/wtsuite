@@ -3,22 +3,14 @@ package macros
 import (
 	"../"
 
-	"../prototypes"
-
 	"../../context"
 )
 
 var _classMacros = map[string]MacroGroup{
 	"SyntaxTree": MacroGroup{
 		macros: map[string]MacroConstructor{
+      // TODO: probably better as underscore call macros
 			"info":  NewSyntaxTreeInfo,
-			"stack": NewStackTrace,
-		},
-	},
-
-	"Document": MacroGroup{
-		macros: map[string]MacroConstructor{
-			"getElementById": NewDocumentGetElementById,
 		},
 	},
 
@@ -66,20 +58,15 @@ var _classMacros = map[string]MacroGroup{
 		},
 	},
 
-	"$": MacroGroup{
-		macros: map[string]MacroConstructor{
-			"post": NewDollarPost,
-		},
-	},
-
 	"XMLHttpRequest": MacroGroup{
 		macros: map[string]MacroConstructor{
-			"post": NewDollarPost, // alias
+			"post": NewXMLHttpRequestPost,
 		},
 	},
 }
 
 var _callMacros = map[string]MacroConstructor{
+  "cast":   NewCastCall,
 	"BigInt": NewBigIntCall,
 	//"WebAssemblyEnv": NewWebAssemblyEnvCall,
 }
@@ -101,19 +88,6 @@ func IsClassMacro(gname string, name string) bool {
 func IsCallMacro(name string) bool {
 	_, ok := _callMacros[name]
 	return ok
-}
-
-// words that cannot be used as variables
-func IsOnlyMacro(name string) bool {
-	if IsClassMacroGroup(name) || IsCallMacro(name) {
-		if js.IsBuiltinName(name) {
-			return false
-		} else {
-			return true
-		}
-	} else {
-		return false
-	}
 }
 
 func MemberIsClassMacro(m *js.Member) bool {
@@ -166,8 +140,6 @@ func NewCallMacroFromCall(call *js.Call,
 
 	return NewCallMacro(name, args, ctx)
 }
-
-var _isClassMacroRegistered = prototypes.RegisterIsClassMacro(IsClassMacro)
 
 func RegisterActivateMacroHeadersCallback() bool {
 	js.ActivateMacroHeaders = func(name string) {

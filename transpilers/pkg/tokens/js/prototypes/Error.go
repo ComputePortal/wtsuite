@@ -1,34 +1,51 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var Error *BuiltinPrototype = allocBuiltinPrototype()
-
-func NewError(ctx context.Context) *values.Instance {
-	return NewInstance(Error, ctx)
+type Error struct {
+  BuiltinPrototype
 }
 
-func generateErrorPrototype() bool {
-	*Error = BuiltinPrototype{
-		"Error", nil,
-		map[string]BuiltinFunction{
-			"message": NewGetter(String),
-		},
-		NewConstructorGenerator(&Opt{String}, Error,
-			func(stack values.Stack, keys []string, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				if keys != nil || args != nil {
-					return nil, ctx.NewError("Error: unexpected content types")
-				}
-				return NewError(ctx), nil
-			}),
-	}
-
-	return true
+func NewErrorPrototype() values.Prototype {
+  return &Error{newBuiltinPrototype("Error")}
 }
 
-var _ErrorOk = generateErrorPrototype()
+func NewError(ctx context.Context) values.Value {
+  return values.NewInstance(NewErrorPrototype(), ctx)
+}
+
+func IsError(v values.Value) bool {
+  ctx := context.NewDummyContext()
+
+  errorCheck := NewError(ctx)
+
+  return errorCheck.Check(v, ctx) == nil
+}
+
+func (p *Error) IsUniversal() bool {
+  return true
+}
+
+func (p *Error) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  s := NewString(ctx)
+
+  switch key {
+  case "message":
+    return s, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Error) GetClassValue() (*values.Class, error) {
+  ctx := context.NewDummyContext()
+
+  return values.NewClass([][]values.Value{
+    []values.Value{},
+    []values.Value{NewString(ctx)},
+  }, NewErrorPrototype(), ctx), nil
+}

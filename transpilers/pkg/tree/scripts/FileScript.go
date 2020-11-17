@@ -13,7 +13,7 @@ import (
 type FileScript interface {
 	Script
 	ResolveNames(scope js.GlobalScope) error
-	EvalTypes(globals values.Stack) error
+	EvalTypes() error
 	ResolveActivity(usage js.Usage) error
 	UniqueEntryPointNames(ns js.Namespace) error
 	UniversalNames(ns js.Namespace) error

@@ -3,7 +3,7 @@ package js
 import (
 	"strings"
 
-	"./values"
+  "./prototypes"
 
 	"../context"
 )
@@ -51,23 +51,22 @@ func (t *Throw) ResolveStatementNames(scope Scope) error {
 	return t.expr.ResolveExpressionNames(scope)
 }
 
-func (t *Throw) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-func (t *Throw) EvalStatement(stack values.Stack) error {
-	exprValue, err := t.expr.EvalExpression(stack)
+func (t *Throw) EvalStatement() error {
+	exprValue, err := t.expr.EvalExpression()
 	if err != nil {
 		return err
 	}
-
-	// TODO: should exprValue be instance of Error?
 
 	if exprValue == nil {
 		// should've been caught earlier
 		errCtx := t.expr.Context()
 		panic(errCtx.NewError("Error: expected non-void value"))
 	}
+
+  if !prototypes.IsError(exprValue) {
+    errCtx := t.expr.Context()
+    return errCtx.NewError("Error: not an Error")
+  }
 
 	return nil
 }

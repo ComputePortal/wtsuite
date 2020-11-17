@@ -42,7 +42,7 @@ func (t *LiteralString) WriteExpression() string {
 	}
 }
 
-func (t *LiteralString) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *LiteralString) EvalExpression() (values.Value, error) {
 	return prototypes.NewLiteralString(t.value, t.Context()), nil
 }
 

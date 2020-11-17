@@ -6,24 +6,43 @@ import (
 	"../../context"
 )
 
-var Boolean *BuiltinPrototype = allocBuiltinPrototype()
+type Boolean struct {
+  BuiltinPrototype
+}
+
+func NewBooleanPrototype() values.Prototype {
+  return &Boolean{newBuiltinPrototype("Boolean")}
+}
 
 func NewBoolean(ctx context.Context) values.Value {
-	return values.NewInstance(Boolean, values.NewBooleanProperties(false, false, ctx), ctx)
+  return values.NewInstance(NewBooleanPrototype(), ctx)
 }
 
 func NewLiteralBoolean(v bool, ctx context.Context) values.Value {
-	return values.NewInstance(Boolean, values.NewBooleanProperties(true, v, ctx), ctx)
+  return values.NewLiteralBooleanInstance(NewBooleanPrototype(), v, ctx)
 }
 
-func generateBooleanPrototype() bool {
-	*Boolean = BuiltinPrototype{
-		"Boolean", nil,
-		map[string]BuiltinFunction{},
-		NewConstructorNoContentGenerator(Number, Boolean),
-	}
+func IsBoolean(v values.Value) bool {
+  ctx := context.NewDummyContext()
+  
+  booleanCheck := NewBoolean(ctx)
 
-	return true
+  return booleanCheck.Check(v, ctx) == nil
 }
 
-var _BooleanOk = generateBooleanPrototype()
+func (p *Boolean) IsUniversal() bool {
+  return true
+}
+
+func (p *Boolean) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  return nil, nil
+}
+
+func (p *Boolean) GetClassValue() (*values.Class, error) {
+  ctx := context.NewDummyContext()
+
+  return values.NewClass(
+    [][]values.Value{
+      []values.Value{NewNumber(ctx)},
+    }, NewBooleanPrototype(), ctx), nil
+}

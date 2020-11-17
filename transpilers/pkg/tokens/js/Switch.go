@@ -3,7 +3,6 @@ package js
 import (
 	"strings"
 
-	"./prototypes"
 	"./values"
 
 	"../context"
@@ -196,46 +195,33 @@ func (t *Switch) ResolveStatementNames(scope Scope) error {
 	return nil
 }
 
-func (t *Switch) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-func (t *Switch) EvalStatement(stack values.Stack) error {
-	var exprProto values.Prototype = prototypes.Boolean
-
-	exprVal, err := t.expr.EvalExpression(stack)
+func (t *Switch) EvalStatement() error {
+	exprVal, err := t.expr.EvalExpression()
 	if err != nil {
 		return err
 	}
 
-	exprProto, ok := exprVal.GetInstancePrototype()
-	if !ok {
+  if values.IsInstance(exprVal) {
 		errCtx := exprVal.Context()
 		return errCtx.NewError("Error: not a switchable value (" + exprVal.TypeName() + ")")
-	}
+  }
 
 	for i, clause := range t.clauses {
 		if clause != nil {
-			clauseVal, err := clause.EvalExpression(stack)
+			clauseVal, err := clause.EvalExpression()
 			if err != nil {
 				return err
 			}
 
-			if !clauseVal.IsInstanceOf(exprProto) {
-				errCtx := clauseVal.Context()
-				return errCtx.NewError("Error: clause is not an instance of " +
-					exprProto.Name() + ", but of " + clauseVal.TypeName())
+      if err := exprVal.Check(clauseVal, clauseVal.Context()); err != nil {
+        return err
 			}
 
-			subStack := NewBranchStack(stack)
-
-			if err := t.Block.evalStatements(t.grouped[i], subStack); err != nil {
+			if err := t.Block.evalStatements(t.grouped[i]); err != nil {
 				return err
 			}
 		} else if i < len(t.grouped) {
-			subStack := NewBranchStack(stack)
-
-			if err := t.Block.evalStatements(t.grouped[i], subStack); err != nil {
+			if err := t.Block.evalStatements(t.grouped[i]); err != nil {
 				return err
 			}
 		}

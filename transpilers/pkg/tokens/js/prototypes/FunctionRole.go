@@ -17,6 +17,7 @@ const (
 	ABSTRACT              = 1 << 6
 	OVERRIDE              = 1 << 7
 	ASYNC                 = 1 << 8
+  PROPERTY              = 1 << 9
 )
 
 func IsNormal(m FunctionWithRole) bool {
@@ -63,4 +64,8 @@ func IsAbstract(m FunctionWithRole) bool {
 
 func IsAsync(m FunctionWithRole) bool {
 	return m.Role()&ASYNC > 0
+}
+
+func IsProperty(m FunctionWithRole) bool {
+  return m.Role()&PROPERTY > 0
 }

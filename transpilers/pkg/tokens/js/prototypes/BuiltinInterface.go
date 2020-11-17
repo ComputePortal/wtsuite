@@ -1,115 +1,96 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-type BuiltinInterfaceMember struct {
-	args ArgCheck
-	role FunctionRole
-	ret  values.Prototype // can be nil for no return value
+type BuiltinInterface interface {
+  values.Interface
+
+  hasImplementation(values.Prototype) bool
+
+  appendImplementation(values.Prototype)
 }
 
-type BuiltinInterface struct {
-	name string
+type AbstractBuiltinInterface struct {
+  name string
 
-	Members map[string]*BuiltinInterfaceMember
-
-	cache map[values.Prototype]string // only check implements once
+  // might need mutex in case of parallel eval
+  implementations []values.Prototype
 }
 
-var PrototypeImplements func(proto values.Prototype, interf values.Interface) (string, bool) = nil
-
-func RegisterPrototypeImplements(fn func(proto values.Prototype, interf values.Interface) (string, bool)) bool {
-	PrototypeImplements = fn
-
-	return true
+func newAbstractBuiltinInterface(name string) AbstractBuiltinInterface {
+  return AbstractBuiltinInterface{name, make([]values.Prototype, 0)}
 }
 
-func allocBuiltinInterface() *BuiltinInterface {
-	return &BuiltinInterface{"", map[string]*BuiltinInterfaceMember{}, map[values.Prototype]string{}}
+func (p *AbstractBuiltinInterface) Name() string {
+  return p.name
 }
 
-func (m *BuiltinInterfaceMember) Role() FunctionRole {
-	return m.role
+func (p *AbstractBuiltinInterface) Context() context.Context {
+  return context.NewDummyContext()
 }
 
-func (m *BuiltinInterfaceMember) Check(args []interface{}) bool {
-	pos := 0
-
-	var err error
-	pos, err = m.args.Check(args, pos, context.NewDummyContext())
-	if err != nil {
-		return false
-	}
-
-	if pos != len(args) {
-		return false
-	}
-
-	return true
+func (p *AbstractBuiltinInterface) GetInterfaces() ([]values.Interface, error) {
+  return []values.Interface{}, nil
 }
 
-func (p *BuiltinInterfaceMember) CheckRetType(retName string) bool {
-	// builtin interfaces can't be part of packages this way!
-	if p.ret == nil {
-		return retName == ""
-	} else {
-		return retName == p.ret.Name()
-	}
+func (p *AbstractBuiltinInterface) GetPrototypes() ([]values.Prototype, error) {
+  return []values.Prototype{}, nil
 }
 
-func (p *BuiltinInterface) Name() string {
-	return p.name
+func (p *AbstractBuiltinInterface) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  return nil, nil
 }
 
-func (p *BuiltinInterface) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return CheckInterface(p, args, pos, ctx)
+func (p *AbstractBuiltinInterface) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  return ctx.NewError("Error: " + p.Name() + "." + key + " not setable")
 }
 
-func (p *BuiltinInterface) HasMember(this *values.Instance, key string, includePrivate bool) bool {
-	_, ok := p.Members[key]
-	return ok
+func (p *AbstractBuiltinInterface) hasImplementation(proto values.Prototype) bool {
+  for _, ips := range p.implementations {
+    if ips == proto {
+      return true
+    }
+  }
+
+  return false
 }
 
-func (p *BuiltinInterface) HasAncestor(interf values.Interface) bool {
-	return false
+func (p *AbstractBuiltinInterface) appendImplementation(proto values.Prototype) {
+  p.implementations = append(p.implementations, proto)
 }
 
-func (p *BuiltinInterface) IsImplementedBy(proto values.Prototype) (string, bool) {
-	if p.cache == nil {
-		p.cache = make(map[values.Prototype]string)
-	}
+func checkInterfaceImplementation(interf BuiltinInterface, proto values.Prototype, getables[]string, setables map[string]values.Value, ctx context.Context) error {
+  if interf.hasImplementation(proto) {
+    return nil
+  }
 
-	if implements, ok := p.cache[proto]; ok {
-		return implements, implements == ""
-	} else if _, ok := proto.(*values.AllPrototype); ok {
-		return "", true
-	}
+  for _, key := range getables {
+    v, err := interf.GetInstanceMember(key, false, ctx)
+    if err != nil {
+      panic(err)
+    }
 
-	msg, _ := PrototypeImplements(proto, p)
+    vProto, err := proto.GetInstanceMember(key, false, ctx)
+    if err != nil {
+      return err
+    }
 
-	p.cache[proto] = msg
+    if err := v.Check(vProto, ctx); err != nil {
+      return err
+    }
+  }
 
-	return msg, msg == ""
-}
+  for key, v := range setables {
+    if err := proto.SetInstanceMember(key, false, v, ctx); err != nil {
+      return err
+    }
+  }
 
-func (p *BuiltinInterface) CastInstance(v *values.Instance, typeChildren []*values.NestedType, ctx context.Context) (values.Value, error) {
-	if typeChildren != nil {
-		return nil, ctx.NewError("Error: " + p.Name() + " can't have content types")
-	}
+  interf.appendImplementation(proto)
 
-	newV, ok := v.ChangeInstanceInterface(p, false, true)
-	if !ok {
-		return nil, ctx.NewError("Error: " + v.TypeName() + " doesn't inherit from " + p.Name())
-	}
-
-	return newV, nil
-
-}
-
-func (p *BuiltinInterface) GenerateInstance(stack values.Stack, keys []string, args []values.Value, ctx context.Context) (values.Value, error) {
-	return nil, ctx.NewError("Error: builtin interface can't yet be generated")
+  return nil
 }

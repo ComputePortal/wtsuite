@@ -1,7 +1,6 @@
 package js
 
 import (
-	"strconv"
 	"strings"
 
 	"./prototypes"
@@ -11,60 +10,8 @@ import (
 	"../patterns"
 )
 
-var _binaryPrecedenceMap = map[string]int{
-	".":          19, // not actually used, treated separately
-	"**":         16,
-	"*":          15,
-	"/":          15,
-	"%":          15,
-	"+":          14,
-	"-":          14,
-	"<<":         13,
-	">>":         13,
-	">>>":        13,
-	"<":          12,
-	"<=":         12,
-	">":          12,
-	">=":         12,
-	"in":         12,
-	"instanceof": 12,
-	"==":         11,
-	"!=":         11,
-	"===":        11,
-	"!==":        11,
-	"&":          10,
-	"^":          9,
-	"|":          8,
-	"&&":         6,
-	"||":         5,
-	"=":          3,
-}
-
-var _preUnaryPrecedenceMap = map[string]int{
-	"new":    19,
-	"!":      17,
-	"-":      17,
-	"~":      17,
-	"+":      17,
-	"++":     17,
-	"--":     17,
-	"typeof": 17,
-	"delete": 17,
-	"await":  17,
-}
-
-var _postUnaryPrecedenceMap = map[string]int{
-	"++": 18,
-	"--": 18,
-}
-
-var _ternaryPrecedenceMap = map[string]int{
-	"? :": 4,
-}
-
 type Op interface {
 	Args() []Token
-	Precedence() int
 	Expression
 }
 
@@ -389,22 +336,6 @@ func NewTernaryOp(op string, a Expression, b Expression, c Expression, ctx conte
 	}
 }
 
-func (t *BinaryOp) Precedence() int {
-	return _binaryPrecedenceMap[t.op]
-}
-
-func (t *TernaryOp) Precedence() int {
-	return _ternaryPrecedenceMap[t.op0+" "+t.op1]
-}
-
-func (t *PreUnaryOp) Precedence() int {
-	return _preUnaryPrecedenceMap[t.op]
-}
-
-func (t *PostUnaryOp) Precedence() int {
-	return _postUnaryPrecedenceMap[t.op]
-}
-
 func (t *PreUnaryOp) Dump(indent string) string {
 	var b strings.Builder
 
@@ -439,19 +370,11 @@ func (t *PostUnaryOp) HoistNames(scope Scope) error {
 	return nil
 }
 
-func (t *PostUnaryOp) HoistValues(stack values.Stack) error {
-	return nil
-}
-
 func (t *PreUnaryOp) AddStatement(st Statement) {
 	panic("not a block")
 }
 
 func (t *PreUnaryOp) HoistNames(scope Scope) error {
-	return nil
-}
-
-func (t *PreUnaryOp) HoistValues(stack values.Stack) error {
 	return nil
 }
 
@@ -494,14 +417,7 @@ func (t *PreUnaryOp) WriteExpression() string {
 	}
 
 	if aOp, ok := t.a.(Op); ok {
-		if aOp.Precedence() < t.Precedence() {
-			panic("unexpected")
-			b.WriteString("(")
-			b.WriteString(aOp.WriteExpression())
-			b.WriteString(")")
-		} else {
-			b.WriteString(aOp.WriteExpression())
-		}
+    b.WriteString(aOp.WriteExpression())
 	} else {
 		b.WriteString(t.a.WriteExpression())
 	}
@@ -512,14 +428,7 @@ func (t *PostUnaryOp) WriteExpression() string {
 	var b strings.Builder
 
 	if aOp, ok := t.a.(Op); ok {
-		if aOp.Precedence() < t.Precedence() {
-			panic("unexpected")
-			b.WriteString("(")
-			b.WriteString(aOp.WriteExpression())
-			b.WriteString(")")
-		} else {
-			b.WriteString(aOp.WriteExpression())
-		}
+    b.WriteString(aOp.WriteExpression())
 	} else {
 		b.WriteString(t.a.WriteExpression())
 	}
@@ -546,14 +455,7 @@ func (t *TernaryOp) WriteExpression() string {
 func (t *BinaryOp) WriteExpression() string {
 	var b strings.Builder
 	if aOp, ok := t.a.(Op); ok {
-		if aOp.Precedence() < t.Precedence() {
-			panic("unexpected")
-			b.WriteString("(")
-			b.WriteString(aOp.WriteExpression())
-			b.WriteString(")")
-		} else {
-			b.WriteString(aOp.WriteExpression())
-		}
+    b.WriteString(aOp.WriteExpression())
 	} else {
 		b.WriteString(t.a.WriteExpression())
 	}
@@ -570,15 +472,7 @@ func (t *BinaryOp) WriteExpression() string {
 	}
 
 	if bOp, ok := t.b.(Op); ok {
-		if bOp.Precedence() < t.Precedence() {
-			errCtx := t.Context()
-			panic(errCtx.NewError("unexpected precedence for b (" + strconv.Itoa(bOp.Precedence()) + " is less than " + strconv.Itoa(t.Precedence()) + ")").Error())
-			b.WriteString("(")
-			b.WriteString(bOp.WriteExpression())
-			b.WriteString(")")
-		} else {
-			b.WriteString(bOp.WriteExpression())
-		}
+    b.WriteString(bOp.WriteExpression())
 	} else {
 		b.WriteString(t.b.WriteExpression())
 	}
@@ -790,13 +684,13 @@ func (t *DeleteOp) UniqueStatementNames(ns Namespace) error {
 	return t.UniqueExpressionNames(ns)
 }
 
-func (t *PostIncrOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *PostIncrOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	if !a.IsInstanceOf(prototypes.Int) {
+	if !prototypes.IsInt(a) {
 		errCtx := t.a.Context()
 		return nil, errCtx.NewError("Error: expected Int, got " + a.TypeName())
 	}
@@ -804,43 +698,28 @@ func (t *PostIncrOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 	result := prototypes.NewInt(ctx)
 
-	switch lhs := t.a.(type) {
-	case *VarExpression:
-		if err := stack.SetValue(lhs.ref, result, true, ctx); err != nil {
-			return nil, err
-		}
-	}
-
 	return result, nil
 }
 
-func (t *PostDecrOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *PostDecrOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	if !a.IsInstanceOf(prototypes.Int) {
+	if !prototypes.IsInt(a) {
 		errCtx := t.a.Context()
 		return nil, errCtx.NewError("Error: expected Int, got " + a.TypeName())
 	}
 
 	ctx := t.Context()
-
 	result := prototypes.NewInt(ctx)
-
-	switch lhs := t.a.(type) {
-	case *VarExpression:
-		if err := stack.SetValue(lhs.ref, result, true, ctx); err != nil {
-			return nil, err
-		}
-	}
 
 	return result, nil
 }
 
-func (t *PostIncrOp) EvalStatement(stack values.Stack) error {
-	_, err := t.EvalExpression(stack)
+func (t *PostIncrOp) EvalStatement() error {
+	_, err := t.EvalExpression()
 	return err
 }
 
@@ -852,8 +731,8 @@ func (t *PostIncrOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *PostDecrOp) EvalStatement(stack values.Stack) error {
-	_, err := t.EvalExpression(stack)
+func (t *PostDecrOp) EvalStatement() error {
+	_, err := t.EvalExpression()
 	return err
 }
 
@@ -865,23 +744,23 @@ func (t *PostDecrOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *DeleteOp) EvalStatement(stack values.Stack) error {
-	_, err := t.EvalExpression(stack)
+func (t *DeleteOp) EvalStatement() error {
+	_, err := t.EvalExpression()
 	return err
 }
 
-func (t *TernaryOp) evalArgs(stack values.Stack) (values.Value, values.Value, values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *TernaryOp) evalArgs() (values.Value, values.Value, values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	b, err := t.b.EvalExpression(stack)
+	b, err := t.b.EvalExpression()
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	c, err := t.c.EvalExpression(stack)
+	c, err := t.c.EvalExpression()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -901,13 +780,13 @@ func (t *TernaryOp) Walk(fn WalkFunc) error {
   return t.c.Walk(fn)
 }
 
-func (t *BinaryOp) evalArgs(stack values.Stack) (values.Value, values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *BinaryOp) evalArgs() (values.Value, values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	b, err := t.b.EvalExpression(stack)
+	b, err := t.b.EvalExpression()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -923,8 +802,8 @@ func (t *BinaryOp) Walk(fn WalkFunc) error {
   return t.b.Walk(fn)
 }
 
-func (t *UnaryOp) evalArg(stack values.Stack) (values.Value, error) {
-	if a, err := t.a.EvalExpression(stack); err != nil {
+func (t *UnaryOp) evalArg() (values.Value, error) {
+	if a, err := t.a.EvalExpression(); err != nil {
 		return nil, err
 	} else {
 		return a, nil
@@ -935,23 +814,23 @@ func (t *UnaryOp) Walk(fn WalkFunc) error {
   return t.a.Walk(fn)
 }
 
-func (t *NewOp) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *NewOp) EvalExpression() (values.Value, error) {
 	call, ok := t.a.(*Call)
 	if !ok {
 		panic("expected call")
 	}
 
-	lhsCallValue, err := call.lhs.EvalExpression(stack)
+	lhsCallValue, err := call.lhs.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	args, err := call.evalArgs(stack)
+	args, err := call.evalArgs()
 	if err != nil {
 		return nil, err
 	}
 
-	return lhsCallValue.EvalConstructor(stack, args, t.Context())
+	return lhsCallValue.EvalConstructor(args, t.Context())
 }
 
 func (t *NewOp) Walk(fn WalkFunc) error {
@@ -962,15 +841,15 @@ func (t *NewOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *DeleteOp) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *DeleteOp) EvalExpression() (values.Value, error) {
 	switch t.a.(type) {
 	case *Member, *Index:
 	default:
 		errCtx := t.Context()
-		return nil, errCtx.NewError("Error: expected Member of Index rhs to delete")
+		return nil, errCtx.NewError("Error: expected Member or Index rhs to delete")
 	}
 
-	if _, err := t.a.EvalExpression(stack); err != nil {
+	if _, err := t.a.EvalExpression(); err != nil {
 		return nil, err
 	}
 
@@ -985,8 +864,8 @@ func (t *DeleteOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *TypeOfOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	if _, err := t.a.EvalExpression(stack); err != nil {
+func (t *TypeOfOp) EvalExpression() (values.Value, error) {
+	if _, err := t.a.EvalExpression(); err != nil {
 		return nil, err
 	}
 
@@ -1002,8 +881,8 @@ func (t *TypeOfOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *InOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	if _, _, err := t.BinaryOp.evalArgs(stack); err != nil {
+func (t *InOp) EvalExpression() (values.Value, error) {
+	if _, _, err := t.BinaryOp.evalArgs(); err != nil {
 		return nil, err
 	}
 
@@ -1018,56 +897,54 @@ func (t *InOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *AddOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *AddOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := t.Context()
 
-	aStr, aOk := a.LiteralStringValue()
-	bStr, bOk := b.LiteralStringValue()
-	if aOk && bOk {
-		// literal concatenation
-		return prototypes.NewLiteralString(aStr+bStr, t.Context()), nil
-	}
+  isString := false
+  isInt := false
+  isNumber := false
 
 	switch {
-	case values.IsAllNull(a) && values.IsAllNull(b):
-		return values.NewAllNull(ctx), nil
-	case values.IsAllNull(a):
-		if !b.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean) {
-			return nil, ctx.NewError("Error: expected String, Number, of Boolean for second argument")
-		}
-		return values.NewContextValue(b.RemoveLiteralness(true), ctx), nil
-	case values.IsAllNull(b):
-		if !a.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean) {
-			return nil, ctx.NewError("Error: expected String, Number, of Boolean for first argument")
-		}
-		return values.NewContextValue(a.RemoveLiteralness(true), ctx), nil
-	case a.IsInstanceOf(prototypes.String):
-		if !b.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean) {
+	case prototypes.IsString(a):
+		if !prototypes.IsStringable(b) {
 			return nil, ctx.NewError("Error: expected String for second argument (hint: first argument is String)")
 		}
 		return prototypes.NewString(ctx), nil
-	case b.IsInstanceOf(prototypes.String):
-		if !a.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean) {
+	case prototypes.IsString(b):
+		if !prototypes.IsStringable(a) {
 			return nil, ctx.NewError("Error: expected String for first argument (hint: second argument is String)")
 		}
-		return prototypes.NewString(ctx), nil
-	case a.IsInstanceOf(prototypes.Int) && b.IsInstanceOf(prototypes.Int):
-		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
-		return prototypes.NewNumber(ctx), nil
-	case a.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean) &&
-		b.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean):
-		return prototypes.NewString(ctx), nil
+
+    isString = true
+	case prototypes.IsInt(a) && prototypes.IsInt(b):
+    isInt = true
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
+    isNumber = true
+	case prototypes.IsStringable(a) && prototypes.IsStringable(b):
+    isString = true
 	default:
 		return nil, ctx.NewError("Error: invalid operands for '+' operator" +
 			" (expected two Numbers, or a String and String/Boolean/Number, got " +
 			a.TypeName() + " and " + b.TypeName() + ")")
 	}
+
+  if isString && (isNumber || isInt) {
+    return values.NewAny(ctx), nil
+  } else if isNumber {
+    return prototypes.NewNumber(ctx), nil
+  } else if isInt {
+    return prototypes.NewInt(ctx), nil
+  } else {
+    if !isString {
+      panic("unexpected")
+    }
+    return prototypes.NewString(ctx), nil
+  } 
 }
 
 func (t *AddOp) Walk(fn WalkFunc) error {
@@ -1078,8 +955,8 @@ func (t *AddOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *SubOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *SubOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1087,21 +964,9 @@ func (t *SubOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 
 	switch {
-	case values.IsAllNull(a) && values.IsAllNull(b):
-		return values.NewAllNull(ctx), nil
-	case values.IsAllNull(a):
-		if !b.IsInstanceOf(prototypes.Number) {
-			return nil, ctx.NewError("Error: expected Number for second argument")
-		}
-		return values.NewContextValue(b, ctx), nil
-	case values.IsAllNull(b):
-		if !a.IsInstanceOf(prototypes.Number) {
-			return nil, ctx.NewError("Error: expected Number for first argument")
-		}
-		return values.NewContextValue(a, ctx), nil
-	case a.IsInstanceOf(prototypes.Int) && b.IsInstanceOf(prototypes.Int):
+	case prototypes.IsInt(a) && prototypes.IsInt(b):
 		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
 		return prototypes.NewNumber(ctx), nil
 	default:
 		return nil, ctx.NewError("Error: invalid operands for '-' operator" +
@@ -1118,8 +983,8 @@ func (t *SubOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *DivOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *DivOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1127,7 +992,7 @@ func (t *DivOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 
 	switch {
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
 		return prototypes.NewNumber(ctx), nil
 	default:
 		return nil, ctx.NewError("Error: invalid operands for '/' operator" +
@@ -1144,8 +1009,8 @@ func (t *DivOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *MulOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *MulOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1153,9 +1018,9 @@ func (t *MulOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 
 	switch {
-	case a.IsInstanceOf(prototypes.Int) && b.IsInstanceOf(prototypes.Int):
+	case prototypes.IsInt(a) && prototypes.IsInt(b):
 		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
 		return prototypes.NewNumber(ctx), nil
 	default:
 		return nil, ctx.NewError("Error: invalid operands for '*' operator" +
@@ -1172,8 +1037,8 @@ func (t *MulOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *RemainderOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *RemainderOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1181,9 +1046,9 @@ func (t *RemainderOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 
 	switch {
-	case a.IsInstanceOf(prototypes.Int) && b.IsInstanceOf(prototypes.Int):
+	case prototypes.IsInt(a) && prototypes.IsInt(b):
 		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
 		return prototypes.NewNumber(ctx), nil
 	default:
 		return nil, ctx.NewError("Error: invalid operands for '%' operator" +
@@ -1200,8 +1065,8 @@ func (t *RemainderOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *PowOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *PowOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1209,9 +1074,9 @@ func (t *PowOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 
 	switch {
-	case a.IsInstanceOf(prototypes.Int) && b.IsInstanceOf(prototypes.Int):
+	case prototypes.IsInt(a) && prototypes.IsInt(b):
 		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
 		return prototypes.NewNumber(ctx), nil
 	default:
 		return nil, ctx.NewError("Error: invalid operands for '**' operator" +
@@ -1229,8 +1094,8 @@ func (t *PowOp) Walk(fn WalkFunc) error {
 }
 
 // >=, <=, >, <
-func (t *OrderCompareOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *OrderCompareOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1238,16 +1103,15 @@ func (t *OrderCompareOp) EvalExpression(stack values.Stack) (values.Value, error
 	ctx := t.Context()
 
 	switch {
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
-		return prototypes.NewBoolean(ctx), nil
-	case a.IsInstanceOf(prototypes.String) && b.IsInstanceOf(prototypes.String):
-		return prototypes.NewBoolean(ctx), nil
-	case a.IsInstanceOf(prototypes.Boolean) && b.IsInstanceOf(prototypes.Boolean):
-		return prototypes.NewBoolean(ctx), nil
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
+	case prototypes.IsString(a) && prototypes.IsString(b):
+	case prototypes.IsBoolean(a) && prototypes.IsBoolean(b):
 	default:
 		return nil, ctx.NewError("Error: expected a 2 Numbers, 2 Strings or 2 Booleans" +
 			" (got " + a.TypeName() + " and " + b.TypeName() + ")")
 	}
+
+  return prototypes.NewBoolean(ctx), nil
 }
 
 // TODO: implement for specific types
@@ -1259,8 +1123,8 @@ func (t *OrderCompareOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *EqCompareOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	_, _, err := t.BinaryOp.evalArgs(stack)
+func (t *EqCompareOp) EvalExpression() (values.Value, error) {
+	_, _, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -1278,23 +1142,12 @@ func (t *EqCompareOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *StrictEqOp) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *StrictEqOp) EvalExpression() (values.Value, error) {
 	ctx := t.Context()
 
-	a, b, err := t.BinaryOp.evalArgs(stack)
+	_, _, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
-	}
-
-	// return literal bool if both a and b are null
-	if _, ok := t.a.(*LiteralNull); ok {
-		if b.IsNull() && !values.IsAllNull(b) {
-			return prototypes.NewLiteralBoolean(true, ctx), nil
-		}
-	} else if _, ok := t.b.(*LiteralNull); ok {
-		if a.IsNull() && !values.IsAllNull(a) {
-			return prototypes.NewLiteralBoolean(true, ctx), nil
-		}
 	}
 
 	return prototypes.NewBoolean(ctx), nil
@@ -1308,23 +1161,12 @@ func (t *StrictEqOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *StrictNEOp) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *StrictNEOp) EvalExpression() (values.Value, error) {
 	ctx := t.Context()
 
-	a, b, err := t.BinaryOp.evalArgs(stack)
+	_, _, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
-	}
-
-	// return literal bool if both a and b are null
-	if _, ok := t.a.(*LiteralNull); ok {
-		if b.IsNull() { //&& !values.IsAllNull(b) {
-			return prototypes.NewLiteralBoolean(false, ctx), nil
-		}
-	} else if _, ok := t.b.(*LiteralNull); ok {
-		if a.IsNull() { //&& !values.IsAllNull(a) {
-			return prototypes.NewLiteralBoolean(false, ctx), nil
-		}
 	}
 
 	return prototypes.NewBoolean(ctx), nil
@@ -1342,13 +1184,13 @@ func (t *NewOp) WriteExpression() string {
 	return t.PreUnaryOp.WriteExpression()
 }
 
-func (t *PreIncrOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *PreIncrOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	if !a.IsInstanceOf(prototypes.Int) {
+	if !prototypes.IsInt(a) {
 		errCtx := t.a.Context()
 		return nil, errCtx.NewError("Error: expected Int, got " + a.TypeName())
 	}
@@ -1364,13 +1206,13 @@ func (t *PreIncrOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *PreDecrOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *PreDecrOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	if !a.IsInstanceOf(prototypes.Int) {
+	if !prototypes.IsInt(a) {
 		errCtx := t.a.Context()
 		return nil, errCtx.NewError("Error: expected Int, got " + a.TypeName())
 	}
@@ -1386,8 +1228,8 @@ func (t *PreDecrOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *NegOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *NegOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
@@ -1395,9 +1237,9 @@ func (t *NegOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 
 	switch {
-	case a.IsInstanceOf(prototypes.Int):
+	case prototypes.IsInt(a):
 		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean, prototypes.Int):
+  case prototypes.IsNumber(a):
 		return prototypes.NewNumber(ctx), nil
 	default:
 		return nil, ctx.NewError("Error: expected a Number, got " + a.TypeName())
@@ -1412,8 +1254,8 @@ func (t *NegOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *PosOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *PosOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
@@ -1421,10 +1263,12 @@ func (t *PosOp) EvalExpression(stack values.Stack) (values.Value, error) {
 	ctx := t.Context()
 
 	switch {
-	case a.IsInstanceOf(prototypes.Int):
+	case prototypes.IsInt(a):
 		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.String, prototypes.Number, prototypes.Boolean, prototypes.Int):
-		return prototypes.NewNumber(ctx), nil
+  case prototypes.IsNumber(a):
+    return prototypes.NewNumber(ctx), nil
+  //case prototypes.IsStringable(a):
+		//return prototypes.NewString(ctx), nil
 	default:
 		return nil, ctx.NewError("Error: expected a Number, got " + a.TypeName())
 	}
@@ -1438,15 +1282,15 @@ func (t *PosOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *BinaryBitOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, b, err := t.BinaryOp.evalArgs(stack)
+func (t *BinaryBitOp) EvalExpression() (values.Value, error) {
+	a, b, err := t.BinaryOp.evalArgs()
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := t.Context()
 
-	if !(a.IsInstanceOf(prototypes.Int) && b.IsInstanceOf(prototypes.Int)) {
+	if !(prototypes.IsInt(a) && prototypes.IsInt(b)) {
 		errCtx := ctx
 		return nil, errCtx.NewError("Error: expected two Int arguments," +
 			" got " + a.TypeName() + " and " + b.TypeName())
@@ -1464,15 +1308,15 @@ func (t *BinaryBitOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *BitNotOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *BitNotOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := t.Context()
 
-	if !a.IsInstanceOf(prototypes.Int) {
+	if !prototypes.IsInt(a) {
 		return nil, ctx.NewError("Error: expected Int argument, got " + a.TypeName())
 	}
 
@@ -1487,15 +1331,15 @@ func (t *BitNotOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *LogicalNotOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *LogicalNotOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := t.Context()
 
-	if !a.IsInstanceOf(prototypes.Boolean) {
+	if !prototypes.IsBoolean(a) {
 		return nil, ctx.NewError("Error: expected Boolean argument, got " + a.TypeName())
 	}
 
@@ -1515,13 +1359,13 @@ func (t *LogicalNotOp) Walk(fn WalkFunc) error {
 }
 
 
-func (t *LogicalBinaryOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *LogicalBinaryOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	b, err := t.b.EvalExpression(stack)
+	b, err := t.b.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
@@ -1530,11 +1374,11 @@ func (t *LogicalBinaryOp) EvalExpression(stack values.Stack) (values.Value, erro
 
 	// also allow two numbers (to absorb nans, nulls etc)
 	switch {
-	case a.IsInstanceOf(prototypes.Boolean) && b.IsInstanceOf(prototypes.Boolean):
+	case prototypes.IsBoolean(a) && prototypes.IsBoolean(b):
 		return prototypes.NewBoolean(ctx), nil
-	case a.IsInstanceOf(prototypes.Int) && b.IsInstanceOf(prototypes.Int):
+	case prototypes.IsInt(a) && prototypes.IsInt(b):
 		return prototypes.NewInt(ctx), nil
-	case a.IsInstanceOf(prototypes.Number) && b.IsInstanceOf(prototypes.Number):
+	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
 		return prototypes.NewNumber(ctx), nil
 	default:
 		err := ctx.NewError("Error: expected two Booleans, or two Numbers")
@@ -1558,21 +1402,20 @@ func (t *LogicalAndOp) Walk(fn WalkFunc) error {
   return fn(t)
 }
 
-func (t *LogicalAndOp) CollectTypeGuards(stack values.Stack, c map[interface{}]values.Interface) (bool, error) {
-	// eval expression isn't strictly necessary, but the shortcircuit Boolean/Int/Number evals might give an error
-	if _, err := t.EvalExpression(stack); err != nil {
+func (t *LogicalAndOp) CollectTypeGuards(c map[Variable]values.Interface) (bool, error) {
+	if _, err := t.EvalExpression(); err != nil {
 		return false, err
 	}
 
 	if a, ok := t.a.(TypeGuard); ok {
 		if b, ok := t.b.(TypeGuard); ok {
-			ok, err := a.CollectTypeGuards(stack, c)
+			ok, err := a.CollectTypeGuards(c)
 			if err != nil {
 				return false, err
 			}
 
 			if ok {
-				ok, err := b.CollectTypeGuards(stack, c)
+				ok, err := b.CollectTypeGuards(c)
 				if err != nil {
 					return false, err
 				}
@@ -1585,29 +1428,30 @@ func (t *LogicalAndOp) CollectTypeGuards(stack values.Stack, c map[interface{}]v
 	return false, nil
 }
 
-func (t *IfElseOp) EvalExpression(stack values.Stack) (values.Value, error) {
-	a, err := t.a.EvalExpression(stack)
+func (t *IfElseOp) EvalExpression() (values.Value, error) {
+	a, err := t.a.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	b, err := t.b.EvalExpression(stack)
+	b, err := t.b.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	c, err := t.c.EvalExpression(stack)
+	c, err := t.c.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
 	ctx := t.Context()
 
-	if !a.IsInstanceOf(prototypes.Boolean) {
+	if !prototypes.IsBoolean(a) {
 		return nil, ctx.NewError("Error: expected Boolean first argument, got " + a.TypeName())
 	}
 
-	return values.NewMulti([]values.Value{b, c}, ctx), nil
+  common := values.CommonValue([]values.Value{b, c})
+	return values.NewContextValue(common, ctx), nil
 }
 
 func (t *IfElseOp) Walk(fn WalkFunc) error {

@@ -1,41 +1,48 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var FileReader *BuiltinPrototype = allocBuiltinPrototype()
-
-func fileReaderCallback(stack values.Stack, this *values.Instance,
-	args []values.Value, ctx context.Context) (values.Value, error) {
-	arg := args[0]
-
-	event := NewEvent(this, ctx)
-	if err := arg.EvalMethod(stack.Parent(), []values.Value{event}, ctx); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+type FileReader struct {
+  BuiltinPrototype
 }
 
-func generateFileReader() bool {
-	*FileReader = BuiltinPrototype{
-		"FileReader", nil,
-		map[string]BuiltinFunction{
-			"onload":  NewSetterFunction(&Function{}, fileReaderCallback),
-			"onerror": NewSetterFunction(&Function{}, fileReaderCallback),
-			"result": NewGetterFunction(func(stack values.Stack, this *values.Instance,
-				args []values.Value, ctx context.Context) (values.Value, error) {
-				return NewInstance(ArrayBuffer, ctx), nil
-			}),
-			"readAsArrayBuffer": NewNormal(Blob, nil),
-		},
-		NewConstructor(&None{}, FileReader),
-	}
-
-	return true
+func NewFileReaderPrototype() values.Prototype {
+  return &FileReader{newBuiltinPrototype("FileReader")}
 }
 
-var _FileReaderOk = generateFileReader()
+func NewFileReader(ctx context.Context) values.Value {
+  return values.NewInstance(NewFileReaderPrototype(), ctx)
+}
+
+func (p *FileReader) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "readAsArrayBuffer":
+    return values.NewFunction([]values.Value{NewBlob(ctx)}, ctx), nil
+  case "result":
+    return NewArrayBuffer(ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *FileReader) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  switch key {
+  case "onload", "onerror":
+    callback := values.NewFunction([]values.Value{NewEvent(nil, ctx), nil}, ctx)
+    return callback.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: FileReader." + key + " not setable")
+  }
+}
+
+func (p *FileReader) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+
+  return values.NewClass([][]values.Value{
+    []values.Value{},
+  }, NewFileReaderPrototype(), ctx), nil
+}

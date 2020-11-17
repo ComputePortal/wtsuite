@@ -3,8 +3,8 @@ package js
 import (
 	"strings"
 
+  "./values"
 	"./prototypes"
-	"./values"
 
 	"../context"
 )
@@ -113,9 +113,6 @@ func (t *If) WriteStatement(indent string) string {
 	return b.String()
 }
 
-///////////////////////////
-// 1. Name resolution stage
-///////////////////////////
 func (t *If) HoistNames(scope Scope) error {
 	for _, statements := range t.grouped {
 		t.statements = statements
@@ -146,24 +143,19 @@ func (t *If) ResolveStatementNames(scope Scope) error {
 	return nil
 }
 
-func (t *If) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-func (t *If) evalTypeGuards(stack values.Stack, cond Expression) (map[interface{}]values.Interface, error) {
+func (t *If) evalTypeGuards(cond Expression) (map[Variable]values.Interface, error) {
 	if cond == nil {
 		return nil, nil
 	}
 
-	if typeGuard, ok := cond.(TypeGuard); ok {
-		typeGuards := make(map[interface{}]values.Interface)
-
-		isTG, err := typeGuard.CollectTypeGuards(stack, typeGuards)
+	if typeGuardCond, ok := cond.(TypeGuard); ok {
+    typeGuards := make(map[Variable]values.Interface)
+		hasTypeGuards, err := typeGuardCond.CollectTypeGuards(typeGuards)
 		if err != nil {
 			return nil, err
 		}
 
-		if isTG {
+		if hasTypeGuards {
 			if len(typeGuards) == 0 {
 				// some conditions can work alongside typeguards, even though they dont add any typeguards
 				return nil, nil
@@ -178,23 +170,23 @@ func (t *If) evalTypeGuards(stack values.Stack, cond Expression) (map[interface{
 	}
 }
 
-func (t *If) EvalStatement(stack values.Stack) error {
+func (t *If) EvalStatement() error {
 	for i, cond := range t.conds {
 		condIsLit := false
 		condLitVal := false
-		typeGuards, err := t.evalTypeGuards(stack, cond)
+		typeGuards, err := t.evalTypeGuards(cond)
 		if err != nil {
 			return err
 		}
 
 		if cond != nil && typeGuards == nil { // cond == nil -> else {...}
 			// condition cannot be literal if there are typeGuards present
-			condVal, err := cond.EvalExpression(stack)
+			condVal, err := cond.EvalExpression()
 			if err != nil {
 				return err
 			}
 
-			if !condVal.IsInstanceOf(prototypes.Boolean) {
+			if !prototypes.IsBoolean(condVal) {
 				errCtx := condVal.Context()
 				return errCtx.NewError("Error: expected boolean condition")
 			}
@@ -206,11 +198,21 @@ func (t *If) EvalStatement(stack values.Stack) error {
 			}
 		}
 
-		subStack := NewTypeGuardBranchStack(typeGuards, stack)
+    oldValues := make(map[Variable]values.Value)
+    if typeGuards != nil {
+      for key, typeGuard := range typeGuards {
+        oldValues[key] = key.GetValue()
+        key.SetValue(values.NewInstance(typeGuard, typeGuard.Context()))
+      }
+    }
 
-		if err := t.Block.evalStatements(t.grouped[i], subStack); err != nil {
+		if err := t.Block.evalStatements(t.grouped[i]); err != nil {
 			return err
 		}
+
+    for key, val := range oldValues {
+      key.SetValue(val)
+    }
 
 		if condIsLit && condLitVal {
 			break

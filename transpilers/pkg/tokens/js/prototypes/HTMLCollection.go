@@ -1,65 +1,43 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var HTMLCollection *HTMLCollectionPrototype = allocHTMLCollectionPrototype()
-
-type HTMLCollectionPrototype struct {
-	BuiltinPrototype
+type HTMLCollection struct {
+  BuiltinPrototype
 }
 
-func allocHTMLCollectionPrototype() *HTMLCollectionPrototype {
-	return &HTMLCollectionPrototype{BuiltinPrototype{
-		"", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}}
+func NewHTMLCollectionPrototype() values.Prototype {
+  return &HTMLCollection{newBuiltinPrototype("HTMLCollection")}
 }
 
-// exactly the same as BuiltinPrototype.Check, but with *HTMLCollectionPrototype receiver
-func (p *HTMLCollectionPrototype) Check(args []interface{}, pos int, ctx context.Context) (int, error) {
-	return CheckPrototype(p, args, pos, ctx)
+func NewHTMLCollection(ctx context.Context) values.Value {
+  return values.NewInstance(NewHTMLCollectionPrototype(), ctx)
 }
 
-func (p *HTMLCollectionPrototype) HasAncestor(other_ values.Interface) bool {
-	if other, ok := other_.(*HTMLCollectionPrototype); ok {
-		if other == p {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		return false
-	}
+func (p *HTMLCollection) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
+  elem := NewHTMLElement(ctx)
+
+  switch key {
+  case ".getitem", "item":
+    return values.NewFunction([]values.Value{i, elem}, ctx), nil
+  case ".setitem":
+    return values.NewFunction([]values.Value{i, elem, nil}, ctx), nil
+  case "length":
+    return i, nil
+  case "nameItem":
+    return values.NewFunction([]values.Value{s, elem}, ctx), nil
+  default:
+    return nil, nil
+  }
 }
 
-func (p *HTMLCollectionPrototype) GetIndex(stack values.Stack, this *values.Instance,
-	index values.Value, ctx context.Context) (values.Value, error) {
-	return NewInstance(HTMLElement, ctx), nil
+func (p *HTMLCollection) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewHTMLCollectionPrototype(), ctx), nil
 }
-
-func (p *HTMLCollectionPrototype) SetIndex(stack values.Stack, this *values.Instance,
-	index values.Value, arg values.Value, ctx context.Context) error {
-	return CheckInputs(&And{Int, HTMLElement}, []values.Value{index, arg}, ctx)
-}
-
-func generateHTMLCollectionPrototype() bool {
-	*HTMLCollection = HTMLCollectionPrototype{BuiltinPrototype{
-		"HTMLCollection", nil,
-		map[string]BuiltinFunction{
-			"item":      NewNormal(Int, HTMLElement),
-			"length":    NewGetter(Int),
-			"namedItem": NewNormal(String, HTMLElement),
-		},
-		NewNoContentGenerator(HTMLCollection),
-	},
-	}
-
-	return true
-}
-
-var _HTMLCollectionOk = generateHTMLCollectionPrototype()

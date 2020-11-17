@@ -151,7 +151,10 @@ func (p *JSParser) buildEnum(ts []raw.Token) (*js.Enum, error) {
 		}
 	}
 
-	extends := js.NewTypeExpression(extendsName, nil, nil, enCtx)
+	extends, err := js.NewTypeExpression(extendsName, nil, nil, enCtx)
+  if err != nil {
+    return nil, err
+  }
 
 	return js.NewEnum(clType, extends, keys, values, enCtx)
 }

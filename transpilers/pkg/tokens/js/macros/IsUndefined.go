@@ -59,14 +59,14 @@ func (m *IsUndefined) ResolveExpressionNames(scope js.Scope) error {
 	return arg_.ResolveExpressionNames(scope)
 }
 
-func (m *IsUndefined) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *IsUndefined) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
 	if m.varNotFound {
 		return prototypes.NewLiteralBoolean(true, ctx), nil
 	}
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}

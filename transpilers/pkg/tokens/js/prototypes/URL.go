@@ -1,19 +1,51 @@
 package prototypes
 
-var URL *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateURLPrototype() bool {
-	*URL = BuiltinPrototype{
-		"URL", nil,
-		map[string]BuiltinFunction{
-			"searchParams":    NewGetter(URLSearchParams),
-			"createObjectURL": NewStatic(Blob, String),
-			"revokeObjectURL": NewStatic(String, nil),
-		},
-		NewConstructor(&And{String, &Opt{String}}, URL),
-	}
+  "../../context"
+)
 
-	return true
+type URL struct {
+  BuiltinPrototype
 }
 
-var _URLOk = generateURLPrototype()
+func NewURLPrototype() values.Prototype {
+  return &URL{newBuiltinPrototype("URL")}
+}
+
+func NewURL(ctx context.Context) values.Value {
+  return values.NewInstance(NewURLPrototype(), ctx)
+}
+
+func (p *URL) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "searchParams":
+    return NewURLSearchParams(ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *URL) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  s := NewString(ctx)
+
+  switch key {
+  case "createObjectURL":
+    return values.NewFunction([]values.Value{NewBlob(ctx), s}, ctx), nil
+  case "revokeObjectURL":
+    return values.NewFunction([]values.Value{s, nil}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *URL) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  s := NewString(ctx)
+
+  return values.NewClass([][]values.Value{
+    []values.Value{s},
+    []values.Value{s, s},
+  }, NewURLPrototype(), ctx), nil
+}

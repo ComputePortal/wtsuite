@@ -26,7 +26,6 @@ type IDMap interface {
 	Set(id string, t IDMapTag)
 
 	Dump() // for debugging
-	FillViewInterface(vif *js.ViewInterface)
 }
 
 type IDMapData struct {
@@ -58,13 +57,5 @@ func (m *IDMapData) Set(id string, t IDMapTag) {
 func (m *IDMapData) Dump() {
 	for k, v := range m.tags {
 		fmt.Println(k + ": " + v.Name())
-	}
-}
-
-func (m *IDMapData) FillViewInterface(vif *js.ViewInterface) {
-	for k, v := range m.tags {
-		if !styles.IsAutoUID(k) {
-			vif.AddElem(k, v.ToJSType(), v.InnerHTML(), v.CollectStates())
-		}
 	}
 }

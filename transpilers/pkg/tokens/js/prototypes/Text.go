@@ -1,15 +1,28 @@
 package prototypes
 
-var Text *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateTextPrototype() bool {
-	*Text = BuiltinPrototype{
-		"Text", Node,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type Text struct {
+  BuiltinPrototype
 }
 
-var _TextOk = generateTextPrototype()
+func NewTextPrototype() values.Prototype {
+  return &Text{newBuiltinPrototype("Text")}
+}
+
+func NewText(ctx context.Context) values.Value {
+  return values.NewInstance(NewTextPrototype(), ctx)
+}
+
+func (p *Text) GetParent() (values.Prototype, error) {
+  return NewNodePrototype(), nil
+}
+
+func (p *Text) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewTextPrototype(), ctx), nil
+}

@@ -14,3 +14,4 @@ out
 *.ttf
 woff2.go
 build
+examples

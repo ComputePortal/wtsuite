@@ -1,15 +1,24 @@
 package prototypes
 
-var ArrayBuffer *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateArrayBuffer() bool {
-	*ArrayBuffer = BuiltinPrototype{
-		"ArrayBuffer", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type ArrayBuffer struct {
+  BuiltinPrototype
 }
 
-var _ArrayBufferOk = generateArrayBuffer()
+func NewArrayBufferPrototype() values.Prototype {
+  return &ArrayBuffer{newBuiltinPrototype("ArrayBuffer")}
+}
+
+func NewArrayBuffer(ctx context.Context) values.Value {
+  return values.NewInstance(NewArrayBufferPrototype(), ctx)
+}
+
+func (p *ArrayBuffer) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewArrayBufferPrototype(), ctx), nil
+}

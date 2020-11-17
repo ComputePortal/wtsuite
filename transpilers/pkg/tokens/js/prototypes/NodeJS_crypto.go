@@ -1,24 +1,29 @@
 package prototypes
 
-var NodeJS_crypto *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-// is actually a builtin nodejs module
-func generateNodeJS_cryptoPrototype() bool {
-	*NodeJS_crypto = BuiltinPrototype{
-		"crypto", nil,
-		map[string]BuiltinFunction{
-      "createCipheriv":   NewStatic(&And{String, &And{Buffer, Buffer}}, 
-        NodeJS_crypto_Cipher),
-      "createDecipheriv": NewStatic(&And{String, &And{Buffer, Buffer}}, 
-        NodeJS_crypto_Decipher),
-			"randomBytes":      NewStatic(Int, Buffer),
-			"Cipher":           NewStaticClassGetter(NodeJS_crypto_Cipher),
-			"Decipher":         NewStaticClassGetter(NodeJS_crypto_Decipher),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+func FillNodeJS_cryptoPackage(pkg values.Package) {
+  pkg.AddPrototype(NewNodeJS_crypto_CipherPrototype())
+  pkg.AddPrototype(NewNodeJS_crypto_DecipherPrototype())
+
+  ctx := context.NewDummyContext()
+  i := NewInt(ctx)
+  s := NewString(ctx)
+  buf := NewNodeJS_Buffer(ctx)
+
+  pkg.AddValue("createCipheriv", values.NewFunction([]values.Value{
+    s, buf, buf, NewNodeJS_crypto_Cipher(ctx),
+  }, ctx))
+
+  pkg.AddValue("createDecipheriv", values.NewFunction([]values.Value{
+    s, buf, buf, NewNodeJS_crypto_Decipher(ctx),
+  }, ctx))
+
+  pkg.AddValue("randomBytes", values.NewFunction([]values.Value{ 
+    i, buf,
+  }, ctx))
 }
-
-var _NodeJS_cryptoOk = generateNodeJS_cryptoPrototype()

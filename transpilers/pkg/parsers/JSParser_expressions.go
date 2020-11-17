@@ -347,15 +347,10 @@ func (p *JSParser) condensePackagePeriods(ts []raw.Token) (*raw.Word, []raw.Toke
 	return nameToken, ts[i:], nil
 }
 
-func (p *JSParser) buildTypeExpression(ts []raw.Token, allowAny bool) (*js.TypeExpression, error) {
+func (p *JSParser) buildTypeExpression(ts []raw.Token) (*js.TypeExpression, error) {
 	nameToken, ts, err := p.condensePackagePeriods(ts)
 	if err != nil {
 		return nil, err
-	}
-
-	if !allowAny && nameToken.Value() == "any" {
-		errCtx := nameToken.Context()
-		return nil, errCtx.NewError("Error: any is only allowed for return types")
 	}
 
 	var contentKeys []*js.Word = nil
@@ -384,7 +379,7 @@ func (p *JSParser) buildTypeExpression(ts []raw.Token, allowAny bool) (*js.TypeE
 
 					somePositional = true
 
-					contentType, err := p.buildTypeExpression(field, false)
+					contentType, err := p.buildTypeExpression(field)
 					if err != nil {
 						return nil, err
 					}
@@ -413,7 +408,7 @@ func (p *JSParser) buildTypeExpression(ts []raw.Token, allowAny bool) (*js.TypeE
 						return nil, err
 					}
 
-					contentType, err := p.buildTypeExpression(components[1], false)
+					contentType, err := p.buildTypeExpression(components[1])
 					if err != nil {
 						return nil, err
 					}
@@ -428,17 +423,17 @@ func (p *JSParser) buildTypeExpression(ts []raw.Token, allowAny bool) (*js.TypeE
 		return nil, errCtx.NewError("Error: bad type expression")
 	}
 
-	return js.NewTypeExpression(nameToken.Value(), contentKeys, contentTypes, nameToken.Context()), nil
+	return js.NewTypeExpression(nameToken.Value(), contentKeys, contentTypes, nameToken.Context())
 }
 
 // extracts angled brackets
 func (p *JSParser) buildClassOrExtendsTypeExpression(ts []raw.Token) (*js.TypeExpression, []raw.Token, error) {
 	if len(ts) == 1 {
-		te, err := p.buildTypeExpression(ts, false)
+		te, err := p.buildTypeExpression(ts)
 		return te, []raw.Token{}, err
 	} else {
 		if raw.IsAnyWord(ts[0]) && raw.IsAngledGroup(ts[1]) {
-			te, err := p.buildTypeExpression(ts[:2], false)
+			te, err := p.buildTypeExpression(ts[:2])
 			return te, ts[2:], err
 		} else if raw.IsAnyWord(ts[0]) {
 			w, rem, err := p.condensePackagePeriods(ts)
@@ -446,7 +441,7 @@ func (p *JSParser) buildClassOrExtendsTypeExpression(ts []raw.Token) (*js.TypeEx
 				return nil, nil, err
 			}
 
-			te, err := p.buildTypeExpression([]raw.Token{w}, false)
+			te, err := p.buildTypeExpression([]raw.Token{w})
 			return te, rem, err
 		} else {
 			errCtx := raw.MergeContexts(ts...)

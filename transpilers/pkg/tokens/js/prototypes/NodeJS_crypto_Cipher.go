@@ -1,18 +1,41 @@
 package prototypes
 
-var NodeJS_crypto_Cipher *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateNodeJS_crypto_CipherPrototype() bool {
-	*NodeJS_crypto_Cipher = BuiltinPrototype{
-		"crypto.Cipher", NodeJS_EventEmitter,
-		map[string]BuiltinFunction{
-      "final":  NewNormal(String, String),
-      "update": NewNormal(&And{String, &And{String, String}}, String),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type NodeJS_crypto_Cipher struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_crypto_CipherOk = generateNodeJS_crypto_CipherPrototype()
+func NewNodeJS_crypto_CipherPrototype() values.Prototype {
+  return &NodeJS_crypto_Cipher{newBuiltinPrototype("Cipher")}
+}
+
+func NewNodeJS_crypto_Cipher(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_crypto_CipherPrototype(), ctx)
+}
+
+func (p *NodeJS_crypto_Cipher) GetParent() (values.Prototype, error) {
+  return NewNodeJS_EventEmitterPrototype(), nil
+}
+
+func (p *NodeJS_crypto_Cipher) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  s := NewString(ctx)
+
+  switch key {
+  case "final":
+    return values.NewFunction([]values.Value{s, s}, ctx), nil
+  case "update":
+    return values.NewFunction([]values.Value{s, s, s, s}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_crypto_Cipher) GetClassValue() (*values.Class, error) {
+  ctx := context.NewDummyContext()
+  return values.NewUnconstructableClass(NewNodeJS_crypto_CipherPrototype(), ctx), nil
+}

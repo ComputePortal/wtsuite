@@ -17,12 +17,15 @@ func (p *JSParser) buildFunctionArgumentInner(nameToken raw.Token,
 
 	var typeExpr *js.TypeExpression = nil
 	if len(typeTokens) > 0 {
-		typeExpr, err = p.buildTypeExpression(typeTokens, false)
+		typeExpr, err = p.buildTypeExpression(typeTokens)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		typeExpr = js.NewTypeExpression("any", nil, nil, nameToken.Context())
+		typeExpr, err = js.NewTypeExpression("any", nil, nil, nameToken.Context())
+    if err != nil {
+      return nil, err
+    }
 	}
 
 	var defArg js.Expression = nil
@@ -38,18 +41,7 @@ func (p *JSParser) buildFunctionArgumentInner(nameToken raw.Token,
 	return js.NewFunctionArgument(name.Value(), typeExpr, defArg, ctx)
 }
 
-func (p *JSParser) buildRestFunctionArgument(t raw.Token) (*js.FunctionArgument, error) {
-	name, err := raw.AssertWord(t)
-	if err != nil {
-		panic(err)
-	}
-
-	ctx := name.Context()
-
-	return js.NewRestFunctionArgument(name.Value(), ctx)
-}
-
-func (p *JSParser) buildFunctionArgument(ts []raw.Token, allowDefaultsAndRest bool,
+func (p *JSParser) buildFunctionArgument(ts []raw.Token, 
 	last bool) (*js.FunctionArgument, error) {
 	switch {
 	case len(ts) == 1 &&
@@ -72,32 +64,19 @@ func (p *JSParser) buildFunctionArgument(ts []raw.Token, allowDefaultsAndRest bo
 		raw.IsAnyWord(ts[0]) &&
 		raw.IsAnyWord(ts[1]) &&
 		raw.IsSymbol(ts[2], patterns.EQUAL):
-		if !allowDefaultsAndRest {
-			errCtx := raw.MergeContexts(ts[2:]...)
-			err := errCtx.NewError("Error: default not allowed in interface")
-			return nil, err
-		}
 		return p.buildFunctionArgumentInner(ts[0], ts[1:2], ts[3:])
 	case len(ts) > 4 &&
 		raw.IsAnyWord(ts[0]) &&
 		raw.IsAnyWord(ts[1]) &&
 		raw.IsAngledGroup(ts[2]) &&
 		raw.IsSymbol(ts[3], patterns.EQUAL):
-		if !allowDefaultsAndRest {
-			errCtx := raw.MergeContexts(ts[4:]...)
-			err := errCtx.NewError("Error: default not allowed in interface")
-			return nil, err
-		}
 		return p.buildFunctionArgumentInner(ts[0], ts[1:3], ts[4:])
 	case len(ts) == 2 && last &&
 		raw.IsSymbol(ts[0], patterns.SPLAT) &&
 		raw.IsAnyWord(ts[1]):
 		// not typed, because it is always an Array
-		if !allowDefaultsAndRest {
-			errCtx := raw.MergeContexts(ts[0:]...)
-			return nil, errCtx.NewError("Error: rest not allowed in interface")
-		}
-		return p.buildRestFunctionArgument(ts[0])
+    errCtx := raw.MergeContexts(ts[0:]...)
+    return nil, errCtx.NewError("Error: rest not yet supported")
 	default:
 		// TODO: replace all other non-rest cases with this one
 		if len(ts) == 0 {
@@ -188,8 +167,7 @@ func (p *JSParser) buildFunctionRole(ts []raw.Token) (prototypes.FunctionRole, e
 }
 
 func (p *JSParser) buildFunctionInterface(ts []raw.Token,
-	named bool, allowDefaultsAndRest bool,
-	ctx context.Context) (*js.FunctionInterface, []raw.Token, error) {
+	named bool, ctx context.Context) (*js.FunctionInterface, []raw.Token, error) {
 	if len(ts) == 0 {
 		return nil, nil, ctx.NewError("Error: bad function interface")
 	}
@@ -258,8 +236,7 @@ func (p *JSParser) buildFunctionInterface(ts []raw.Token,
 			return nil, nil, errCtx.NewError("Error: empty function argument")
 		}
 
-		arg, err := p.buildFunctionArgument(field, allowDefaultsAndRest,
-			i == len(argGroup.Fields)-1)
+		arg, err := p.buildFunctionArgument(field, i == len(argGroup.Fields)-1)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -277,7 +254,7 @@ func (p *JSParser) buildFunctionInterface(ts []raw.Token,
 			iLastRetTypeToken = i
 		}
 
-		retType, err := p.buildTypeExpression(ts[0:iLastRetTypeToken+1], true)
+		retType, err := p.buildTypeExpression(ts[0:iLastRetTypeToken+1])
 		if err != nil {
 			return nil, nil, err
 		}
@@ -304,7 +281,7 @@ func (p *JSParser) buildFunction(ts []raw.Token, named bool,
 
 	fnCtx := raw.MergeContexts(ts[0 : iFirstBrace+1]...)
 
-	fnInterf, ts, err := p.buildFunctionInterface(ts, named, true, fnCtx)
+	fnInterf, ts, err := p.buildFunctionInterface(ts, named, fnCtx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -385,11 +362,4 @@ func (p *JSParser) buildFunctionStatement(ts []raw.Token) (*js.Function,
 	}
 
 	return fn, remaining, nil
-
-	//statement, remaining, err := p.buildFunction(ts[0:4], false)
-	//if err != nil {
-	//return nil, nil, err
-	//}
-
-	//return statement, remaining, nil
 }

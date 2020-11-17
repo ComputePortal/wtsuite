@@ -7,7 +7,7 @@ import (
 	"../tokens/raw"
 )
 
-func (p *JSParser) buildInterface(ts []raw.Token) (*js.ClassInterface, error) {
+func (p *JSParser) buildInterface(ts []raw.Token) (*js.Interface, error) {
 	interfCtx := raw.MergeContexts(ts...)
 
 	if len(ts) == 2 && raw.IsBracesGroup(ts[1]) {
@@ -31,7 +31,7 @@ func (p *JSParser) buildInterface(ts []raw.Token) (*js.ClassInterface, error) {
 		}
 	}
 
-	classInterface, err := js.NewClassInterface(clType, extends, interfCtx)
+	classInterface, err := js.NewInterface(clType, []*js.TypeExpression{extends}, interfCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (p *JSParser) buildInterface(ts []raw.Token) (*js.ClassInterface, error) {
 			continue
 		}
 
-		fi, remaining, err := p.buildFunctionInterface(field, true, false, interfCtx)
+		fi, remaining, err := p.buildFunctionInterface(field, true, interfCtx)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +77,7 @@ func (p *JSParser) buildInterface(ts []raw.Token) (*js.ClassInterface, error) {
 	return classInterface, nil
 }
 
-func (p *JSParser) buildInterfaceStatement(ts []raw.Token) (*js.ClassInterface, []raw.Token, error) {
+func (p *JSParser) buildInterfaceStatement(ts []raw.Token) (*js.Interface, []raw.Token, error) {
 	for i, t := range ts {
 		if raw.IsBracesGroup(t) {
 			statement, err := p.buildInterface(ts[0 : i+1])

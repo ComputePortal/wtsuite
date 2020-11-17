@@ -30,10 +30,10 @@ func (m *SharedWorkerPost) WriteExpression() string {
 	return m.PostMacro.writeExpression(sharedWorkerPostHeader.Name())
 }
 
-func (m *SharedWorkerPost) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *SharedWorkerPost) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -42,11 +42,11 @@ func (m *SharedWorkerPost) EvalExpression(stack values.Stack) (values.Value, err
 		return nil, ctx.NewError("Error: expected 3 arguments")
 	}
 
-	if !args[0].IsInstanceOf(prototypes.SharedWorker) {
+	if !prototypes.IsSharedWorker(args[0]) {
 		return nil, ctx.NewError("Error: expected SharedWorker for argument 1, got " + args[0].TypeName())
 	}
 
-	return m.PostMacro.evalExpression(stack, args[1], args[2])
+	return m.PostMacro.evalExpression(args[1], args[2])
 }
 
 func (m *SharedWorkerPost) ResolveExpressionActivity(usage js.Usage) error {

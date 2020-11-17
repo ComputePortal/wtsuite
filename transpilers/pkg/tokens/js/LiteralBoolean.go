@@ -33,8 +33,8 @@ func (t *LiteralBoolean) WriteExpression() string {
 	return s
 }
 
-func (t *LiteralBoolean) EvalExpression(stack values.Stack) (values.Value, error) {
-	return values.NewInstance(prototypes.Boolean, values.NewBooleanProperties(true, t.value, t.Context()), t.Context()), nil
+func (t *LiteralBoolean) EvalExpression() (values.Value, error) {
+  return prototypes.NewLiteralBoolean(t.value, t.Context()), nil
 }
 
 func (t *LiteralBoolean) Walk(fn WalkFunc) error {

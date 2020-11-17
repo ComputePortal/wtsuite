@@ -3,8 +3,6 @@ package js
 import (
 	"strings"
 
-	"./values"
-
 	"../context"
 )
 
@@ -50,11 +48,7 @@ func (t *Continue) ResolveStatementNames(scope Scope) error {
 	return nil
 }
 
-func (t *Continue) HoistValues(stack values.Stack) error {
-	return nil
-}
-
-func (t *Continue) EvalStatement(stack values.Stack) error {
+func (t *Continue) EvalStatement() error {
 	return nil
 }
 

@@ -1,19 +1,37 @@
 package prototypes
 
-var ImageData *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateImageDataPrototype() bool {
-	*ImageData = BuiltinPrototype{
-		"ImageData", nil,
-		map[string]BuiltinFunction{
-			"data":   NewGetter(Uint8ClampedArray),
-			"height": NewGetter(Int),
-			"width":  NewGetter(Int),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type ImageData struct {
+  BuiltinPrototype
 }
 
-var _ImageDataOk = generateImageDataPrototype()
+func NewImageDataPrototype() values.Prototype {
+  return &ImageData{newBuiltinPrototype("ImageData")}
+}
+
+func NewImageData(ctx context.Context) values.Value {
+  return values.NewInstance(NewImageDataPrototype(), ctx)
+}
+
+func (p *ImageData) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+
+  switch key {
+  case "data":
+    return NewUint8ClampedArray(ctx), nil
+  case "height", "width":
+    return i, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *ImageData) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewImageDataPrototype(), ctx), nil
+}

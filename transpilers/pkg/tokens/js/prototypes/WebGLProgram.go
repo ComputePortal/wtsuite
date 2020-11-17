@@ -1,15 +1,24 @@
 package prototypes
 
-var WebGLProgram *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateWebGLProgramPrototype() bool {
-	*WebGLProgram = BuiltinPrototype{
-		"WebGLProgram", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type WebGLProgram struct {
+  BuiltinPrototype
 }
 
-var _WebGLProgramOk = generateWebGLProgramPrototype()
+func NewWebGLProgramPrototype() values.Prototype {
+  return &WebGLProgram{newBuiltinPrototype("WebGLProgram")}
+}
+
+func NewWebGLProgram(ctx context.Context) values.Value {
+  return values.NewInstance(NewWebGLProgramPrototype(), ctx)
+}
+
+func (p *WebGLProgram) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWebGLProgramPrototype(), ctx), nil
+}

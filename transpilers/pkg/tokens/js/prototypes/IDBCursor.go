@@ -1,38 +1,48 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var IDBCursor *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateIDBCursorPrototype() bool {
-	*IDBCursor = BuiltinPrototype{
-		"IDBCursor", nil,
-		map[string]BuiltinFunction{
-			"advance":            NewNormal(Int, nil),
-			"continue":           NewNormal(&Opt{Int}, nil),
-			"continuePrimaryKey": NewNormal(&And{Int, Int}, nil),
-			"delete": NewNormalFunction(&None{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					return NewInstance(IDBRequest, ctx), nil
-				}),
-			"key": NewGetter(Int),
-			"update": NewNormalFunction(&Any{},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					// should updated value be same type are current value?
-					// XXX: should request.result = args[0] ?
-					return NewInstance(IDBRequest, ctx), nil
-				}),
-		},
-		nil,
-	}
-
-	return true
+type IDBCursor struct {
+  BuiltinPrototype
 }
 
-var _IDBCursorOk = generateIDBCursorPrototype()
+func NewIDBCursorPrototype() values.Prototype {
+  return &IDBCursor{newBuiltinPrototype("IDBCursor")}
+}
+
+func NewIDBCursor(ctx context.Context) values.Value {
+  return values.NewInstance(NewIDBCursorPrototype(), ctx)
+}
+
+func (p *IDBCursor) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+
+  switch key {
+  case "advance":
+    return values.NewFunction([]values.Value{i, nil}, ctx), nil
+  case "continue":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{nil}, 
+      []values.Value{i, nil},
+    }, ctx), nil
+  case "continuePrimaryKey":
+    return values.NewFunction([]values.Value{i, i, nil}, ctx), nil
+  case "delete":
+    return values.NewFunction([]values.Value{NewEmptyIDBRequest(ctx)}, ctx), nil
+  case "key":
+    return i, nil
+  case "update":
+    return values.NewFunction([]values.Value{NewObject(nil, ctx), NewEmptyIDBRequest(ctx)}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *IDBCursor) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewIDBCursorPrototype(), ctx), nil
+}

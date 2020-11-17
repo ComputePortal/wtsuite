@@ -34,10 +34,10 @@ func (m *BlobFromInstance) WriteExpression() string {
 	return b.String()
 }
 
-func (m *BlobFromInstance) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *BlobFromInstance) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func (m *BlobFromInstance) EvalExpression(stack values.Stack) (values.Value, err
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
 
-	return prototypes.NewInstance(prototypes.Blob, ctx), nil
+	return prototypes.NewBlob(ctx), nil
 }
 
 func (m *BlobFromInstance) ResolveExpressionActivity(usage js.Usage) error {

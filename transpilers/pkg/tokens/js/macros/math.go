@@ -49,10 +49,10 @@ func (m *Convert) WriteExpression() string {
 	return b.String()
 }
 
-func (m *Convert) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *Convert) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +61,11 @@ func (m *Convert) EvalExpression(stack values.Stack) (values.Value, error) {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
 
-	if !args[0].IsInstanceOf(prototypes.Number) {
+	if !prototypes.IsNumber(args[0]) {
 		return nil, ctx.NewError("Error: expected Number argument, got " + args[0].TypeName())
 	}
 
-	return prototypes.NewInstance(prototypes.Number, ctx), nil
+	return prototypes.NewNumber(ctx), nil
 }
 
 type DegToRad struct {
@@ -105,10 +105,10 @@ func (m *MathAdvanceWidth) Dump(indent string) string {
 	return indent + "MathAdvanceWidth(...)"
 }
 
-func (m *MathAdvanceWidth) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *MathAdvanceWidth) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,14 @@ func (m *MathAdvanceWidth) EvalExpression(stack values.Stack) (values.Value, err
 	}
 
 	if litInt, ok := args[0].LiteralIntValue(); ok {
-		m.aw = serif.AdvanceWidths[litInt]
+    aw, okInner := serif.AdvanceWidths[litInt]
+    if !okInner {
+      err := ctx.NewError(fmt.Sprintf("Error: advance width for %d not found", litInt))
+      panic(err)
+    }
+
+    m.aw = aw
+
 		return prototypes.NewLiteralInt(m.aw, ctx), nil
 	} else {
 		return nil, ctx.NewError("Error: expected a literal int, got " + args[0].TypeName())
@@ -142,10 +149,10 @@ func (m *MathBoundingBox) Dump(indent string) string {
 	return indent + "MathBoundingBox(...)"
 }
 
-func (m *MathBoundingBox) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *MathBoundingBox) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -155,18 +162,19 @@ func (m *MathBoundingBox) EvalExpression(stack values.Stack) (values.Value, erro
 	}
 
 	if litInt, ok := args[0].LiteralIntValue(); ok {
-		bb := serif.Bounds[litInt]
+		bb, okInner := serif.Bounds[litInt]
+
+    if !okInner {
+      err := ctx.NewError(fmt.Sprintf("Error: bounds for char %d not found", litInt))
+      panic(err)
+    }
+
 		m.bb[0] = bb.Left()
 		m.bb[1] = bb.Right()
 		m.bb[2] = bb.Top()
 		m.bb[3] = bb.Bottom()
 
-		return prototypes.NewLiteralArray([]values.Value{
-			prototypes.NewLiteralNumber(m.bb[0], ctx),
-			prototypes.NewLiteralNumber(m.bb[1], ctx),
-			prototypes.NewLiteralNumber(m.bb[2], ctx),
-			prototypes.NewLiteralNumber(m.bb[3], ctx),
-		}, ctx), nil
+		return prototypes.NewArray(prototypes.NewNumber(ctx), ctx), nil
 	} else {
 		return nil, ctx.NewError("Error: expected a literal int, got " + args[0].TypeName())
 	}
@@ -188,10 +196,10 @@ func (m *MathFormatMetrics) Dump(indent string) string {
 	return indent + "MathFormatMetrics(...)"
 }
 
-func (m *MathFormatMetrics) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *MathFormatMetrics) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}

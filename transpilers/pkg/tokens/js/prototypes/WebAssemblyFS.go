@@ -1,24 +1,68 @@
 package prototypes
 
-var WebAssemblyFS *BuiltinInterface = allocBuiltinInterface()
+import (
+  "../values"
 
-func generateWebAssemblyFSInterface() bool {
-	*WebAssemblyFS = BuiltinInterface{
-		"WebAssemblyFS", map[string]*BuiltinInterfaceMember{
-			"exists": &BuiltinInterfaceMember{String, NORMAL, Boolean},
-			"open":   &BuiltinInterfaceMember{String, NORMAL, Int},
-			"create": &BuiltinInterfaceMember{String, NORMAL, Int},
-			"close":  &BuiltinInterfaceMember{Int, NORMAL, nil},
-			"read":   &BuiltinInterfaceMember{&And{Int, Int}, NORMAL, Uint8Array},
-			"write":  &BuiltinInterfaceMember{&And{Int, Uint8Array}, NORMAL, nil},
-			"seek":   &BuiltinInterfaceMember{&And{Int, Int}, NORMAL, nil},
-			"tell":   &BuiltinInterfaceMember{Int, NORMAL, Int},
-			"size":   &BuiltinInterfaceMember{Int, NORMAL, Int},
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type WebAssemblyFS struct {
+  AbstractBuiltinInterface
 }
 
-var _WebAssemblyFSOk = generateWebAssemblyFSInterface()
+var webAssemblyFSInterface values.Interface = &WebAssemblyFS{newAbstractBuiltinInterface("WebAssemblyFS")}
+
+func NewWebAssemblyFS(ctx context.Context) values.Value {
+  return values.NewInstance(webAssemblyFSInterface, ctx)
+}
+
+// interfaces usually check in a different way, but this isn't really an interface
+func (p *WebAssemblyFS) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*WebAssemblyFS); ok {
+    return nil
+  } else if other, ok := other_.(values.Prototype); ok {
+    return checkInterfaceImplementation(p, other, 
+    // list of getters
+    []string{
+      "close",
+      "create",
+      "exists",
+      "open",
+      "read",
+      "seek",
+      "size",
+      "tell",
+      "write",
+    }, 
+    // list of setters
+    map[string]values.Value{}, 
+    ctx)
+  } else {
+    return ctx.NewError("Error: not an WebAssemblyFS")
+  }
+}
+
+func (p *WebAssemblyFS) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "close":
+    return values.NewFunction([]values.Value{i, nil}, ctx), nil
+  case "create", "open":
+    return values.NewFunction([]values.Value{s, i}, ctx), nil
+  case "exists":
+    return values.NewFunction([]values.Value{s, b}, ctx), nil
+  case "read":
+    return values.NewFunction([]values.Value{i, i, NewUint8Array(ctx)}, ctx), nil
+  case "seek":
+    return values.NewFunction([]values.Value{i, i, nil}, ctx), nil
+  case "size", "tell":
+    return values.NewFunction([]values.Value{i, i}, ctx), nil
+  case "write":
+    return values.NewFunction([]values.Value{i, NewUint8Array(ctx), nil}, ctx), nil
+  default:
+    return nil, nil
+  }
+}

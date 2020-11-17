@@ -3,18 +3,19 @@ package js
 import (
 	"strings"
 
-	"./values"
+  "./values"
 
 	"../context"
 )
 
 type Return struct {
 	expr Expression // can be nil for void return
+  fn   *Function // registered during resolve stage
 	TokenData
 }
 
 func NewReturn(expr Expression, ctx context.Context) (*Return, error) {
-	return &Return{expr, TokenData{ctx}}, nil
+	return &Return{expr, nil, TokenData{ctx}}, nil
 }
 
 func (t *Return) Dump(indent string) string {
@@ -58,6 +59,17 @@ func (t *Return) ResolveStatementNames(scope Scope) error {
 		return t.expr.ResolveExpressionNames(scope)
 	}
 
+  fn := scope.GetFunction()
+  if fn == nil {
+    errCtx := t.Context()
+    return errCtx.NewError("Error: return not inside function")
+  }
+
+  t.fn = fn
+  if t.expr != nil {
+    t.fn.RegisterReturn(t)
+  }
+
 	return nil
 }
 
@@ -69,46 +81,38 @@ func IsVoidReturn(t Token) bool {
 	return false
 }
 
-func (t *Return) HoistValues(stack values.Stack) error {
-	return nil
-}
+func (t *Return) EvalStatement() error {
+  var exprVal values.Value = nil
+	if t.expr != nil {
+    var err error
+    exprVal, err = t.expr.EvalExpression()
+    if err != nil {
+      return err
+    }
+  }
 
-func (t *Return) EvalStatement(stack values.Stack) error {
-	if t.expr == nil {
-		retValue, err := stack.GetReturn(t.Context())
-		if err != nil {
-			return err
-		}
+  retVal, err := t.fn.GetReturnValue()
+  if err != nil {
+    return err
+  }
 
-		if retValue != nil && !values.IsVoid(retValue) {
-			errCtx := t.Context()
-			err := errCtx.NewError("Error: returning void, " +
-				"in a function where previously non-void was returned")
-			err.AppendContextString("Info: previous return value", retValue.Context())
-			return err
-		} else {
-			return stack.SetReturn(values.NewVoid(t.Context()), t.Context())
-		}
-	}
+  if retVal == nil {
+    if exprVal != nil {
+      errCtx := t.Context()
+      return errCtx.NewError("Error: expected void return value")
+    }
+  } else {
+    if exprVal == nil {
+      errCtx := t.Context()
+      return errCtx.NewError("Error: unexpected return value")
+    }
 
-	exprVal, err := t.expr.EvalExpression(stack)
-	if err != nil {
-		return err
-	}
+    if err := retVal.Check(exprVal, t.Context()); err != nil {
+      return err
+    }
+  }
 
-	retVal, err := stack.GetReturn(t.Context())
-	if err != nil {
-		return err
-	}
-
-	if retVal != nil && values.IsVoid(retVal) {
-		errCtx := t.Context()
-		err := errCtx.NewError("Error: returning non-void, in a function where previously void was returned")
-		err.AppendContextString("Info: previous return value", retVal.Context())
-		return err
-	}
-
-	return stack.SetReturn(values.NewContextValue(exprVal, t.expr.Context()), t.Context())
+  return nil
 }
 
 func (t *Return) ResolveStatementActivity(usage Usage) error {

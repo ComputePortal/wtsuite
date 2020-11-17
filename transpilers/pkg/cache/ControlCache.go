@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"../files"
-	"../tokens/js"
 )
 
 type ControlCacheEntry struct {
@@ -20,54 +19,33 @@ type ControlCacheEntry struct {
 type ControlCache struct {
 	age      time.Time
 	Compact  bool
-	Controls map[string][]js.ViewInterface // Data contains all js files, not just controls
+	Controls []string // Data contains all js files, not just controls
 	Data     map[string]ControlCacheEntry
 }
 
 func (c *ControlCache) reset() {
-	c.Controls = make(map[string][]js.ViewInterface)
+	c.Controls = make([]string, 0)
 	c.Data = make(map[string]ControlCacheEntry)
 }
 
-func (c *ControlCache) invalidateControls(controlViews map[string][]string,
-	viewInterfaces map[string]*js.ViewInterface) {
+// controls should be sorted
+func (c *ControlCache) invalidateControls(controls []string) {
 
 	// if the controls differ, then update everything
-	if len(controlViews) != len(c.Controls) {
+	if len(controls) != len(c.Controls) {
 		c.reset()
 		return
 	}
 
-	for control, origViewInterfs := range c.Controls {
-		views, ok := controlViews[control]
-		if !ok {
-			c.reset()
-			return
-		}
-
-		for _, view := range views {
-			vif, ok := viewInterfaces[view]
-			if !ok {
-				continue
-				//panic("unexpected")
-			}
-
-			found := false
-			for _, origViewInterf := range origViewInterfs {
-				if vif.IsSame(&origViewInterf) {
-					found = true
-				}
-			}
-
-			if !found {
-				c.reset()
-				return
-			}
-		}
+	for i, control := range c.Controls {
+    if control != c.Controls[i] {
+      c.reset()
+      return
+    }
 	}
 }
 
-func LoadControlCache(controls map[string][]string, jsDst string, viewInterfaces map[string]*js.ViewInterface,
+func LoadControlCache(controls []string, jsDst string,
 	compact bool, forceBuild bool) {
 	// the cache file names is based on jsDst
 	src := cacheFile(jsDst)
@@ -76,7 +54,7 @@ func LoadControlCache(controls map[string][]string, jsDst string, viewInterfaces
 	c := &ControlCache{
 		age,
 		compact,
-		make(map[string][]js.ViewInterface),
+		make([]string, 0),
 		make(map[string]ControlCacheEntry),
 	}
 
@@ -96,14 +74,13 @@ func LoadControlCache(controls map[string][]string, jsDst string, viewInterfaces
 					c = &ControlCache{
 						age,
 						compact,
-						make(map[string][]js.ViewInterface),
+						make([]string, 0),
 						make(map[string]ControlCacheEntry),
 					}
 				} else {
 					// remove everything if:
 					//  any controls dont match
-					//  any views dont match
-					c.invalidateControls(controls, viewInterfaces)
+					c.invalidateControls(controls)
 
 					c.age = statAge
 				}
@@ -158,42 +135,20 @@ func (c *ControlCache) HasUpstreamDependency(thisPath string, upstreamPath strin
 	return false
 }
 
-func AddControl(control string, views []string, viewInterfaces map[string]*js.ViewInterface) {
+func AddControl(control string) {
 	c, ok := _cache.(*ControlCache)
 	if !ok {
 		panic("unexpected")
 	}
 
-	uniqueViewInterfs := make([]js.ViewInterface, 0)
+  // only append if unique
+  for _, check := range c.Controls {
+    if check == control {
+      return
+    }
+  }
 
-	for _, view := range views {
-		vif, ok := viewInterfaces[view]
-
-		if !ok {
-			for testViewName, _ := range viewInterfaces {
-				fmt.Println("found: ", testViewName)
-			}
-
-			panic("view interface for " + view + " not found")
-		}
-
-		if vif == nil {
-			panic("view interface cant be nil")
-		}
-
-		unique := true
-		for _, other := range uniqueViewInterfs {
-			if vif.IsSame(&other) {
-				unique = false
-			}
-		}
-
-		if unique {
-			uniqueViewInterfs = append(uniqueViewInterfs, *vif)
-		}
-	}
-
-	c.Controls[control] = uniqueViewInterfs
+	c.Controls = append(c.Controls, control)
 }
 
 func (c *ControlCache) requiresUpdate(fname string, m map[string]bool) bool {

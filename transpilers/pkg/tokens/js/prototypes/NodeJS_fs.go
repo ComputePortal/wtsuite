@@ -1,44 +1,27 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var NodeJS_fs *BuiltinPrototype = allocBuiltinPrototype()
+func FillNodeJS_fsPackage(pkg values.Package) {
+  ctx := context.NewDummyContext()
+  b := NewBoolean(ctx)
+  s := NewString(ctx)
+  buf := NewNodeJS_Buffer(ctx)
 
-func generateNodeJS_fsPrototype() bool {
-	*NodeJS_fs = BuiltinPrototype{
-		"fs", nil,
-		map[string]BuiltinFunction{
-			"existsSync": NewStatic(String, Boolean),
-			"readFileSync": NewStaticFunction(&And{String, &Opt{String}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					var returnProto values.Prototype = Buffer
-					if len(args) == 2 {
-						// always string if encoding is specified
-						if str, ok := args[1].LiteralStringValue(); ok {
-							switch str {
-							case "buffer":
-								returnProto = Buffer
-							default:
-								returnProto = String
-							}
-						} else {
-							returnProto = String
-						}
-					}
+  pkg.AddValue("existsSync", values.NewFunction([]values.Value{s, b}, ctx))
 
-					return NewInstance(returnProto, ctx), nil
-				}),
-			"unlinkSync": NewStatic(&Or{String, Buffer}, nil),
-		},
-		nil,
-	}
+  pkg.AddValue("readFileSync", values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, buf},
+      []values.Value{s, NewLiteralString("buffer", ctx), buf},
+      []values.Value{s, s, s},
+    }, ctx))
 
-	return true
+  pkg.AddValue("unlinkSync", values.NewOverloadedFunction([][]values.Value{
+      []values.Value{s, nil},
+      []values.Value{buf, nil},
+    }, ctx))
 }
-
-var _NodeJS_fsOk = generateNodeJS_fsPrototype()

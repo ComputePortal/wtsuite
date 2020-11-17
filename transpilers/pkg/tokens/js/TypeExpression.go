@@ -1,7 +1,6 @@
 package js
 
 import (
-	"reflect"
 	"strings"
 
 	"./prototypes"
@@ -12,55 +11,85 @@ import (
 
 // very similar to VarExpression, but with extra
 type TypeExpression struct {
-  content []*TypeExpressionMember // can be nil, can't be empty
+  parameters []*TypeExpressionMember // can be nil, can't be empty
 	interf        values.Interface  // starts as nil, evaluated later
 	VarExpression                   // the base type will be a class variable
 }
 
 type TypeExpressionMember struct {
   key *Word // can be nil
-  texpr *TypeExpression // can't be nil
+  typeExpr *TypeExpression // can't be nil
 }
 
-func NewTypeExpression(name string, contentKeys []*Word, contentTypes []*TypeExpression,
-	ctx context.Context) *TypeExpression {
-
-	if contentKeys != nil && contentTypes != nil && len(contentKeys) != len(contentTypes) {
-		panic("contentKeys and contentTypes should have same length")
+func NewTypeExpression(name string, parameterKeys []*Word, 
+  parameterTypes []*TypeExpression, ctx context.Context) (*TypeExpression, error) {
+	if parameterKeys != nil && parameterTypes != nil && len(parameterKeys) != len(parameterTypes) {
+		panic("parameterKeys and parameterTypes should have same length")
 	}
 
-  var content []*TypeExpressionMember = nil
-  if contentTypes != nil {
-    if len(contentTypes) == 0 {
-      panic("contentTypes can't be empty (but can be nil)")
+  var parameters []*TypeExpressionMember = nil
+  if parameterTypes != nil {
+    if len(parameterTypes) == 0 {
+      errCtx := ctx
+      return nil, errCtx.NewError("Error: parameter types can't be empty")
     }
 
-    content = make([]*TypeExpressionMember, len(contentTypes))
+    parameters = make([]*TypeExpressionMember, len(parameterTypes))
 
-    for i, contentType := range contentTypes {
-      if contentKeys == nil {
-        content[i] = &TypeExpressionMember{
+    for i, parameterType := range parameterTypes {
+      if parameterKeys == nil {
+        parameters[i] = &TypeExpressionMember{
           nil,
-          contentType,
+          parameterType,
         }
       } else {
-        content[i] = &TypeExpressionMember{
-          contentKeys[i],
-          contentType,
+        parameters[i] = &TypeExpressionMember{
+          parameterKeys[i],
+          parameterType,
         }
       }
     }
   }
 
-	return &TypeExpression{content, nil, newVarExpression(name, true, ctx)}
+	return &TypeExpression{parameters, nil, newVarExpression(name, true, ctx)}, nil
 }
 
 func (t *TypeExpression) hasKeys() bool {
-  if t.content != nil {
-    return t.content[0].key != nil
+  if t.parameters != nil {
+    if t.parameters[0].key != nil {
+      return true
+    } else {
+      return false
+    }
+  } else {
+    return false
   }
+}
 
-  return false
+func (t *TypeExpression) assertKeys() error {
+  if t.parameters != nil {
+    if t.parameters[0].key != nil {
+      return nil
+    } else {
+      errCtx := t.parameters[0].typeExpr.Context()
+      return errCtx.NewError("Error: expected keyed type parameter")
+    }
+  } else {
+    return nil
+  }
+}
+
+func (t *TypeExpression) assertNoKeys() error {
+  if t.parameters != nil {
+    if t.parameters[0].key == nil {
+      return nil
+    } else {
+      errCtx := t.parameters[0].key.Context()
+      return errCtx.NewError("Error: unexpected keyed type parameter")
+    }
+  } else {
+    return nil
+  }
 }
 
 func (t *TypeExpression) Dump(indent string) string {
@@ -73,21 +102,21 @@ func (t *TypeExpression) Dump(indent string) string {
 
 	if t.hasKeys() {
 		b.WriteString("<")
-		for _, cont := range t.content {
-			contentType := cont.texpr
+		for _, cont := range t.parameters {
+			parameterType := cont.typeExpr
 
 			b.WriteString(cont.key.Value())
 			b.WriteString(":")
-			b.WriteString(contentType.Dump(""))
+			b.WriteString(parameterType.Dump(""))
 			b.WriteString(",")
 		}
 
 		b.WriteString(">")
-	} else if t.content != nil {
+	} else if t.parameters != nil {
 		b.WriteString("<")
 
-		for _, cont := range t.content {
-			b.WriteString(cont.texpr.Dump(""))
+		for _, cont := range t.parameters {
+			b.WriteString(cont.typeExpr.Dump(""))
 		}
 
 		b.WriteString(">")
@@ -99,17 +128,30 @@ func (t *TypeExpression) Dump(indent string) string {
 }
 
 func (t *TypeExpression) ResolveExpressionNames(scope Scope) error {
-	if t.Name() == "any" || t.Name() == "function" || t.Name() == "class" || t.Name() == "void" {
-		return nil
+	if t.Name() == "any" || t.Name() == "void" {
+    if t.parameters != nil {
+      errCtx := t.Context()
+      return errCtx.NewError("Error: doesn't accept type parameters")
+    } else {
+      return nil
+    }
 	}
 
-	if err := t.VarExpression.ResolveExpressionNames(scope); err != nil {
-		return err
-	}
+  if t.Name() != "function" && t.Name() != "class" {
+    if err := t.VarExpression.ResolveExpressionNames(scope); err != nil {
+      return err
+    }
+  }
 
-	if t.content != nil {
-		for _, cont := range t.content {
-			if err := cont.texpr.ResolveExpressionNames(scope); err != nil {
+  if t.Name() != "Object" {
+    if err := t.assertNoKeys(); err != nil {
+      return err
+    }
+  }
+
+	if t.parameters != nil {
+		for _, parameter := range t.parameters {
+			if err := parameter.typeExpr.ResolveExpressionNames(scope); err != nil {
 				return err
 			}
 		}
@@ -118,21 +160,272 @@ func (t *TypeExpression) ResolveExpressionNames(scope Scope) error {
 	return nil
 }
 
-func (t *TypeExpression) EvalExpression(stack values.Stack) (values.Value, error) {
-	if t.Name() == "any" || t.Name() == "function" || t.Name() == "class" || t.Name() == "void" {
-		if t.content != nil {
+// class<...>
+func (t *TypeExpression) generateClass() (values.Value, error) {
+  ctx := t.Context()
+
+  // overloads of constructor args
+  var cArgs [][]values.Value = nil
+  var proto values.Prototype = nil
+
+  if t.parameters != nil {
+    if len(t.parameters) < 1 {
+      errCtx := ctx
+      return nil, errCtx.NewError("Error: 0 class type parameters")
+    }
+
+    n := len(t.parameters)
+
+    cArgs = make([][]values.Value, 1)
+
+    cArgs[0] = make([]values.Value, n - 1)
+
+    for i := 0; i < n - 1; i++ {
+      parameter := t.parameters[i]
+
+      cArg, err := parameter.typeExpr.EvalExpression()
+      if err != nil {
+        return nil, err
+      }
+
+      if cArg == nil {
+        errCtx := parameter.typeExpr.Context()
+        return nil, errCtx.NewError("Error: unexpected void value")
+      }
+
+      cArgs[0][i] = cArg
+    }
+
+    newVal, err := t.parameters[n-1].typeExpr.EvalExpression()
+    if err != nil {
+      return nil, err
+    }
+
+    proto := values.GetPrototype(newVal)
+    if proto == nil {
+      errCtx := t.parameters[n-1].typeExpr.Context()
+      return nil, errCtx.NewError("Error: expected instance of prototype")
+    }
+  }
+
+  return values.NewClass(cArgs, proto, ctx), nil
+}
+
+// function<..., retType>
+func (t *TypeExpression) generateFunction() (values.Value, error) {
+  ctx := t.Context()
+
+  var args [][]values.Value = nil
+  if t.parameters != nil {
+    if len(t.parameters) < 1 {
+      return nil, ctx.NewError("Error: expected more than 0 function type parameters")
+    }
+
+    n := len(t.parameters)
+
+    args = make([][]values.Value, 1)
+    args[0] = make([]values.Value, n)
+
+    for i := 0; i < n; i++ {
+      p := t.parameters[i]
+
+      arg, err := p.typeExpr.EvalExpression()
+      if err != nil {
+        return nil, err
+      }
+
+      if arg == nil && i < n -1 {
+        errCtx := p.typeExpr.Context()
+        return nil, errCtx.NewError("Error: unexpected void value")
+      } 
+
+      args[0][i] = arg
+    }
+  }
+
+  return values.NewOverloadedFunction(args, t.Context()), nil
+}
+
+func (t *TypeExpression) generateSingleParameterValue() (values.Value, error) {
+  var content values.Value
+  if t.parameters != nil {
+    if len(t.parameters) != 1 {
+      ctx := t.Context()
+      return nil, ctx.NewError("Error: expected 1 type parameter")
+    }
+
+    arg, err := t.parameters[0].typeExpr.EvalExpression()
+    if err != nil {
+      return nil, err
+    }
+
+    if arg == nil {
+      errCtx := t.parameters[0].typeExpr.Context()
+      return nil, errCtx.NewError("Error: unexpected void value")
+    }
+
+    content = arg
+  }
+
+  return content, nil
+}
+
+func (t *TypeExpression) generateDoubleParameterValue() (values.Value, values.Value, error) {
+  content := []values.Value{nil, nil}
+
+  if t.parameters != nil {
+    if len(t.parameters) != 2 {
+      errCtx := t.Context()
+      return nil, nil, errCtx.NewError("Error: expected 1 type parameter")
+    }
+
+    for i, p := range t.parameters {
+      arg, err := p.typeExpr.EvalExpression()
+      if err != nil {
+        return nil, nil, err
+      }
+
+      if arg == nil {
+        errCtx := p.typeExpr.Context()
+        return nil, nil, errCtx.NewError("Error: unexpected void value")
+      }
+
+      content[i] = arg
+    }
+  }
+
+  return content[0], content[1], nil
+}
+
+func (t *TypeExpression) generateObject() (values.Value, error) {
+  var props map[string]values.Value = nil
+
+  if t.parameters != nil {
+    if len(t.parameters) < 1 {
+      errCtx := t.Context()
+      return nil, errCtx.NewError("Error: expected at least 1 type parameter")
+    }
+
+    if !t.hasKeys() {
+      common, err := t.generateSingleParameterValue()
+      if err != nil {
+        return nil, err
+      }
+
+      return prototypes.NewMapLikeObject(common, t.Context()), nil
+    } else {
+      for _, p := range t.parameters {
+        key := p.key.Value()
+        val, err := p.typeExpr.EvalExpression()
+        if err != nil {
+          return nil, err
+        }
+
+        if prev, ok := props[key]; ok {
+          errCtx := p.key.Context()
+          err := errCtx.NewError("Error: duplicate Object key")
+          err.AppendContextString("Info: previously defined here", prev.Context())
+          return nil, err
+        }
+
+        props[key] = val
+      }
+    }
+  }
+
+  return prototypes.NewObject(props, t.Context()), nil
+}
+
+// Acts as the new generate instance
+func (t *TypeExpression) EvalExpression() (values.Value, error) {
+  ctx := t.Context()
+
+  switch t.Name() {
+  case "any":
+    if t.parameters != nil {
+      panic("should've been checked during resolve stage")
+    }
+    return values.NewAny(ctx), nil
+  case "class": 
+    return t.generateClass();
+  case "function":
+    return t.generateFunction()
+  case "void":
+    if t.parameters != nil {
 			errCtx := t.Context()
-			return nil, errCtx.NewError("Error: " + t.Name() + " can't have content types")
-		}
-		return values.NewClass(values.NewDummyPrototype(t.Name()), t.Context()), nil
-	} else {
-		return t.VarExpression.EvalExpression(stack)
+			return nil, errCtx.NewError("Error: void can't have parameter types")
+    }
+    return nil, nil
+  case "Array":
+    content, err := t.generateSingleParameterValue()
+    if err != nil {
+      return nil, err
+    }
+
+    return prototypes.NewArray(content, ctx), nil
+  case "Set":
+    content, err := t.generateSingleParameterValue()
+    if err != nil {
+      return nil, err
+    }
+
+    return prototypes.NewSet(content, ctx), nil
+  case "Map":
+    key, val, err := t.generateDoubleParameterValue()
+    if err != nil {
+      return nil, err
+    }
+
+    return prototypes.NewMap(key, val, ctx), nil
+  case "Promise":
+    content, err := t.generateSingleParameterValue()
+    if err != nil {
+      return nil, err
+    }
+
+    if content == nil {
+      if t.parameters != nil {
+        return prototypes.NewVoidPromise(ctx), nil
+      } else {
+        return prototypes.NewPromise(nil, ctx), nil
+      }
+    } else {
+      return  prototypes.NewPromise(content, ctx), nil
+    }
+  case "Event":
+    content, err := t.generateSingleParameterValue()
+    if err != nil {
+      return nil, err
+    }
+
+    return prototypes.NewEvent(content, ctx), nil
+  case "IDBRequest":
+    content, err := t.generateSingleParameterValue()
+    if err != nil {
+      return nil, err
+    }
+
+    return prototypes.NewIDBRequest(content, ctx), nil
+  case "Object":
+    return t.generateObject()
+  default:
+    if t.parameters != nil {
+			errCtx := ctx
+			return nil, errCtx.NewError("Error: unexpected type parameters")
+    }
+
+    interf := t.GetInterface()
+    if interf == nil {
+      return nil, ctx.NewError("Error: expeceted an interface")
+    }
+
+    return values.NewInstance(interf, ctx), nil
 	}
 }
 
 func (t *TypeExpression) Walk(fn WalkFunc) error {
-  if t.content != nil {
-    for _, cont := range t.content {
+  if t.parameters != nil {
+    for _, cont := range t.parameters {
       if err := cont.Walk(fn); err != nil {
         return err
       }
@@ -153,211 +446,9 @@ func (t *TypeExpressionMember) Walk(fn WalkFunc) error {
     }
   }
 
-  if err := t.texpr.Walk(fn); err != nil {
+  if err := t.typeExpr.Walk(fn); err != nil {
     return err
   }
 
   return nil
 }
-
-func (t *TypeExpression) GenerateInstance(stack values.Stack, ctx context.Context) (values.Value, error) {
-	if t.Name() == "class" {
-		return nil, ctx.NewError("Error: can't generate class")
-	}
-
-	if t.Name() == "any" {
-		return nil, ctx.NewError("Error: can't generate generic instance")
-	}
-
-	if t.Name() == "function" {
-		return nil, ctx.NewError("Error: can't generate function")
-	}
-
-	cl, err := stack.GetValue(t.ref, t.Context())
-	if err != nil {
-		return nil, err
-	}
-
-	if cl == nil {
-		errCtx := t.Context()
-		return nil, errCtx.NewError("Error: class variable declared, but doesn't have a value")
-	}
-
-	var keys []string = nil
-	var args []values.Value = nil
-
-	if t.hasKeys() {
-		keys = make([]string, 0)
-		for _, cont := range t.content {
-			keys = append(keys, cont.key.Value())
-		}
-	}
-
-	if t.content != nil {
-		args = make([]values.Value, 0)
-		for _, cont := range t.content {
-			contentArg, err := cont.texpr.GenerateInstance(stack, t.Context())
-			if err != nil {
-				return nil, err
-			}
-
-			args = append(args, contentArg)
-		}
-	}
-
-	if cl.IsClass() {
-		proto_, ok := cl.GetClassPrototype()
-		if !ok {
-			panic("unexpected")
-		}
-
-		switch proto := proto_.(type) {
-		case *prototypes.BuiltinPrototype:
-		case *Class:
-			if proto.IsAbstract() {
-				errCtx := t.Context()
-				return nil, errCtx.NewError("Error: can't instantiate an abstract class")
-			}
-		}
-
-		res, err := proto_.GenerateInstance(stack, keys, args, t.Context())
-		if err != nil {
-			return nil, err
-		}
-
-		return values.NewContextValue(res, t.Context()), nil
-	} else if cl.IsInterface() {
-		ci, ok := cl.GetClassInterface()
-		if !ok {
-			panic("unexpected")
-		}
-
-		return ci.GenerateInstance(stack, keys, args, t.Context())
-	} else {
-		errCtx := t.Context()
-		return nil, errCtx.NewError("Error: not a class nor an explicit interface")
-	}
-}
-
-func (t *TypeExpression) CollectNestedTypes(stack values.Stack) (*values.NestedType, error) {
-
-	var interf values.Interface = nil
-	if t.Name() == "any" || t.Name() == "class" || t.Name() == "function" || t.Name() == "void" {
-		interf = values.NewDummyPrototype(t.Name())
-	} else {
-		classVal, err := t.EvalExpression(stack)
-		if err != nil {
-			return nil, err
-		}
-
-		var ok bool
-		interf, ok = classVal.GetClassInterface()
-		if !ok {
-			errCtx := t.Context()
-			return nil, errCtx.NewError("Error: contraint is not an interface (" + reflect.TypeOf(values.UnpackContextValue(classVal)).String() + ")")
-		}
-	}
-
-	t.interf = interf
-	var children []*values.NestedType = nil
-
-	if t.content != nil {
-		children = make([]*values.NestedType, len(t.content))
-		for i, cont := range t.content {
-			nested, err := cont.texpr.CollectNestedTypes(stack)
-			if err != nil {
-				return nil, err
-			}
-
-			if cont.key != nil {
-				nested.SetKey(cont.key.Value())
-			}
-
-			children[i] = nested
-		}
-	}
-
-	return values.NewNestedType("", interf, children, t.Context()), nil
-}
-
-func (t *TypeExpression) Constrain(stack values.Stack, v values.Value) (values.Value, error) {
-	nestedType, err := t.CollectNestedTypes(stack)
-	if err != nil {
-		return nil, err
-	}
-
-  res, err := v.Cast(nestedType, t.Context())
-
-  // attempt to generate instance for AllNull, don't bother for typed nulls (those should'be been created by casting an AllNull anyway)
-  if values.IsAllNull(v) {
-    genRes, err := t.GenerateInstance(stack, v.Context())
-    if err == nil {
-      return genRes, nil
-    }
-  }
-
-  return res, nil
-}
-
-// the dual of Constrain() for Function<...> types (void part is handled in FunctionInterface)
-/*func (t *TypeExpression) CheckInterface(wanted *values.NestedType, ctx context.Context) error {
-	if t.Name() == "any" && wanted.Name() != "any" {
-		errCtx := wanted.Context()
-		return errCtx.NewError("Error: have any, want " + wanted.Name())
-	}
-
-	if t.Name() != "any" && wanted.Name() == "any" {
-		errCtx := wanted.Context()
-		return errCtx.NewError("Error: have " + t.Name() + ", want " + wanted.Name())
-	}
-
-	// types should be identical, but we can't check based on name
-	if t.interf != wanted.Interface() {
-		errCtx := wanted.Context()
-		return errCtx.NewError("Error: have " + t.Name() + ", want " + wanted.Name())
-	}
-
-	wantedChildren := wanted.Children()
-	if wantedChildren != nil {
-		if t.contentKeys == nil {
-			errCtx := wanted.Context()
-			return errCtx.NewError("Error: don't have content, want content")
-		}
-
-		if len(wantedChildren) != len(t.contentTypes) {
-			errCtx := wanted.Context()
-			return errCtx.NewError(fmt.Sprintf("Error: have %d content type, want %d content types", len(t.contentTypes), len(wantedChildren)))
-		}
-
-		if t.contentKeys != nil {
-			// check that all the keys are the same and exist
-			for i, key := range t.contentKeys {
-				found := false
-				for _, wantedType := range wantedChildren {
-
-					if key.Value() == wantedType.Key() {
-						found = true
-
-						if err := t.contentTypes[i].CheckInterface(wantedType, ctx); err != nil {
-							return err
-						}
-						break
-					}
-				}
-
-				if !found {
-					errCtx := wanted.Context()
-					return errCtx.NewError("Error: subtype " + key.Value() + " not wanted")
-				}
-			}
-		} else {
-			for i, contentType := range t.contentTypes {
-				if err := contentType.CheckInterface(wantedChildren[i], ctx); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}*/

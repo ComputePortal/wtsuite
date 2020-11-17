@@ -1,6 +1,8 @@
 package js
 
 import (
+  "./values"
+
 	"../context"
 )
 
@@ -8,24 +10,31 @@ import (
 type Variable interface {
 	Context() context.Context
 	Dump(indent string) string
+
 	Name() string
+	Rename(newName string)
+
 	Constant() bool
 	SetConstant()
-	Rename(newName string)
-	GetObject() interface{} // anything that can be evaluated during the resolve names stage (eg. class statement)
+
+  GetValue() values.Value
+  SetValue(values.Value)
+
+  // anything that can be evaluated during the resolve names stage (eg. class statement)
+	GetObject() interface{} 
 	SetObject(interface{})
 }
 
 type VariableData struct {
 	name     string
 	constant bool
+  value    values.Value
 	object   interface{}
-
 	TokenData
 }
 
 func newVariableData(name string, constant bool, ctx context.Context) VariableData {
-	return VariableData{name, constant, nil, TokenData{ctx}}
+	return VariableData{name, constant, nil, nil, TokenData{ctx}}
 }
 
 func NewVariable(name string, constant bool, ctx context.Context) *VariableData {
@@ -41,6 +50,11 @@ func (t *VariableData) Name() string {
 	return t.name
 }
 
+// TODO: do this directly in the Namespace
+func (t *VariableData) Rename(newName string) {
+	t.name = newName
+}
+
 func (t *VariableData) Constant() bool {
 	return t.constant
 }
@@ -49,9 +63,16 @@ func (t *VariableData) SetConstant() {
 	t.constant = true
 }
 
-// TODO: do this directly in the Namespace
-func (t *VariableData) Rename(newName string) {
-	t.name = newName
+func (t *VariableData) GetValue() values.Value {
+  if t.value == nil {
+    panic("value unset")
+  }
+
+  return t.value
+}
+
+func (t *VariableData) SetValue(v values.Value) {
+  t.value = v
 }
 
 func (t *VariableData) GetObject() interface{} {

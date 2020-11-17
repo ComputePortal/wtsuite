@@ -59,11 +59,11 @@ func (t *LiteralArray) ResolveExpressionNames(scope Scope) error {
 	return nil
 }
 
-func (t *LiteralArray) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *LiteralArray) EvalExpression() (values.Value, error) {
 	items := make([]values.Value, len(t.items))
 
 	for i, itemExpr := range t.items {
-		item, err := itemExpr.EvalExpression(stack)
+		item, err := itemExpr.EvalExpression()
 		if err != nil {
 			return nil, err
 		}
@@ -71,9 +71,9 @@ func (t *LiteralArray) EvalExpression(stack values.Stack) (values.Value, error) 
 		items[i] = item
 	}
 
-	return values.NewInstance(prototypes.Array,
-		values.NewArrayProperties(true, items, t.Context()),
-		t.Context()), nil
+  common := values.CommonValue(items)
+
+	return prototypes.NewArray(common, t.Context()), nil
 }
 
 func (t *LiteralArray) ResolveExpressionActivity(usage Usage) error {

@@ -1,24 +1,44 @@
 package prototypes
 
-var NodeJS_mysql *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-// is actually a builtin nodejs module
-func generateNodeJS_mysqlPrototype() bool {
-	*NodeJS_mysql = BuiltinPrototype{
-		"mysql", nil,
-		map[string]BuiltinFunction{
-			"createConnection": NewStatic(Object, NodeJS_mysql_Connection),
-			"createPool": NewStatic(Object, NodeJS_mysql_Pool),
-			"Connection":       NewStaticClassGetter(NodeJS_mysql_Connection),
-      "Error":            NewStaticClassGetter(NodeJS_mysql_Error),
-			"FieldPacket":      NewStaticClassGetter(NodeJS_mysql_FieldPacket),
-			"Query":            NewStaticClassGetter(NodeJS_mysql_Query),
-			"Pool":            NewStaticClassGetter(NodeJS_mysql_Pool),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+func FillNodeJS_mysqlPackage(pkg values.Package) {
+  pkg.AddPrototype(NewNodeJS_mysql_ConnectionPrototype())
+  pkg.AddPrototype(NewNodeJS_mysql_ErrorPrototype())
+  pkg.AddPrototype(NewNodeJS_mysql_FieldPacketPrototype())
+  pkg.AddPrototype(NewNodeJS_mysql_PoolPrototype())
+  pkg.AddPrototype(NewNodeJS_mysql_QueryPrototype())
+
+  ctx := context.NewDummyContext()
+
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  connOpt := NewConfigObject(map[string]values.Value{
+    "host": s,
+    "post": i,
+    "user": s,
+    "password": s,
+    "database": s,
+  }, ctx)
+
+  pkg.AddValue("createConnection", values.NewFunction([]values.Value{
+    connOpt, NewNodeJS_mysql_Connection(ctx),
+  }, ctx))
+
+  poolOpt := NewConfigObject(map[string]values.Value{
+    "connectionLimit": i,
+    "host": s,
+    "user": s,
+    "password": s,
+    "database": s,
+  }, ctx)
+
+  pkg.AddValue("createPool", values.NewFunction([]values.Value{
+    poolOpt, NewNodeJS_mysql_Pool(ctx),
+  }, ctx))
 }
-
-var _NodeJS_mysqlOk = generateNodeJS_mysqlPrototype()

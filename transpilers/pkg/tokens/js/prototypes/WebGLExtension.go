@@ -1,15 +1,24 @@
 package prototypes
 
-var WebGLExtension *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateWebGLExtension() bool {
-	*WebGLExtension = BuiltinPrototype{
-		"WebGLExtension", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type WebGLExtension struct {
+  BuiltinPrototype
 }
 
-var _WebGLExtensionOk = generateWebGLExtension()
+func NewWebGLExtensionPrototype() values.Prototype {
+  return &WebGLExtension{newBuiltinPrototype("WebGLExtension")}
+}
+
+func NewWebGLExtension(ctx context.Context) values.Value {
+  return values.NewInstance(NewWebGLExtensionPrototype(), ctx)
+}
+
+func (p *WebGLExtension) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWebGLExtensionPrototype(), ctx), nil
+}

@@ -9,7 +9,7 @@ type Expression interface {
 
 	ResolveExpressionNames(scope Scope) error
 
-	EvalExpression(stack values.Stack) (values.Value, error)
+	EvalExpression() (values.Value, error)
 
 	ResolveExpressionActivity(usage Usage) error
 

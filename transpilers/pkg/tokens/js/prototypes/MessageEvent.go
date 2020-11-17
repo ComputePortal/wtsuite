@@ -1,38 +1,38 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var MessageEvent *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateMessageEventPrototype() bool {
-	*MessageEvent = BuiltinPrototype{
-		"MessageEvent", Event,
-		map[string]BuiltinFunction{
-			"data": NewGetter(&values.AllPrototype{}),
-			"ports": NewGetterFunction(
-				func(stack values.Stack, this *values.Instance, args []values.Value,
-					ctx context.Context) (values.Value, error) {
-					content := NewInstance(MessagePort, ctx)
-					return NewArray([]values.Value{content}, ctx), nil
-				}),
-		},
-		NewConstructorGeneratorFunction(nil,
-			func(stack values.Stack, keys []string, args []values.Value,
-				ctx context.Context) (values.Value, error) {
-				if keys != nil || args != nil {
-					return nil, ctx.NewError("Error: unexpected content types")
-				}
-
-				target := NewInstance(MessagePort, ctx)
-				return NewAltEvent(MessageEvent, target, ctx), nil
-			}),
-	}
-
-	return true
+type MessageEvent struct {
+  AbstractEvent
 }
 
-var _MessageEventOk = generateMessageEventPrototype()
+func NewMessageEventPrototype() values.Prototype {
+  ctx := context.NewDummyContext()
+  return &MessageEvent{newAbstractEventPrototype("MessageEvent", NewMessagePort(ctx))}
+}
+
+func NewMessageEvent(ctx context.Context) values.Value {
+  return values.NewInstance(NewMessageEventPrototype(), ctx)
+}
+
+func (p *MessageEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  a := values.NewAny(ctx)
+
+  switch key {
+  case "data": 
+    return a, nil
+  case "ports":
+    return NewArray(p.target, ctx), nil
+  default:
+    return p.AbstractEvent.GetInstanceMember(key, includePrivate, ctx)
+  }
+}
+
+func (p *MessageEvent) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewMessageEventPrototype(), ctx), nil
+}

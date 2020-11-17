@@ -81,10 +81,10 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 	var clType *js.TypeExpression
 	var err error = nil
 	if raw.IsAnyWord(ts[1]) && len(ts) > 2 && raw.IsAngledGroup(ts[2]) {
-		clType, err = p.buildTypeExpression(ts[1:3], false)
+		clType, err = p.buildTypeExpression(ts[1:3])
 		ts = ts[3:]
 	} else if raw.IsAnyWord(ts[1]) {
-		clType, err = p.buildTypeExpression(ts[1:2], false)
+		clType, err = p.buildTypeExpression(ts[1:2])
 		ts = ts[2:]
 	}
 	if err != nil {
@@ -113,7 +113,7 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 		return nil, err
 	}
 
-	class, err := js.NewUniversalClass(clType, extends, implements, universalName, clCtx)
+  class, err := js.NewUniversalClass(clType, extends, []*js.VarExpression{implements}, universalName, clCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 							return nil, errCtx.NewError("Error: unexpected tokens after member function")
 						}
 
-						if err := class.AddMember(function); err != nil {
+						if err := class.AddFunction(function); err != nil {
 							return nil, err
 						}
 
@@ -175,8 +175,32 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 				}
 			}
 
-			errCtx := raw.MergeContexts(remaining...)
-			return nil, errCtx.NewError("Error: no member function body found")
+      // could be a property
+      if raw.IsAnyWord(remaining[0]) {
+        propNameToken, err := raw.AssertWord(remaining[0])
+        if err != nil {
+          panic(err)
+        }
+
+        propName := js.NewWord(propNameToken.Value(), propNameToken.Context())
+        var typeExpr *js.TypeExpression = nil
+        if len(remaining) > 1 {
+          typeExpr, err = p.buildTypeExpression(remaining[1:])
+          if err != nil {
+            return nil, err
+          }
+        }
+
+        if err := class.AddProperty(propName, typeExpr); err != nil {
+          return nil, err
+        }
+
+        // set remaining to zero length, so the loop quits
+        remaining = []raw.Token{}
+      } else {
+        errCtx := raw.MergeContexts(remaining...)
+        return nil, errCtx.NewError("Error: invalid class content")
+      }
 		}
 	}
 

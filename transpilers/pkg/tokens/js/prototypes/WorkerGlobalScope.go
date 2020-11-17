@@ -1,15 +1,28 @@
 package prototypes
 
-var WorkerGlobalScope *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateWorkerGlobalScopePrototype() bool {
-	*WorkerGlobalScope = BuiltinPrototype{
-		"WorkerGlobalScope", EventTarget,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type WorkerGlobalScope struct {
+  BuiltinPrototype
 }
 
-var _WorkerGlobalScopeOk = generateWorkerGlobalScopePrototype()
+func NewWorkerGlobalScopePrototype() values.Prototype {
+  return &WorkerGlobalScope{newBuiltinPrototype("WorkerGlobalScope")}
+}
+
+func NewWorkerGlobalScope(ctx context.Context) values.Value {
+  return values.NewInstance(NewWorkerGlobalScopePrototype(), ctx)
+}
+
+func (p *WorkerGlobalScope) GetParent() (values.Prototype, error) {
+  return NewEventTargetPrototype(), nil
+}
+
+func (p *WorkerGlobalScope) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWorkerGlobalScopePrototype(), ctx), nil
+}

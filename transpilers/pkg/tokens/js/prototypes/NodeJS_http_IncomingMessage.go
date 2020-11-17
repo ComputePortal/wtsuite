@@ -1,35 +1,49 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var NodeJS_http_IncomingMessage *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_http_IncomingMessagePrototype() bool {
-	*NodeJS_http_IncomingMessage = BuiltinPrototype{
-		"http.IncomingMessage", NodeJS_stream_Readable,
-		map[string]BuiltinFunction{
-			"aborted":     NewGetter(Boolean),
-			"complete":    NewGetter(Boolean),
-			"headers":     NewGetter(Object),
-			"httpVersion": NewGetter(String),
-			"method":      NewGetter(String),
-			"rawHeaders": NewGetterFunction(func(stack values.Stack, this *values.Instance,
-				args []values.Value, ctx context.Context) (values.Value, error) {
-				content := NewInstance(String, ctx)
-				return NewArray([]values.Value{content}, ctx), nil
-			}),
-			"statusCode":    NewGetter(Int),
-			"statusMessage": NewGetter(String),
-			"url":           NewGetter(String),
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_http_IncomingMessage struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_http_IncomingMessageOk = generateNodeJS_http_IncomingMessagePrototype()
+func NewNodeJS_http_IncomingMessagePrototype() values.Prototype {
+  return &NodeJS_http_IncomingMessage{newBuiltinPrototype("IncomingMessage")}
+}
+
+func NewNodeJS_http_IncomingMessage(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_http_IncomingMessagePrototype(), ctx)
+}
+
+func (p *NodeJS_http_IncomingMessage) GetParent() (values.Prototype, error) {
+  return NewNodeJS_stream_ReadablePrototype(), nil
+}
+
+func (p *NodeJS_http_IncomingMessage) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "aborted", "complete":
+    return b, nil
+  case "headers":
+    return NewObject(nil, ctx), nil
+  case "httpVersion", "method", "statusMessage", "url":
+    return s, nil
+  case "rawHeaders":
+    return NewArray(s, ctx), nil
+  case "statusCode":
+    return i, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_http_IncomingMessage) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_http_IncomingMessagePrototype(), ctx), nil
+}

@@ -35,11 +35,7 @@ func (m *SyntaxTreeInfo) dumpValue(v values.Value) string {
 	var b strings.Builder
 	b.WriteString(v.TypeName())
 	switch {
-	case v.IsInstanceOf(prototypes.Int):
-		if intVal, ok := v.LiteralIntValue(); ok {
-			b.WriteString(fmt.Sprintf("(%d)", intVal))
-		}
-	case v.IsInstanceOf(prototypes.Boolean):
+	case prototypes.IsBoolean(v):
 		if boolVal, ok := v.LiteralBooleanValue(); ok {
 			if boolVal {
 				b.WriteString("(true)")
@@ -47,14 +43,12 @@ func (m *SyntaxTreeInfo) dumpValue(v values.Value) string {
 				b.WriteString("(false)")
 			}
 		}
-	case v.IsInstanceOf(prototypes.String):
+	case prototypes.IsString(v):
 		if strVal, ok := v.LiteralStringValue(); ok {
 			b.WriteString("(")
 			b.WriteString(strVal)
 			b.WriteString(")")
 		}
-	case v.IsNull():
-		b.WriteString("(null)")
 	}
 
 	return b.String()
@@ -105,10 +99,10 @@ func (m *SyntaxTreeInfo) ResolveExpressionNames(scope js.Scope) error {
 	return m.Macro.ResolveExpressionNames(scope)
 }
 
-func (m *SyntaxTreeInfo) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *SyntaxTreeInfo) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +126,7 @@ func (m *SyntaxTreeInfo) EvalExpression(stack values.Stack) (values.Value, error
 	arg := args[0]
 	arg = values.UnpackContextValue(arg)
 
-	suffix := ""
-	if _, isMulti := arg.(*values.Multi); isMulti {
-		suffix = "(multi)"
-	} else {
-		suffix = reflect.TypeOf(arg).String()
-	}
+	suffix := reflect.TypeOf(arg).String()
 
 	fmt.Fprintf(os.Stdout, "#%s: %s @ %p %s\n", prefix, m.dumpValue(arg), arg, suffix)
 

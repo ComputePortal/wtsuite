@@ -1,41 +1,81 @@
 package prototypes
 
 import (
-//"../values"
+  "../values"
 
-//"../../context"
+  "../../context"
 )
 
-var Element *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateElementPrototype() bool {
-	*Element = BuiltinPrototype{
-		"Element", Node,
-		map[string]BuiltinFunction{
-			"className":             NewGetterSetter(String),
-			"getAttribute":          NewNormal(String, String),
-			"getBoundingClientRect": NewNormal(&None{}, DOMRect),
-			"hasAttribute":          NewNormal(String, Boolean),
-			"id":                    NewGetterSetter(String),
-			"innerHTML":             NewGetterSetter(String),
-			"removeAttribute":       NewNormal(String, nil),
-			"scrollLeft":            NewGetterSetter(Number),
-			"scrollWidth":           NewGetter(Number),
-			"scrollTo":              NewNormal(&And{Number, Number}, nil),
-			"scrollIntoView":        NewNormal(&Or{&None{}, &Or{Boolean, Object}}, nil),
-			"scrollTop":             NewGetterSetter(Number),
-			"scrollHeight":          NewGetter(Number),
-			"clientLeft":            NewGetter(Number),
-			"clientWidth":           NewGetter(Number),
-			"clientTop":             NewGetter(Number),
-			"clientHeight":          NewGetter(Number),
-			"setAttribute":          NewNormal(&And{String, String}, nil),
-			"tagName":               NewGetter(String),
-		},
-		nil,
-	}
-
-	return true
+type Element struct {
+  BuiltinPrototype
 }
 
-var _ElementOk = generateElementPrototype()
+func NewElementPrototype() values.Prototype {
+  return &Element{newBuiltinPrototype("Element")}
+}
+
+func NewElement(ctx context.Context) values.Value {
+  return values.NewInstance(NewElementPrototype(), ctx)
+}
+
+func (p *Element) GetParent() (values.Prototype, error) {
+  return NewNodePrototype(), nil
+}
+
+func (p *Element) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  b := NewBoolean(ctx)
+  f := NewNumber(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "className", "id", "innerHTML", "tagName":
+    return s, nil
+  case "getAttribute":
+    return values.NewFunction([]values.Value{s, s}, ctx), nil
+  case "getBoundingClientRect":
+    return values.NewFunction([]values.Value{NewDOMRect(ctx)}, ctx), nil
+  case "hasAttribute": 
+    return values.NewFunction([]values.Value{s, b}, ctx), nil
+  case "removeAttribute":
+    return values.NewFunction([]values.Value{s, nil}, ctx), nil
+  case "scrollLeft", "scrollWidth", "scrollTop", "scrollHeight", "clientLeft", "clientWidth", "clientTop", "clientHeight":
+    return f, nil
+  case "scrollTo":
+    return values.NewFunction([]values.Value{f, f, nil}, ctx), nil
+  case "scrollIntoView":
+    o := NewConfigObject(map[string]values.Value{
+      "behavior": s,
+      "block": s,
+      "inline": s,
+    }, ctx)
+
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{nil},
+      []values.Value{b, nil},
+      []values.Value{o, nil},
+    }, ctx), nil
+  case "setAttribute":
+    return values.NewFunction([]values.Value{s, s, nil}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *Element) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  f := NewNumber(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "className", "id", "innerHTML":
+    return s.Check(arg, ctx)
+  case "scrollLeft", "scrollTop":
+    return f.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: Element." + key + " not setable")
+  }
+}
+
+func (p *Element) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewElementPrototype(), ctx), nil
+}

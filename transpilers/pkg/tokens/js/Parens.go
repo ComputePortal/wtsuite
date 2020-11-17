@@ -42,13 +42,13 @@ func (t *Parens) ResolveExpressionNames(scope Scope) error {
 	return t.expr.ResolveExpressionNames(scope)
 }
 
-func (t *Parens) EvalExpression(stack values.Stack) (values.Value, error) {
-	return t.expr.EvalExpression(stack)
+func (t *Parens) EvalExpression() (values.Value, error) {
+	return t.expr.EvalExpression()
 }
 
-func (t *Parens) CollectTypeGuards(stack values.Stack, c map[interface{}]values.Interface) (bool, error) {
+func (t *Parens) CollectTypeGuards(c map[Variable]values.Interface) (bool, error) {
 	if expr, ok := t.expr.(TypeGuard); ok {
-		return expr.CollectTypeGuards(stack, c)
+		return expr.CollectTypeGuards(c)
 	} else {
 		return false, nil
 	}

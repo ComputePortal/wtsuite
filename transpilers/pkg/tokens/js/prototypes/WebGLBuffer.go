@@ -1,15 +1,24 @@
 package prototypes
 
-var WebGLBuffer *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateWebGLBufferPrototype() bool {
-	*WebGLBuffer = BuiltinPrototype{
-		"WebGLBuffer", nil,
-		map[string]BuiltinFunction{},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+type WebGLBuffer struct {
+  BuiltinPrototype
 }
 
-var _WebGLBufferOk = generateWebGLBufferPrototype()
+func NewWebGLBufferPrototype() values.Prototype {
+  return &WebGLBuffer{newBuiltinPrototype("WebGLBuffer")}
+}
+
+func NewWebGLBuffer(ctx context.Context) values.Value {
+  return values.NewInstance(NewWebGLBufferPrototype(), ctx)
+}
+
+func (p *WebGLBuffer) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewWebGLBufferPrototype(), ctx), nil
+}

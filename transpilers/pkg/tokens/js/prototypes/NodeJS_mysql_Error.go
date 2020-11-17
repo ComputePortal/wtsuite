@@ -1,28 +1,42 @@
 package prototypes
 
 import (
-	//"../values"
+  "../values"
 
-	//"../../context"
+  "../../context"
 )
 
-var NodeJS_mysql_Error *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_mysql_ErrorPrototype() bool {
-	*NodeJS_mysql_Error = BuiltinPrototype{
-		"mysql.Error", Error,
-		map[string]BuiltinFunction{
-      "code": NewGetter(String),
-      "errno": NewGetter(Int),
-      "sqlMessage": NewGetter(String),
-      "sqlState": NewGetter(String),
-      "index": NewGetter(Int),
-      "sql": NewGetter(String),
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_mysql_Error struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_mysql_ErrorOk = generateNodeJS_mysql_ErrorPrototype()
+func NewNodeJS_mysql_ErrorPrototype() values.Prototype {
+  return &NodeJS_mysql_Error{newBuiltinPrototype("Error")}
+}
+
+func NewNodeJS_mysql_Error(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_mysql_ErrorPrototype(), ctx)
+}
+
+func (p *NodeJS_mysql_Error) GetParent() (values.Prototype, error) {
+  return NewErrorPrototype(), nil
+}
+
+func (p *NodeJS_mysql_Error) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "code", "sqlMessage", "sqlState", "sql":
+    return s, nil
+  case "errno", "index":
+    return i, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_mysql_Error) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_mysql_ErrorPrototype(), ctx), nil
+}

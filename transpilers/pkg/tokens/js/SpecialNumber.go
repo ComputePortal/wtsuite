@@ -32,8 +32,8 @@ func (t *SpecialNumber) ResolveExpressionNames(scope Scope) error {
 	return nil
 }
 
-func (t *SpecialNumber) EvalExpression(stack values.Stack) (values.Value, error) {
-	return prototypes.NewInstance(prototypes.Number, t.Context()), nil
+func (t *SpecialNumber) EvalExpression() (values.Value, error) {
+	return prototypes.NewNumber(t.Context()), nil
 }
 
 func (t *SpecialNumber) ResolveExpressionActivity(usage Usage) error {

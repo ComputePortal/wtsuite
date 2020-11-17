@@ -1,21 +1,19 @@
 package prototypes
 
-var NodeJS_http *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-// is actually a builtin nodejs module
-func generateNodeJS_httpPrototype() bool {
-	*NodeJS_http = BuiltinPrototype{
-		"http", nil,
-		map[string]BuiltinFunction{
-			"createServer":    NewStatic(&None{}, NodeJS_http_Server),
-			"IncomingMessage": NewStaticClassGetter(NodeJS_http_IncomingMessage),
-			"Server":          NewStaticClassGetter(NodeJS_http_Server),
-			"ServerResponse":  NewStaticClassGetter(NodeJS_http_ServerResponse),
-		},
-		nil,
-	}
+  "../../context"
+)
 
-	return true
+func FillNodeJS_httpPackage(pkg values.Package) {
+  pkg.AddPrototype(NewNodeJS_http_IncomingMessagePrototype())
+  pkg.AddPrototype(NewNodeJS_http_ServerPrototype())
+  pkg.AddPrototype(NewNodeJS_http_ServerResponsePrototype())
+
+  ctx := context.NewDummyContext()
+
+  pkg.AddValue("createServer", values.NewFunction([]values.Value{
+    NewNodeJS_http_Server(ctx),
+  }, ctx))
 }
-
-var _NodeJS_httpOk = generateNodeJS_httpPrototype()

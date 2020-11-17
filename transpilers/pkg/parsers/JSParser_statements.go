@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"../tokens/js"
-	"../tokens/js/macros"
 	"../tokens/patterns"
 	"../tokens/raw"
 )
@@ -21,6 +20,7 @@ func (p *JSParser) buildVarStatement(ts []raw.Token,
 	fields := p.splitBySeparator(ts[1:], patterns.COMMA)
 
 	expressions := make([]js.Expression, 0)
+  typeExprs := make([]*js.TypeExpression, 0)
 
 	for _, field := range fields {
 		if len(field) < 1 {
@@ -43,12 +43,8 @@ func (p *JSParser) buildVarStatement(ts []raw.Token,
 					"(hint: include rhs)")
 			}
 
-			if macros.IsOnlyMacro(name.Value()) {
-				errCtx := name.Context()
-				return nil, nil, errCtx.NewError("Error: macro " + name.Value() + " is not variable")
-			}
-
 			expressions = append(expressions, js.NewVarExpression(name.Value(), name.Context()))
+      typeExprs = append(typeExprs, nil)
 		case len(field) > 2 &&
 			raw.IsAnyWord(field[0]) &&
 			raw.IsSymbol(field[1], patterns.EQUAL):
@@ -63,15 +59,11 @@ func (p *JSParser) buildVarStatement(ts []raw.Token,
 				return nil, nil, err
 			}
 
-			if macros.IsOnlyMacro(name.Value()) {
-				errCtx := name.Context()
-				return nil, nil, errCtx.NewError("Error: macro " + name.Value() + " is not variable")
-			}
-
 			expressions = append(expressions, js.NewAssign(js.NewVarExpression(name.Value(),
 				name.Context()), rhs, "", field[1].Context()))
+      typeExprs = append(typeExprs, nil)
 		default:
-      iEqual := 0
+      iEqual := -1
 			for i, t := range field {
 				if raw.IsSymbol(t, patterns.EQUAL) {
           if i == len(field)-1 {
@@ -90,26 +82,32 @@ func (p *JSParser) buildVarStatement(ts []raw.Token,
           panic(err)
         }
 
-        if macros.IsOnlyMacro(name.Value()) {
-          errCtx := name.Context()
-          return nil, nil, errCtx.NewError("Error: macro " + name.Value() + " is not variable")
-        }
+        if iEqual == -1 {
+          typeExpr, err := p.buildTypeExpression(field[1:])
+          if err != nil {
+            return nil, nil, err
+          }
 
-        typeExpr, err := p.buildTypeExpression(field[1:iEqual], false)
-        if err != nil {
-          return nil, nil, err
-        }
+          expressions = append(expressions, js.NewVarExpression(name.Value(), name.Context()))
+          typeExprs = append(typeExprs, typeExpr)
+        } else {
+          typeExpr, err := p.buildTypeExpression(field[1:iEqual])
+          if err != nil {
+            return nil, nil, err
+          }
 
-        rhs, err := p.buildExpression(field[iEqual+1:])
-        if err != nil {
-          return nil, nil, err
-        }
+          rhs, err := p.buildExpression(field[iEqual+1:])
+          if err != nil {
+            return nil, nil, err
+          }
 
-        expressions = append(expressions, 
-          js.NewTypedAssign(js.NewVarExpression(name.Value(),
-            name.Context()), typeExpr, rhs, field[iEqual].Context(),
-          ),
-        )
+          expressions = append(expressions, 
+            js.NewAssign(js.NewVarExpression(name.Value(),
+              name.Context()), rhs, "", field[iEqual].Context(),
+            ),
+          )
+          typeExprs = append(typeExprs, typeExpr)
+        }
       } else {
         errCtx := raw.MergeContexts(field...)
         err := errCtx.NewError("Error: not yet supported")
@@ -118,7 +116,7 @@ func (p *JSParser) buildVarStatement(ts []raw.Token,
 		}
 	}
 
-	statement, err := js.NewVarStatement(varType, expressions, ts[0].Context())
+	statement, err := js.NewVarStatement(varType, expressions, typeExprs, ts[0].Context())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -195,7 +193,7 @@ func (p *JSParser) buildContinueStatement(ts []raw.Token) (*js.Continue, []raw.T
 	return continueStatement, remainingTokens, nil
 }
 
-func (p *JSParser) buildAssignStatementLHS(ts []raw.Token) (js.Expression, *js.TypeExpression, []raw.Token, error) {
+func (p *JSParser) buildAssignStatementLHS(ts []raw.Token) (js.Expression, []raw.Token, error) {
   iEqual := -1
   for i, t := range ts {
     if raw.IsSymbolThatEndsWith(t, patterns.EQUAL) {
@@ -206,47 +204,18 @@ func (p *JSParser) buildAssignStatementLHS(ts []raw.Token) (js.Expression, *js.T
 
   if iEqual <= 0 || iEqual == len(ts) - 1 {
     errCtx := raw.MergeContexts(ts...)
-    return nil, nil, nil, errCtx.NewError("Error: invalid assign")
+    return nil, nil, errCtx.NewError("Error: invalid assign")
   }
 
   lhsTokens := ts[0:iEqual]
   nonLHSTokens := ts[iEqual:] // includes *Equals, so op can be extracted
 
-  // if it only contains words, periods, and angled groups, then try parsing TypeExpression after second consecutive word
-  prevWasWord := false
-  for i := 0; i < len(lhsTokens); i++ {
-    t := lhsTokens[i]
-    if !(raw.IsAnyWord(t) || raw.IsSymbol(t, patterns.PERIOD)) {
-      break
-    }
-
-    isWord := raw.IsAnyWord(t)
-    if isWord {
-      if prevWasWord {
-        lhs, err := p.buildExpression(lhsTokens[0:i])
-        if err != nil {
-          return nil, nil, nil, err
-        }
-
-        typeExpr, err := p.buildTypeExpression(lhsTokens[i:], false)
-        if err != nil {
-          return nil, nil, nil, err
-        }
-
-        return lhs, typeExpr, nonLHSTokens, nil
-      } 
-    }
-
-    prevWasWord = isWord
-  }
-
-  // no typeExpression
   lhs, err := p.buildExpression(lhsTokens)
   if err != nil {
-    return nil, nil, nil, err
+    return nil, nil, err
   }
 
-  return lhs, nil, nonLHSTokens, nil
+  return lhs, nonLHSTokens, nil
 }
 
 func (p *JSParser) buildAssignStatement(ts_ []raw.Token) (*js.Assign, []raw.Token, error) {
@@ -257,7 +226,7 @@ func (p *JSParser) buildAssignStatement(ts_ []raw.Token) (*js.Assign, []raw.Toke
 		return nil, nil, errCtx.NewError("Error: assign statement expects rhs")
 	}
 
-  lhs, typeExpr, nonLHSTokens, err := p.buildAssignStatementLHS(ts)
+  lhs, nonLHSTokens, err := p.buildAssignStatementLHS(ts)
   if err != nil {
     return nil, nil, err
   }
@@ -274,20 +243,13 @@ func (p *JSParser) buildAssignStatement(ts_ []raw.Token) (*js.Assign, []raw.Toke
 		return nil, nil, err
 	}
 
-  if op != "" && typeExpr != nil {
-    errCtx := raw.MergeContexts(ts...)
-    return nil, nil, errCtx.NewError("Error: mutating assign can't be typed")
-  } else if op == "!" || op == "<" || op == ">" || op == "!=" || op == "=" || op == "==" {
+  if op == "!" || op == "<" || op == ">" || op == "!=" || op == "=" || op == "==" {
 		errCtx := raw.MergeContexts(ts...)
 		return nil, nil, errCtx.NewError("Error: invalid statement " +
 			"(hint: did you forget return)")
 	}
-  var assign *js.Assign = nil
-  if typeExpr == nil {
-    assign = js.NewAssign(lhs, rhs, op, nonLHSTokens[0].Context())
-  } else {
-    assign = js.NewTypedAssign(lhs, typeExpr, rhs, nonLHSTokens[0].Context())
-  }
+
+  assign := js.NewAssign(lhs, rhs, op, nonLHSTokens[0].Context())
 
 	return assign, remainingTokens, nil
 }

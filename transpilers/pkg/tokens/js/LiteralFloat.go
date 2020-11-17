@@ -30,8 +30,8 @@ func (t *LiteralFloat) WriteExpression() string {
 	return fmt.Sprintf("%g", t.value)
 }
 
-func (t *LiteralFloat) EvalExpression(stack values.Stack) (values.Value, error) {
-	return values.NewInstance(prototypes.Number, values.NewNumberProperties(true, t.value, t.Context()), t.Context()), nil
+func (t *LiteralFloat) EvalExpression() (values.Value, error) {
+	return prototypes.NewNumber(t.Context()), nil 
 }
 
 func (t *LiteralFloat) Walk(fn WalkFunc) error {

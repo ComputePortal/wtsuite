@@ -25,10 +25,10 @@ func (m *URLCurrent) WriteExpression() string {
 	return "(new URL(window.location.href))"
 }
 
-func (m *URLCurrent) EvalExpression(stack values.Stack) (values.Value, error) {
+func (m *URLCurrent) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs(stack)
+	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
@@ -37,5 +37,5 @@ func (m *URLCurrent) EvalExpression(stack values.Stack) (values.Value, error) {
 		return nil, ctx.NewError("Error: expected 0 arguments")
 	}
 
-	return prototypes.NewInstance(prototypes.URL, ctx), nil
+	return prototypes.NewURL(ctx), nil
 }

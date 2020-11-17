@@ -1,39 +1,49 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var MessagePort *BuiltinPrototype = allocBuiltinPrototype()
-
-func messagePortCallback(stack values.Stack, this *values.Instance, args []values.Value,
-	ctx context.Context) (values.Value, error) {
-	arg := args[0]
-
-	event := NewAltEvent(MessageEvent, this, ctx)
-	if err := arg.EvalMethod(stack.Parent(), []values.Value{event}, ctx); err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+type MessagePort struct {
+  BuiltinPrototype
 }
 
-func generateMessagePortPrototype() bool {
-	*MessagePort = BuiltinPrototype{
-		"MessagePort", EventTarget,
-		map[string]BuiltinFunction{
-			"close":          NewNormal(&None{}, nil),
-			"onmessage":      NewSetterFunction(&Function{}, messagePortCallback),
-			"onmessageerror": NewSetterFunction(&Function{}, messagePortCallback),
-			"postMessage":    NewNormal(&Any{}, nil),
-			"start":          NewNormal(&None{}, nil),
-		},
-		nil,
-	}
-
-	return true
+func NewMessagePortPrototype() values.Prototype {
+  return &MessagePort{newBuiltinPrototype("MessagePort")}
 }
 
-var _MessagePortOk = generateMessagePortPrototype()
+func NewMessagePort(ctx context.Context) values.Value {
+  return values.NewInstance(NewMessagePortPrototype(), ctx)
+}
+
+func (p *MessagePort) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  a := values.NewAny(ctx)
+
+  switch key {
+  case "close", "start":
+    return values.NewFunction([]values.Value{nil}, ctx), nil
+  case "postMessage":
+    return values.NewFunction([]values.Value{a, nil}, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *MessagePort) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  callback := values.NewFunction([]values.Value{NewMessageEvent(ctx), nil}, ctx)
+
+  switch key {
+  case "onmessage", "onmessageerror":
+    return callback.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: MessagePort." + key + " not setable")
+  }
+}
+
+func (p *MessagePort) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+
+  return values.NewUnconstructableClass(NewMessagePortPrototype(), ctx), nil
+}

@@ -138,20 +138,11 @@ func (t *Root) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.In
 	return html.CollectScripts(idMap, classMap, bundle)
 }
 
-func (t *Root) ApplyControl(control string, viewInterface *js.ViewInterface, jsUrl string) error {
+func (t *Root) ApplyControl(control string, jsUrl string) error {
 	_, html, err := t.getDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
 
-	return html.ApplyControl(control, viewInterface, jsUrl)
-}
-
-func (t *Root) ApplyAnimation(scenes []int) error {
-	_, html, err := t.getDocTypeAndHTML()
-	if err != nil {
-		return err
-	}
-
-	return html.ApplyAnimation(scenes)
+	return html.ApplyControl(control, jsUrl)
 }

@@ -1,8 +1,6 @@
 package js
 
 import (
-	"fmt"
-	"reflect"
 	"strings"
 
 	"./prototypes"
@@ -45,14 +43,6 @@ func (fi *FunctionInterface) Context() context.Context {
 	return fi.name.Context()
 }
 
-func (fi *FunctionInterface) Rest() bool {
-	if len(fi.args) == 0 {
-		return false
-	} else {
-		return fi.args[len(fi.args)-1].Rest()
-	}
-}
-
 func (fi *FunctionInterface) Role() prototypes.FunctionRole {
 	return fi.role
 }
@@ -65,39 +55,25 @@ func (fi *FunctionInterface) AppendArg(arg *FunctionArgument) {
 	fi.args = append(fi.args, arg)
 }
 
+// used by parser to gradually fill the interface struct
 func (fi *FunctionInterface) SetReturnType(ret *TypeExpression) {
 	fi.ret = ret
 }
 
-func (fi *FunctionInterface) Check() error {
-	argNameDone := make(map[string]*FunctionArgument)
+// can be called after resolve names phase
+// returns nil if void
+// used by return to check type, is used before async (so not a promise)
+func (fi *FunctionInterface) GetReturnValue() (values.Value, error) {
+  if fi.ret == nil {
+    return nil, nil
+  } else {
+    val, err := fi.ret.EvalExpression()
+    if err != nil {
+      return nil, err
+    }
 
-	// check that arg names are unique
-	for _, arg := range fi.args {
-		if other, ok := argNameDone[arg.Name()]; ok {
-			errCtx := context.MergeContexts(other.Context(), arg.Context())
-			return errCtx.NewError("Error: argument duplicate name")
-		}
-
-		argNameDone[arg.Name()] = arg
-	}
-
-	if fi.Rest() && fi.args[len(fi.args)-1].def != nil {
-		errCtx := fi.args[len(fi.args)-1].def.Context()
-		return errCtx.NewError("Error: default argument for rest argument no allowed")
-	}
-
-	return nil
-}
-
-func (fi *FunctionInterface) HasArg(name string) bool {
-	for _, arg := range fi.args {
-		if arg.Name() == name {
-			return true
-		}
-	}
-
-	return false
+    return val, nil
+  }
 }
 
 func (fi *FunctionInterface) Dump() string {
@@ -135,11 +111,7 @@ func (fi *FunctionInterface) Write() string {
 	b.WriteString("(")
 
 	for i, arg := range fi.args {
-		if fi.Rest() && i == len(fi.args)-1 {
-			b.WriteString(arg.Write(true))
-		} else {
-			b.WriteString(arg.Write(false))
-		}
+    b.WriteString(arg.Write())
 
 		if i < len(fi.args)-1 {
 			b.WriteString(",")
@@ -151,12 +123,45 @@ func (fi *FunctionInterface) Write() string {
 	return b.String()
 }
 
-func (fi *FunctionInterface) ResolveInterfaceNames(scope Scope) error {
-	for _, arg := range fi.args {
-		if err := arg.ResolveInterfaceNames(scope); err != nil {
-			return err
-		}
+func (fi *FunctionInterface) performChecks() error {
+	// check that arg names are unique, and check that default arguments come last
+  detectedDefault := false
+
+	for i, arg := range fi.args {
+    if detectedDefault && !arg.HasDefault() {
+      errCtx := arg.Context()
+      return errCtx.NewError("Error: defaults must come last")
+    }
+
+    if arg.HasDefault() {
+      detectedDefault = true
+    }
+
+    for j, otherArg := range fi.args {
+      if i != j {
+        if otherArg.Name() == arg.Name() {
+          errCtx := context.MergeContexts(otherArg.Context(), arg.Context())
+          return errCtx.NewError("Error: argument duplicate name")
+        }
+      }
+    }
 	}
+
+  if prototypes.IsGetter(fi) && len(fi.args) != 0 {
+    errCtx := fi.args[0].Context()
+    return errCtx.NewError("Error: unexpected argument for getter")
+  } else if prototypes.IsSetter(fi) && len(fi.args) != 1 {
+    errCtx := fi.Context()
+    return errCtx.NewError("Error: setter requires exactly one argument")
+  }
+
+	return nil
+}
+
+func (fi *FunctionInterface) ResolveNames(scope Scope) error {
+  if err := fi.performChecks(); err != nil {
+    return err
+  }
 
 	if fi.ret != nil {
 		if err := fi.ret.ResolveExpressionNames(scope); err != nil {
@@ -164,103 +169,97 @@ func (fi *FunctionInterface) ResolveInterfaceNames(scope Scope) error {
 		}
 	}
 
+	for _, arg := range fi.args {
+		if err := arg.ResolveNames(scope); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func (fi *FunctionInterface) ResolveNames(outer Scope, inner Scope) error {
-	for _, arg := range fi.args {
-		if err := arg.ResolveNames(outer, inner); err != nil {
-			return err
-		}
+func (fi *FunctionInterface) AssertNoDefaults() error {
+  for _, arg := range fi.args {
+    if err := arg.AssertNoDefault(); err != nil {
+      return err
+    }
+  }
+
+  return nil
+}
+
+func (fi *FunctionInterface) GetArgValues() ([]values.Value, error) {
+  args := make([]values.Value, len(fi.args))
+
+  for i, fa := range fi.args {
+    arg, err := fa.GetValue()
+    if err != nil {
+      return nil, err
+    }
+
+    args[i] = arg
+  }
+
+  return args, nil
+}
+
+func (fi *FunctionInterface) GetFunctionValue() (*values.Function, error) {
+  nOverloads := 1
+
+  for _, arg := range fi.args {
+    if arg.HasDefault() {
+      nOverloads += 1
+    }
+  }
+
+  // each argument with a default creates an overload
+  argsAndRet := make([][]values.Value, nOverloads)
+
+  retValue, err := fi.ret.EvalExpression()
+  if err != nil {
+    return nil, err
+  }
+
+  if prototypes.IsAsync(fi) {
+    if retValue == nil {
+      retValue = prototypes.NewVoidPromise(fi.ret.Context())
+    } else {
+      retValue = prototypes.NewPromise(retValue, fi.ret.Context())
+    }
+  }
+
+  for i := 0; i < nOverloads; i++ {
+    nOverloadArgs := len(fi.args) - (nOverloads - 1 - i)
+    argsAndRet[i] = make([]values.Value, nOverloadArgs + 1)
+
+    for j := 0; j < nOverloadArgs; j++ {
+      argValue, err := fi.args[j].GetValue()
+      if err != nil {
+        return nil, err
+      }
+
+      argsAndRet[i][j] = argValue
+    }
+
+    argsAndRet[i][nOverloadArgs] = retValue
+  }
+  
+  return values.NewOverloadedFunction(argsAndRet, fi.Context()), nil
+}
+
+func (fi *FunctionInterface) Eval() error {
+  for _, arg := range fi.args {
+    if err := arg.Eval(); err != nil {
+      return err
+    }
 	}
 
 	if fi.ret != nil {
-		if err := fi.ret.ResolveExpressionNames(outer); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (fi *FunctionInterface) GenerateArgInstances(stack values.Stack,
-	ctx context.Context) ([]values.Value, error) {
-	if fi.Rest() {
-		return nil, ctx.NewError("Error: cannot generate arg instances with rest")
-	}
-
-	res := make([]values.Value, 0)
-
-	for _, arg := range fi.args {
-		argInstance, err := arg.GenerateArgInstance(stack, ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, argInstance)
-	}
-
-	return res, nil
-}
-
-func (fi *FunctionInterface) GenerateReturnInstance(stack values.Stack,
-	ctx context.Context) (values.Value, error) {
-	if fi.ret == nil {
-		errCtx := fi.Context()
-		return nil, errCtx.NewError("Error: doesn't have a return value")
-	}
-
-	return fi.ret.GenerateInstance(stack, ctx)
-}
-
-func (fi *FunctionInterface) EvalInterface(stack values.Stack) error {
-	for _, arg := range fi.args {
-		if err := arg.EvalInterface(stack); err != nil {
-			return err
-		}
-	}
-
-	if fi.ret != nil {
-		retClassVal, err := fi.ret.EvalExpression(stack)
+		_, err := fi.ret.EvalExpression()
 		if err != nil {
 			return err
 		}
-
-		_, ok := retClassVal.GetClassInterface()
-		if !ok {
-			errCtx := fi.ret.Context()
-			return errCtx.NewError("Error: not a class or interface")
-		}
-	}
-
-	return nil
-}
-
-func (fi *FunctionInterface) EvalArgs(stack values.Stack, args []values.Value, ctx context.Context) error {
-	i := 0
-	for ; i < len(args); i++ {
-		if !fi.Rest() && i > len(fi.args)-1 {
-			return ctx.NewError("Error: too many arguments, expected " +
-				fmt.Sprintf("%d but got %d", len(fi.args), len(args)))
-		} else if fi.Rest() && i == len(fi.args)-1 {
-			if err := fi.args[i].EvalRest(stack, args[i:], ctx); err != nil {
-				return err
-			}
-
-			break
-		} else {
-			if err := fi.args[i].EvalArg(stack, args[i], ctx); err != nil {
-				return err
-			}
-		}
-	}
-
-	// any remaining args must have defaults
-	for ; i < len(fi.args); i++ {
-		if err := fi.args[i].EvalDef(stack, ctx); err != nil {
-			return err
-		}
-	}
+  }
 
 	return nil
 }
@@ -318,176 +317,3 @@ func (fi *FunctionInterface) Walk(fn WalkFunc) error {
 
   return fn(fi)
 }
-
-func (fi *FunctionInterface) ConstrainReturnValue(stack values.Stack, val values.Value, ctx context.Context) (values.Value, error) {
-	if fi.ret == nil {
-		if val != nil && !values.IsVoid(val) {
-			// function and the value context should be in the same file, so merging the contexts shouldn't be a problem
-			errCtx := context.MergeContexts(fi.name.Context(), val.Context())
-			return nil, errCtx.NewError("Error: no return type specified")
-		} else {
-			return nil, nil
-		}
-	} else if val == nil {
-		errCtx := fi.name.Context()
-		return nil, errCtx.NewError("Error: expected a return value, got void")
-	} else {
-		return fi.ret.Constrain(stack, val)
-	}
-}
-
-func (fi *FunctionInterface) IsImplementedBy(proto_ values.Prototype) (string, bool) {
-
-	switch proto := proto_.(type) {
-	case *Class:
-		return fi.isImplementedByClass(proto)
-	case *Enum:
-		return fi.IsImplementedBy(proto.cachedExtends)
-	case prototypes.BuiltinPrototypeInterface:
-		return fi.isImplementedByBuiltinPrototype(proto)
-	default:
-		panic("not implemented " + reflect.TypeOf(proto_).String())
-	}
-}
-
-func (fi *FunctionInterface) isImplementedByBuiltinPrototype(proto prototypes.BuiltinPrototypeInterface) (string, bool) {
-	builtinFn := proto.FindMember(fi.Name())
-
-	if builtinFn == nil {
-		return fi.Name() + " missing", false
-	} else {
-		return fi.isImplementedByBuiltinFunction(builtinFn)
-	}
-}
-
-func (fi *FunctionInterface) isImplementedByClass(cl *Class) (string, bool) {
-	clMember := cl.FindMember(fi.Name(), false, prototypes.IsSetter(fi))
-	if clMember == nil {
-		if cl.cachedExtends != nil {
-			return fi.IsImplementedBy(cl.cachedExtends)
-		} else {
-			return fi.Name() + " missing", false
-		}
-	}
-
-	return fi.isImplementedByOtherInterface(clMember.function.Interface())
-}
-
-func (fi *FunctionInterface) isImplementedByOtherInterface(other *FunctionInterface) (string, bool) {
-	if fi.Name() != other.Name() {
-		panic("should've been caught before")
-	}
-
-	if fi.role != other.role {
-		return fi.Name() + " differs", false
-	}
-
-	if len(fi.args) > len(other.args) {
-		return fi.Name() + " differs", false
-	} else if len(fi.args) < len(other.args) {
-		// remaining other needs default args
-		for i := len(fi.args); i < len(other.args); i++ {
-			otherArg := other.args[i]
-			if otherArg.def == nil {
-				return fi.Name() + " differs", false
-			}
-		}
-	}
-
-	for i, arg := range fi.args {
-		// if this arg doesnt doesnt have a constraint, neither can the other
-		if !arg.IsImplementedByOtherArg(other.args[i]) {
-			return fi.Name() + " differs", false
-		}
-	}
-
-	if fi.ret == nil {
-		if other.ret != nil {
-			return fi.Name() + "'s return value differs", false
-		}
-	} else if other.ret == nil {
-		return fi.Name() + "'s return value differs", false
-	} else {
-		if fi.ret.Dump("") != other.ret.Dump("") {
-			return fi.Name() + "'s return value differs", false
-		}
-	}
-
-	return "", true
-}
-
-func (fi *FunctionInterface) isImplementedByBuiltinFunction(fn prototypes.BuiltinFunction) (string, bool) {
-	// generate dummy args
-	dummyArgs := make([]values.Value, len(fi.args))
-
-	for i, arg := range fi.args {
-		if arg.constraint == nil {
-			dummyArgs[i] = values.NewVoid(arg.Context())
-		} else if globalProto := GetBuiltinPrototype(arg.constraint.Name()); globalProto != nil {
-
-			dummyArgs[i] = values.NewNull(globalProto, arg.Context())
-		} else {
-			return fi.Name() + " differs", false
-		}
-	}
-
-	res := fn.CheckArgs(dummyArgs)
-	if !res {
-		return fi.Name() + " differs", res
-	} else {
-		return "", true
-	}
-
-	// TODO: take fi.ret into account
-	// XXX: this is actually quite difficult right now
-}
-
-// for builtin interfaces
-func PrototypeImplements(proto_ values.Prototype, interf_ values.Interface) (string, bool) {
-	proto, ok := proto_.(*Class)
-	if !ok {
-		return "not a class", false
-	}
-
-	interf, ok := interf_.(*prototypes.BuiltinInterface)
-	if !ok {
-		panic("not a builtin interface")
-	}
-
-	for name, member := range interf.Members {
-		clMember := proto.FindMember(name, false, prototypes.IsSetter(member))
-		if clMember == nil {
-			return name + " missing", false
-		}
-
-		if clMember.Role() != member.Role() {
-			return name + " roles differ", false
-		}
-
-		// we dont have access to the stack so we need another way
-		fi := clMember.function.Interface()
-
-		args := make([]interface{}, 0)
-		for _, arg := range fi.args {
-			args = append(args, arg.ConstraintName())
-		}
-
-		if !member.Check(args) {
-			return name + " arg types differ", false
-		}
-
-		retName := ""
-		if fi.ret != nil {
-			retName = fi.ret.Name()
-		}
-		if !member.CheckRetType(retName) {
-			return name + " return type differs", false
-		}
-	}
-
-	// TODO: take fi.ret into account
-
-	return "", true
-}
-
-var _PrototypeImplementsOk = prototypes.RegisterPrototypeImplements(PrototypeImplements)

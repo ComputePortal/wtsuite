@@ -84,10 +84,6 @@ func (t *Member) ObjectNameAndKey() (string, string) {
 	return name, t.key.Value()
 }
 
-func (t *Member) Precedence() int {
-	return _binaryPrecedenceMap["."]
-}
-
 func (t *Member) ResolveExpressionNames(scope Scope) error {
 	t.friendlyPrototypes = scope.FriendlyPrototypes()
 
@@ -95,18 +91,25 @@ func (t *Member) ResolveExpressionNames(scope Scope) error {
 }
 
 func (t *Member) havePrivateAccess(objectValue values.Value) bool {
-	isFriendlyScope := values.InstancePrototypeIsAncestorOf(objectValue,
-		t.friendlyPrototypes...)
+  // is this?:
+  if varExpr, ok := t.object.(*VarExpression); ok {
+    if varExpr.Name() == "this" {
+      return true
+    }
+  }
 
-	isThis := false
+  proto := values.GetPrototype(objectValue)
+  if proto != nil {
+    for _, friendlyProto := range t.friendlyPrototypes {
+      if values.PrototypeIsAncestorOf(proto, friendlyProto) {
+        return true
+      }
+    }
 
-	if varExpr, ok := t.object.(*VarExpression); ok {
-		if varExpr.Name() == "this" {
-			isThis = true
-		}
-	}
-
-	return isFriendlyScope || isThis
+    return false
+  } else {
+    return false
+  }
 }
 
 func (t *Member) getPackage() (*Package, error) {
@@ -165,26 +168,26 @@ func (t *Member) KeyContext() context.Context {
   return t.key.Context()
 }
 
-func (t *Member) EvalExpression(stack values.Stack) (values.Value, error) {
+func (t *Member) EvalExpression() (values.Value, error) {
 	pkgMember, err := t.GetPackageMember()
 	if err != nil {
 		return nil, err
 	} else if pkgMember != nil {
 		// use a dummy VarExpression to retrieve the pkgMember value
 		tmpVe := NewConstantVarExpression("", t.Context()) // doesn't need a name
-		tmpVe.ref = pkgMember
+		tmpVe.variable = pkgMember
 
-		return tmpVe.EvalExpression(stack)
+		return tmpVe.EvalExpression()
 	}
 
-	objectValue, err := t.object.EvalExpression(stack)
+	objectValue, err := t.object.EvalExpression()
 	if err != nil {
 		return nil, err
 	}
 
 	includePrivate := t.havePrivateAccess(objectValue)
 
-	res, err := objectValue.GetMember(stack, t.key.value, includePrivate, t.key.Context())
+	res, err := objectValue.GetMember(t.key.value, includePrivate, t.key.Context())
 	if err != nil {
 		return nil, err
 	}
@@ -193,16 +196,15 @@ func (t *Member) EvalExpression(stack values.Stack) (values.Value, error) {
 	//return values.NewContextValue(res, t.Context()), nil
 }
 
-func (t *Member) EvalSet(stack values.Stack, rhsValue values.Value,
-	ctx context.Context) error {
-	objectValue, err := t.object.EvalExpression(stack)
+func (t *Member) EvalSet(rhsValue values.Value, ctx context.Context) error {
+	objectValue, err := t.object.EvalExpression()
 	if err != nil {
 		return err
 	}
 
 	includePrivate := t.havePrivateAccess(objectValue)
 
-	err = objectValue.SetMember(stack, t.key.value, rhsValue, includePrivate,
+	err = objectValue.SetMember(t.key.value, includePrivate, rhsValue,
 		t.key.Context())
 
 	if err != nil {

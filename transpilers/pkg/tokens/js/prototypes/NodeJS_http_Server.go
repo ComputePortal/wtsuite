@@ -1,57 +1,52 @@
 package prototypes
 
 import (
-	"../values"
+  "../values"
 
-	"../../context"
+  "../../context"
 )
 
-var NodeJS_http_Server *BuiltinPrototype = allocBuiltinPrototype()
-
-func generateNodeJS_http_ServerPrototype() bool {
-	*NodeJS_http_Server = BuiltinPrototype{
-		"http.Server", NodeJS_EventEmitter,
-		map[string]BuiltinFunction{
-			"addListener": NewNormalFunction(&And{String, &Function{}},
-				func(stack values.Stack, this *values.Instance,
-					args []values.Value, ctx context.Context) (values.Value, error) {
-					var callbackArgs []values.Value = nil
-
-					if str, ok := args[0].LiteralStringValue(); ok {
-						switch str {
-						case "request":
-							callbackArgs = []values.Value{NewInstance(NodeJS_http_IncomingMessage, ctx),
-								NewInstance(NodeJS_http_ServerResponse, ctx)}
-						}
-					}
-
-					if callbackArgs != nil {
-						callbackCtx := args[1].Context()
-						if err := args[1].EvalMethod(stack.Parent(), callbackArgs, callbackCtx); err != nil {
-							return nil, err
-						}
-
-						return nil, nil
-					} else {
-						eventEmitterFn, err := NodeJS_EventEmitter.GetMember(stack, this, "addListener", false,
-							ctx)
-						if err != nil {
-							panic(err)
-						}
-
-						if err := eventEmitterFn.EvalMethod(stack.Parent(), args, ctx); err != nil {
-							return nil, err
-						}
-
-						return nil, nil
-					}
-				}),
-			"listen": NewMethodLikeNormal(&Or{String, &And{&Opt{Int}, &Opt{String}}}, nil),
-		},
-		nil,
-	}
-
-	return true
+type NodeJS_http_Server struct {
+  BuiltinPrototype
 }
 
-var _NodeJS_http_ServerOk = generateNodeJS_http_ServerPrototype()
+func NewNodeJS_http_ServerPrototype() values.Prototype {
+  return &NodeJS_http_Server{newBuiltinPrototype("Server")}
+}
+
+func NewNodeJS_http_Server(ctx context.Context) values.Value {
+  return values.NewInstance(NewNodeJS_http_ServerPrototype(), ctx)
+}
+
+func (p *NodeJS_http_Server) GetParent() (values.Prototype, error) {
+  return NewNodeJS_EventEmitterPrototype(), nil
+}
+
+func (p *NodeJS_http_Server) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  i := NewInt(ctx)
+  s := NewString(ctx)
+
+  switch key {
+  case "addListener":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{NewLiteralString("request", ctx), values.NewFunction([]values.Value{
+        NewNodeJS_http_IncomingMessage(ctx), NewNodeJS_http_ServerResponse(ctx),
+      }, ctx)},
+      []values.Value{s, values.NewFunction([]values.Value{nil}, ctx)},
+    }, ctx), nil
+  case "listen":
+    return values.NewOverloadedMethodLikeFunction([][]values.Value{
+      []values.Value{nil},
+      []values.Value{s, nil},
+      []values.Value{i, nil},
+      []values.Value{i, s, nil},
+    }, ctx), nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *NodeJS_http_Server) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+  return values.NewUnconstructableClass(NewNodeJS_http_ServerPrototype(), ctx), nil
+}

@@ -1,32 +1,36 @@
 package prototypes
 
-var TextMetrics *BuiltinPrototype = allocBuiltinPrototype()
+import (
+  "../values"
 
-func generateTextMetricsPrototype() bool {
-	*TextMetrics = BuiltinPrototype{
-		"TextMetrics", nil,
-		map[string]BuiltinFunction{
-			"width": NewGetter(Number),
+  "../../context"
+)
 
-			// XXX: not yet supported by all major browsers
-			/*
-				"actualBoundingBoxLeft": NewGetter(Number),
-				"actualBoundingBoxRight": NewGetter(Number),
-				"fontBoundingBoxAscent": NewGetter(Number),
-				"fontBoundingBoxDescent": NewGetter(Number),
-				"actualBoundingBoxAscent": NewGetter(Number),
-				"actualBoundingBoxDescent": NewGetter(Number),
-				"emHeightAscent": NewGetter(Number),
-				"emHeightDescent": NewGetter(Number),
-				"hangingBaseline": NewGetter(Number),
-				"alphabeticBaseline": NewGetter(Number),
-				"ideagraphicBaseline": NewGetter(Number),
-			*/
-		},
-		nil,
-	}
-
-	return true
+type TextMetrics struct {
+  BuiltinPrototype
 }
 
-var _TextMetricsOk = generateTextMetricsPrototype()
+func NewTextMetricsPrototype() values.Prototype {
+  return &TextMetrics{newBuiltinPrototype("TextMetrics")}
+}
+
+func NewTextMetrics(ctx context.Context) values.Value {
+  return values.NewInstance(NewTextMetricsPrototype(), ctx)
+}
+
+func (p *TextMetrics) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  f := NewNumber(ctx)
+
+  switch key {
+  case "width":
+    return f, nil
+  default:
+    return nil, nil
+  }
+}
+
+func (p *TextMetrics) GetClassValue() (*values.Class, error) {
+  ctx := p.Context()
+
+  return values.NewUnconstructableClass(NewTextMetricsPrototype(), ctx), nil
+}
