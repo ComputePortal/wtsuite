@@ -13,11 +13,10 @@ import (
 
 type PostMacro struct {
 	ToInstance
-	Macro
 }
 
-func newPostMacro(args []js.Expression, ctx context.Context) PostMacro {
-	return PostMacro{newToInstance(), newMacro(args, ctx)}
+func newPostMacro(args []js.Expression, interfExpr *js.TypeExpression, ctx context.Context) PostMacro {
+	return PostMacro{newToInstance(args, interfExpr, ctx)}
 }
 
 func (m *PostMacro) writeExpression(fnName string) string {
@@ -33,30 +32,13 @@ func (m *PostMacro) writeExpression(fnName string) string {
 	return b.String()
 }
 
-func (m *PostMacro) evalExpression(msg values.Value,
-	classValue values.Value) (values.Value, error) {
+func (m *PostMacro) evalExpression(msg values.Value) (values.Value, error) {
 	if !isAnObject(msg) {
 		errCtx := m.Context()
-		return nil,
-			errCtx.NewError("Error: expected Object or instance of class that extends Object for argument 2, got " +
-				msg.TypeName())
+		return nil, errCtx.NewError("Error: expected Object or instance of class that extends Object for argument 2, got " + msg.TypeName())
 	}
 
-	resolveValue, err := classValue.EvalConstructor(nil, classValue.Context())
-	if err != nil {
-		context.AppendContextString(err, "Info: needed here", m.Context())
-		return nil, err
-	}
+  res := values.NewInstance(m.interf, m.Context())
 
-  proto := values.GetPrototype(resolveValue)
-  if proto == nil {
-    panic("expected instance of class")
-  }
-
-  if !proto.IsUniversal() {
-    errCtx := m.Context()
-    return nil, errCtx.NewError("Error: class " + proto.Name() + " is not universal (hint: use 'universe'")
-  }
-
-  return prototypes.NewPromise(resolveValue, m.Context()), nil
+  return prototypes.NewPromise(res, m.Context()), nil
 }

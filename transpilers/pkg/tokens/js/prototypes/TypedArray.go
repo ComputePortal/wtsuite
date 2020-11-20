@@ -46,6 +46,7 @@ func newAbstractTypedArrayPrototype(name string, unsigned bool, nBits int, conte
   return AbstractTypedArray{unsigned, nBits, content, newBuiltinPrototype(name)}
 }
 
+// used for some internal type checks instead of [Float32Array, Float64Array, Int16......]
 func NewTypedArray(ctx context.Context) values.Value {
   proto := newAbstractTypedArrayPrototype("TypedArray", false, 0, NewNumber(ctx))
   return values.NewInstance(&proto, ctx)
@@ -65,6 +66,25 @@ func (p *AbstractTypedArray) GetParent() (values.Prototype, error) {
 
 func (p *AbstractTypedArray) IsUniversal() bool {
   return true
+}
+
+func (p *AbstractTypedArray) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(TypedArray); ok {
+    thisContent := p.getContent()
+    otherContent := other.getContent()
+
+    if p.numBits() == 0 {
+      return nil
+    }
+
+    if thisContent.Check(otherContent, ctx) != nil || p.numBits() != other.numBits() || p.isUnsigned() != other.isUnsigned() {
+      return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
+    }
+
+    return nil
+  } else {
+    return ctx.NewError("Error: expected TypedArray, got " + other_.Name())
+  }
 }
 
 func CheckTypedArray(p TypedArray, other_ values.Interface, ctx context.Context) error {
@@ -88,10 +108,18 @@ func CheckTypedArray(p TypedArray, other_ values.Interface, ctx context.Context)
 
 func GetTypedArrayInstanceMember(p TypedArray, key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   i := NewInt(ctx)
+  content := values.NewContextValue(p.getContent(), ctx)
   arr := NewArray(p.getContent(), ctx)
   self := values.NewInstance(p, ctx)
 
   switch key {
+  case ".getindex":
+    return values.NewFunction([]values.Value{i, content}, ctx), nil
+  case ".setindex":
+    // TODO: use this, instead of basing on .getindex
+    return values.NewFunction([]values.Value{i, content, nil}, ctx), nil
+  case ".getof":
+    return content, nil
   case "BYTES_PER_ELEMENT":
     return i, nil
   case "buffer":
@@ -100,6 +128,8 @@ func GetTypedArrayInstanceMember(p TypedArray, key string, includePrivate bool, 
     return values.NewOverloadedFunction([][]values.Value{
       []values.Value{arr, nil},
       []values.Value{arr, i, nil},
+      []values.Value{self, nil},
+      []values.Value{self, i, nil},
     }, ctx), nil
   case "slice":
     return values.NewOverloadedFunction([][]values.Value{
@@ -146,3 +176,14 @@ func GetTypedArrayClassValue(p TypedArray) (*values.Class, error) {
   }, p, ctx), nil
 }
 
+func (p *AbstractTypedArray) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  return GetTypedArrayInstanceMember(p, key, includePrivate, ctx)
+}
+
+func (p *AbstractTypedArray) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  return GetTypedArrayClassMember(p, key, includePrivate, ctx)
+}
+
+func (p *AbstractTypedArray) GetClassValue() (*values.Class, error) {
+  return GetTypedArrayClassValue(p)
+}

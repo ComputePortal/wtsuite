@@ -64,10 +64,17 @@ func UnpackContextValue(val Value) Value {
   var res Value = val
 
   for true {
-    res_, ok := res.(*ContextValue)
-    if ok {
+    br := false
+    switch res_ := res.(type) {
+    case *ContextValue:
       res = res_.val
-    } else {
+    case *This:
+      res = res_.this
+    default:
+      br = true
+    }
+
+    if br {
       break
     }
   }

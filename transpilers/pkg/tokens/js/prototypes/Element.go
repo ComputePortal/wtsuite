@@ -22,6 +22,14 @@ func (p *Element) GetParent() (values.Prototype, error) {
   return NewNodePrototype(), nil
 }
 
+func (p *Element) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Element); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Element) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   f := NewNumber(ctx)

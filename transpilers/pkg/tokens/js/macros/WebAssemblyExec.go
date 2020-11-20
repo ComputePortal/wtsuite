@@ -16,6 +16,10 @@ type WebAssemblyExec struct {
 }
 
 func NewWebAssemblyExec(args []js.Expression, ctx context.Context) (js.Expression, error) {
+	if len(args) != 2 {
+		return nil, ctx.NewError("Error: expected 2 arguments")
+	}
+
 	return &WebAssemblyExec{newMacro(args, ctx)}, nil
 }
 
@@ -43,10 +47,6 @@ func (m *WebAssemblyExec) EvalExpression() (values.Value, error) {
 	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
-	}
-
-	if len(args) != 2 {
-		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
 
 	if !prototypes.IsString(args[0]) {

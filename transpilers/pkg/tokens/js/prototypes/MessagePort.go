@@ -18,10 +18,20 @@ func NewMessagePort(ctx context.Context) values.Value {
   return values.NewInstance(NewMessagePortPrototype(), ctx)
 }
 
+func (p *MessagePort) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*MessagePort); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *MessagePort) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   a := values.NewAny(ctx)
 
   switch key {
+  case "onmessage", "onmessageerror":
+    return nil, ctx.NewError("Error: is only a setter")
   case "close", "start":
     return values.NewFunction([]values.Value{nil}, ctx), nil
   case "postMessage":

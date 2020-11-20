@@ -18,6 +18,14 @@ func NewWebGLRenderingContext(ctx context.Context) values.Value {
   return values.NewInstance(NewWebGLRenderingContextPrototype(), ctx)
 }
 
+func (p *WebGLRenderingContext) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*WebGLRenderingContext); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *WebGLRenderingContext) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   f := NewNumber(ctx)
@@ -42,6 +50,8 @@ func (p *WebGLRenderingContext) GetInstanceMember(key string, includePrivate boo
     return values.NewFunction([]values.Value{enum, enum, nil}, ctx), nil
   case "blendFuncSeparate":
     return values.NewFunction([]values.Value{enum, enum, enum, enum, nil}, ctx), nil
+  case "bufferData":
+    return values.NewFunction([]values.Value{enum, NewTypedArray(ctx), enum, nil}, ctx), nil
   case "compileShader":
     return values.NewFunction([]values.Value{NewWebGLShader(ctx), nil}, ctx), nil
   case "createBuffer":
@@ -82,14 +92,14 @@ func (p *WebGLRenderingContext) GetInstanceMember(key string, includePrivate boo
     return values.NewFunction([]values.Value{NewWebGLProgram(ctx), s, i}, ctx), nil
   case "linkProgram":
     return values.NewFunction([]values.Value{NewWebGLProgram(ctx), nil}, ctx), nil
-  case "scissor", "viewport":
+  case "scissor", "viewport", "clearColor":
     return values.NewFunction([]values.Value{f, f, f, f, nil}, ctx), nil
   case "shaderSource":
     return values.NewFunction([]values.Value{NewWebGLShader(ctx), s, nil}, ctx), nil
   case "texParameterf":
-    return values.NewFunction([]values.Value{enum, enum, f}, ctx), nil
+    return values.NewFunction([]values.Value{enum, enum, f, nil}, ctx), nil
   case "texParameteri":
-    return values.NewFunction([]values.Value{enum, enum, i}, ctx), nil
+    return values.NewFunction([]values.Value{enum, enum, i, nil}, ctx), nil
   case "texImage2D":
     return values.NewOverloadedFunction([][]values.Value{
       []values.Value{enum, i, enum, i, i, i, enum, enum, NewTypedArray(ctx), nil},
@@ -117,6 +127,8 @@ func (p *WebGLRenderingContext) GetInstanceMember(key string, includePrivate boo
     return values.NewFunction([]values.Value{i, NewArray(f, ctx), nil}, ctx), nil
   case "uniform1iv", "uniform2iv", "uniform3iv", "uniform4iv":
     return values.NewFunction([]values.Value{i, NewArray(i, ctx), nil}, ctx), nil
+  case "uniformMatrix2fv", "uniformMatrix3fv", "uniformMatrix4fv":
+    return values.NewFunction([]values.Value{i, b, NewArray(f, ctx), nil}, ctx), nil
   case "useProgram", "validateProgram":
     return values.NewFunction([]values.Value{NewWebGLProgram(ctx), nil}, ctx), nil
   case "vertexAttribPointer":

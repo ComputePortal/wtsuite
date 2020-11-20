@@ -19,9 +19,15 @@ func NewDedicatedWorkerGlobalScope(ctx context.Context) values.Value {
 }
 
 func NewPostMessageFunction(ctx context.Context) values.Value {
-  a := values.NewAny(ctx)
+  return values.NewFunction([]values.Value{NewObject(nil, ctx), nil}, ctx)
+}
 
-  return values.NewFunction([]values.Value{a, nil}, ctx)
+func (p *DedicatedWorkerGlobalScope) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*DedicatedWorkerGlobalScope); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
 }
 
 func (p *DedicatedWorkerGlobalScope) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {

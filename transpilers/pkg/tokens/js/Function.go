@@ -57,6 +57,10 @@ func (t *Function) IsAsync() bool {
 	return prototypes.IsAsync(t)
 }
 
+func (t *Function) IsVoid() bool {
+  return t.fi.IsVoid()
+}
+
 func (t *Function) RegisterReturn(ret *Return) {
   t.ret = append(t.ret, ret)
 }
@@ -165,7 +169,6 @@ func (t *Function) resolveExpressionNames(outer Scope, inner Scope) error {
 	}
 
 	if err := t.Block.HoistAndResolveStatementNames(inner); err != nil {
-		//context.AppendContextString(err, "Info: called here", t.Context())
 		return err
 	}
 
@@ -177,7 +180,21 @@ func (t *Function) ResolveExpressionNames(outer Scope) error {
 	// wrap the scope
 	inner := t.NewScope(outer)
 
-	return t.resolveExpressionNames(outer, inner)
+  if err := t.resolveExpressionNames(outer, inner); err != nil {
+    return err
+  }
+
+  // register value to variable so it is available in a scope that used the hoisted variable
+  // must be done here so value is available in class
+  fn, err := t.GetFunctionValue()
+  if err != nil {
+    return err
+  }
+
+  variable := t.GetVariable()
+  variable.SetValue(fn)
+
+  return nil
 }
 
 func (t *Function) ResolveStatementNames(scope Scope) error {
@@ -185,22 +202,23 @@ func (t *Function) ResolveStatementNames(scope Scope) error {
 		panic("function should've been hoisted before")
 	}
 
-  // register value to variable so it is available in a scope that used the hoisted variable
-  variable := t.GetVariable()
-  fnVal, err := t.GetFunctionValue()
-  if err != nil {
+  if err := t.ResolveExpressionNames(scope); err != nil {
     return err
   }
-  
-  variable.SetValue(fnVal)
 
-	return t.ResolveExpressionNames(scope)
+	return nil
 }
 
 func (t *Function) GetFunctionValue() (*values.Function, error) {
   return t.fi.GetFunctionValue()
 }
 
+// pre async
+func (t *Function) getReturnValue() (values.Value, error) {
+  return t.fi.getReturnValue()
+}
+
+// post async
 // return type can be nil in case of void
 func (t *Function) GetReturnValue() (values.Value, error) {
   return t.fi.GetReturnValue()
@@ -264,20 +282,27 @@ func (t *Function) EvalExpression() (values.Value, error) {
 		return nil, err
 	}
 
-  retType, err := t.fi.GetReturnValue()
+  // pre async (post async might give Promise<void>)
+  retVal, err := t.fi.getReturnValue()
   if err != nil {
     return nil, err
   }
 
-  if retType != nil {
-    if len(t.ret) == 0 {
+  if retVal != nil {
+    n := len(t.statements)
+    if n == 0 {
       errCtx := t.Context()
-      return nil, errCtx.NewError("Error: expected non-void return value, but no return statement found")
+      return nil, errCtx.NewError("Error: expected return statement")
+    } else {
+      if err := t.assertLastStatementReturns(t.statements[n-1]); err != nil {
+        return nil, err
+      }
     }
 
-		if err := t.assertLastStatementReturns(t.statements[len(t.statements)-1]); err != nil {
-			return nil, err
-		}
+    /*if len(t.ret) == 0 {
+      errCtx := t.Context()
+      return nil, errCtx.NewError("Error: expected non-void return value, but no return statement found")
+    }*/
   }
 
   // function value was created before

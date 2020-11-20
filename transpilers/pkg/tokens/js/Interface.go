@@ -121,18 +121,22 @@ func (t *Interface) check(other_ values.Interface, ctx context.Context) error {
     vm, err := v.GetMember(member.Name(), false, ctx)
     if vm == nil && err == nil {
       return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
-    }
+    } 
 
     if prototypes.IsGetter(member) {
       if retVal == nil {
         panic("getter can't return void, should be checked elsewhere")
       }
 
+      if vm == nil {
+        return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
+      }
+
       if err := retVal.Check(vm, ctx); err != nil {
         return err
       }
     } else if prototypes.IsSetter(member) {
-      if err := vm.SetMember(member.Name(), false, args[0], ctx); err != nil {
+      if err := v.SetMember(member.Name(), false, args[0], ctx); err != nil {
         return err
       }
     } else {
@@ -163,6 +167,12 @@ func (t *Interface) check(other_ values.Interface, ctx context.Context) error {
 
 // cached Check
 func (t *Interface) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*Interface); ok {
+    if t == other {
+      return nil
+    }
+  }
+
   if proto, ok := other_.(values.Prototype); ok {
     for _, cached := range t.prototypes {
       if proto == cached {
@@ -213,9 +223,10 @@ func (t *Interface) ResolveStatementNames(scope Scope) error {
 			return err
 		}
 
-		// interface members cant have default arguments, so inner scope is irrelevant
+		// interface members cant have default arguments
 		for _, member := range t.members {
-			if err := member.ResolveNames(scope); err != nil {
+      subScope := NewSubScope(scope)
+			if err := member.ResolveNames(subScope); err != nil {
 				return err
 			}
 		}
@@ -235,13 +246,26 @@ func (t *Interface) EvalStatement() error {
 }
 
 func (t *Interface) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  foundGetter := false
+  for _, member := range t.members {
+    if member.Name() == key {
+      if prototypes.IsGetter(member) {
+        foundGetter = true
+      }
+    }
+  }
+
   for _, member := range t.members {
     if member.Name() == key {
       if prototypes.IsGetter(member) {
         return member.GetReturnValue()
       } else if prototypes.IsSetter(member) {
-        errCtx := ctx
-        return nil, errCtx.NewError("Error: is a setter")
+        if !foundGetter {
+          errCtx := ctx
+          return nil, errCtx.NewError("Error: " + t.Name() + "." + key + " is a setter")
+        } else {
+          continue
+        }
       } else {
         return member.GetFunctionValue()
       }
@@ -252,11 +276,24 @@ func (t *Interface) GetInstanceMember(key string, includePrivate bool, ctx conte
 }
 
 func (t *Interface) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  foundSetter := false
+  for _, member := range t.members {
+    if member.Name() == key {
+      if prototypes.IsSetter(member) {
+        foundSetter = true
+      }
+    }
+  }
+
   for _, member := range t.members {
     if member.Name() == key {
       if !prototypes.IsSetter(member) {
-        return ctx.NewError("Error: not a setter")
-      } else {
+        if !foundSetter {
+          return ctx.NewError("Error: " + t.Name() + "." + key + " not a setter")
+        } else {
+          continue
+        }
+      } else if prototypes.IsSetter(member) {
         args, err := member.GetArgValues()
         if err != nil {
           return err
@@ -267,7 +304,18 @@ func (t *Interface) SetInstanceMember(key string, includePrivate bool, arg value
     }
   }
 
-  return ctx.NewError("Error: not a setter")
+  return ctx.NewError("Error: " + t.Name() + "." + key + " not a setter")
+}
+
+// can only be called after eval phase! (because registration is done during eval phase)
+func (t *Interface) IsUniversal() bool {
+  for _, proto := range t.prototypes {
+    if !proto.IsUniversal() {
+      return false
+    }
+  }
+
+  return true
 }
 
 func (t *Interface) ResolveStatementActivity(usage Usage) error {

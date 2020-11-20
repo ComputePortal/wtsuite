@@ -1,7 +1,6 @@
 package parsers
 
 import (
-	"fmt"
 	"strings"
 
 	"../tokens/js"
@@ -268,10 +267,6 @@ func (p *JSParser) buildIndexExpression(ts []raw.Token) (js.Expression, error) {
 		return nil, err
 	}
 
-	if err := js.AssertIndexable(lhs); err != nil {
-		return nil, err
-	}
-
 	group, err := raw.AssertBracketsGroup(ts[n-1])
 	if err != nil {
 		return nil, err
@@ -420,7 +415,8 @@ func (p *JSParser) buildTypeExpression(ts []raw.Token) (*js.TypeExpression, erro
 		}
 	} else if len(ts) > 1 {
 		errCtx := raw.MergeContexts(ts...)
-		return nil, errCtx.NewError("Error: bad type expression")
+    err := errCtx.NewError("Error: bad type expression")
+		return nil, err
 	}
 
 	return js.NewTypeExpression(nameToken.Value(), contentKeys, contentTypes, nameToken.Context())
@@ -451,7 +447,9 @@ func (p *JSParser) buildClassOrExtendsTypeExpression(ts []raw.Token) (*js.TypeEx
 }
 
 func (p *JSParser) buildExpression(ts []raw.Token) (js.Expression, error) {
-	ts = p.expandAngledGroups(ts)
+  if !((len(ts) > 0 && raw.IsWord(ts[0], "function")) || (len(ts) > 1 && raw.IsWord(ts[1], "function")) || (len(ts) > 2 && raw.IsSymbol(ts[len(ts)-2], patterns.ARROW))) {
+    ts = p.expandAngledGroups(ts)
+  }
 
 	ts, err := p.nestOperators(ts)
 	if err != nil {
@@ -520,6 +518,11 @@ func (p *JSParser) buildExpression(ts []raw.Token) (js.Expression, error) {
 		raw.IsParensGroup(ts[n-2]) &&
 		raw.IsBracesGroup(ts[n-1]):
 		return p.buildFunctionExpression(ts, false)
+	/*case n > 2 &&
+		raw.IsWord(ts[0], "function") &&
+		raw.IsParensGroup(ts[1]) &&
+		raw.IsBracesGroup(ts[n-1]):
+		return p.buildFunctionExpression(ts, false)*/
 	case n > 3 &&
 		raw.IsWord(ts[0], "function") &&
 		(raw.IsParensGroup(ts[1]) || raw.IsParensGroup(ts[2])) &&
@@ -547,12 +550,8 @@ func (p *JSParser) buildExpression(ts []raw.Token) (js.Expression, error) {
 		raw.IsBracesGroup(ts[n-1]):
 		return p.buildClassExpression(ts)
 	default:
-		for _, t := range ts {
-			fmt.Println(t.Dump(""))
-		}
 		errCtx := raw.MergeContexts(ts...)
 		err := errCtx.NewError("Error: unhandled expression (hint: missing a semicolon?)")
-    panic(err)
 		return nil, err
 	}
 }

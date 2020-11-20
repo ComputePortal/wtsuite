@@ -26,6 +26,14 @@ func IsRegExp(v values.Value) bool {
   return regexpCheck.Check(v, ctx) == nil
 }
 
+func (p *RegExp) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*RegExp); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *RegExp) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)

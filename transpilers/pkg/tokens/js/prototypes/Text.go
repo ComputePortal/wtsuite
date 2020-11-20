@@ -22,6 +22,14 @@ func (p *Text) GetParent() (values.Prototype, error) {
   return NewNodePrototype(), nil
 }
 
+func (p *Text) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Text); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Text) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
   return values.NewUnconstructableClass(NewTextPrototype(), ctx), nil

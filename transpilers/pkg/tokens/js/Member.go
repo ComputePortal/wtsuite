@@ -47,7 +47,11 @@ func (t *Member) WriteExpression() string {
 	if err != nil {
 		panic("should've been caught before")
 	} else if pkgMember != nil {
-		return pkgMember.Name()
+    if t.IsBuiltinPackage() {
+      return t.PackageName() + "." + pkgMember.Name()
+    } else {
+      return pkgMember.Name()
+    }
 	} else {
 		var b strings.Builder
 		// literals must be surrounded by brackets
@@ -82,6 +86,15 @@ func (t *Member) ObjectNameAndKey() (string, string) {
 	}
 
 	return name, t.key.Value()
+}
+
+func (t *Member) ToTypeExpression() (*TypeExpression, error) {
+  base, key := t.ObjectNameAndKey()
+  if base == "" {
+    return nil, nil
+  }
+
+  return NewTypeExpression(base + "." + key, nil, nil, t.Context())
 }
 
 func (t *Member) ResolveExpressionNames(scope Scope) error {
@@ -158,6 +171,24 @@ func (t *Member) PackagePath() string {
   }
 }
 
+func (t *Member) IsBuiltinPackage() bool {
+  pkg, err := t.getPackage()
+  if err != nil || pkg == nil {
+    return false
+  } else {
+    return pkg.IsBuiltin()
+  }
+}
+
+func (t *Member) PackageName() string {
+  pkg, err := t.getPackage()
+  if err != nil || pkg == nil {
+    return ""
+  } else {
+    return pkg.Name()
+  }
+}
+
 // used for refactoring
 func (t *Member) ObjectContext() context.Context {
   return t.object.Context()
@@ -208,10 +239,6 @@ func (t *Member) EvalSet(rhsValue values.Value, ctx context.Context) error {
 		t.key.Context())
 
 	if err != nil {
-		if VERBOSITY >= 1 {
-			context.AppendContextString(err, "Info: called here", ctx)
-		}
-
 		return err
 	}
 

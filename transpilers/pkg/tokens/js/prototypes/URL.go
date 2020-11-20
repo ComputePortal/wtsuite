@@ -18,6 +18,14 @@ func NewURL(ctx context.Context) values.Value {
   return values.NewInstance(NewURLPrototype(), ctx)
 }
 
+func (p *URL) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*URL); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *URL) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   switch key {
   case "searchParams":

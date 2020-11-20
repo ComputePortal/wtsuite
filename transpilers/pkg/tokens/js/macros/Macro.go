@@ -1,11 +1,11 @@
 package macros
 
 import (
-	"../"
 
 	"../values"
 
 	"../../context"
+	"../../js"
 )
 
 var COMPACT = false

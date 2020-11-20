@@ -23,8 +23,25 @@ func (p *IDBOpenDBRequest) GetParent() (values.Prototype, error) {
   return NewIDBRequestPrototype(NewIDBDatabase(ctx)), nil
 }
 
+func (p *IDBOpenDBRequest) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*IDBOpenDBRequest); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
+func (p *IDBOpenDBRequest) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  switch key {
+  case "onupgradeneeded":
+    return nil, ctx.NewError("Error: is a setter only")
+  default:
+    return nil, nil
+  }
+}
+
 func (p *IDBOpenDBRequest) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
-  callback := values.NewFunction([]values.Value{NewIDBVersionChangeEvent(ctx)}, ctx)
+  callback := values.NewFunction([]values.Value{NewIDBVersionChangeEvent(ctx), nil}, ctx)
 
   switch key {
   case "onupgradeneeded":

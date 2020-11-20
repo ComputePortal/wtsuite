@@ -51,20 +51,8 @@ func (p *IDBRequest) Check(other_ values.Interface, ctx context.Context) error {
     } else {
       return nil
     }
-  } else if other, ok := other_.(values.Prototype); ok {
-    if otherParent, err := other.GetParent(); err != nil {
-      return err
-    } else if otherParent != nil {
-      if p.Check(otherParent, ctx) != nil {
-        return ctx.NewError("Error: expected IDBRequest, got " + other_.Name())
-      } else {
-        return nil
-      }
-    } else {
-      return ctx.NewError("Error: expected IDBRequest, got " + other_.Name())
-    }
   } else {
-    return ctx.NewError("Error: expected IDBRequest, got " + other_.Name())
+    return checkParent(p, other_, ctx)
   }
 }
 
@@ -80,6 +68,8 @@ func (p *IDBRequest) GetInstanceMember(key string, includePrivate bool, ctx cont
   content := values.NewContextValue(p.getContentValue(), ctx)
 
   switch key {
+  case "onerror", "onsuccess":
+    return nil, ctx.NewError("Error: is a setter only")
   case "result":
     return content, nil
   default:
@@ -100,5 +90,5 @@ func (p *IDBRequest) SetInstanceMember(key string, includePrivate bool, arg valu
 
 func (p *IDBRequest) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
-  return values.NewUnconstructableClass(NewIDBRequestPrototype(values.NewAll(ctx)), ctx), nil
+  return values.NewUnconstructableClass(NewIDBRequestPrototype(values.NewAny(ctx)), ctx), nil
 }

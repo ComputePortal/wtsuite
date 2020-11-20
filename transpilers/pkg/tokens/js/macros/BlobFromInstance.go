@@ -16,6 +16,10 @@ type BlobFromInstance struct {
 }
 
 func NewBlobFromInstance(args []js.Expression, ctx context.Context) (js.Expression, error) {
+	if len(args) != 1 {
+		return nil, ctx.NewError("Error: expected 1 argument")
+	}
+
 	return &BlobFromInstance{newMacro(args, ctx)}, nil
 }
 
@@ -42,9 +46,10 @@ func (m *BlobFromInstance) EvalExpression() (values.Value, error) {
 		return nil, err
 	}
 
-	if len(args) != 1 {
-		return nil, ctx.NewError("Error: expected 1 argument")
-	}
+  if !values.IsInstance(args[0]) {
+    errCtx := args[0].Context()
+    return nil, errCtx.NewError("Error: expected instance, got " + args[0].TypeName())
+  }
 
 	return prototypes.NewBlob(ctx), nil
 }

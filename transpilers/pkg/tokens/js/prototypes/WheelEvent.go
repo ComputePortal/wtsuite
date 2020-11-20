@@ -10,16 +10,29 @@ type WheelEvent struct {
   AbstractEvent
 }
 
-func NewWheelEventPrototype(target values.Value) values.Prototype {
-  return &WheelEvent{newAbstractEventPrototype("WheelEvent", target)}
+func NewWheelEventPrototype() values.Prototype {
+  ctx := context.NewDummyContext()
+  return &WheelEvent{newAbstractEventPrototype("WheelEvent", NewHTMLElement(ctx))}
 }
 
-func NewWheelEvent(target values.Value, ctx context.Context) values.Value {
-  return values.NewInstance(NewWheelEventPrototype(target), ctx)
+func NewWheelEvent(ctx context.Context) values.Value {
+  return values.NewInstance(NewWheelEventPrototype(), ctx)
+}
+
+func (p *WheelEvent) Name() string {
+  return "WheelEvent"
 }
 
 func (p *WheelEvent) GetParent() (values.Prototype, error) {
-  return NewMouseEventPrototype(p.target), nil
+  return NewMouseEventPrototype(), nil
+}
+
+func (p *WheelEvent) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*WheelEvent); ok {
+    return p.AbstractEvent.checkTarget(other.target, ctx)
+  } else {
+    return checkParent(p, other_, ctx)
+  }
 }
 
 func (p *WheelEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
@@ -36,5 +49,5 @@ func (p *WheelEvent) GetInstanceMember(key string, includePrivate bool, ctx cont
 func (p *WheelEvent) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
 
-  return values.NewUnconstructableClass(NewWheelEventPrototype(values.NewAll(ctx)), ctx), nil
+  return values.NewUnconstructableClass(NewWheelEventPrototype(), ctx), nil
 }

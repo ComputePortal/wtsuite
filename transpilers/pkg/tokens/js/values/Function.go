@@ -98,7 +98,7 @@ func (v *Function) GetArgs() [][]Value {
 func (v *Function) Check(other_ Value, ctx context.Context) error {
   other_ = UnpackContextValue(other_)
 
-  if IsAll(other_) {
+  if IsAny(other_) {
     return nil
   } else if other, ok := other_.(*Function); ok {
     if v.args != nil {
@@ -164,12 +164,25 @@ func (v *Function) evalFunction(args []Value, preferMethod bool, ctx context.Con
     }
   }
 
-  return nil, ctx.NewError("Error: function arg types differ")
+  err := ctx.NewError("Error: function arg types differ")
+  
+  // add info for each overload
+  for _, overload := range v.args {
+    n := len(overload)
+
+    if errSub := checkOverload(overload[0:n-1], args, ctx); err != nil {
+      context.AppendError(err, errSub)
+    }
+  }
+
+  return nil, err
 }
 
 func (v *Function) EvalFunction(args []Value, preferMethod bool, ctx context.Context) (Value, error) {
   if v.args == nil {
-    if preferMethod {
+    if v.fn != nil {
+      return v.fn(args, preferMethod, ctx)
+    } else if preferMethod {
       return nil, nil
     } else {
       return NewAny(ctx), nil
@@ -184,12 +197,12 @@ func (v *Function) EvalFunction(args []Value, preferMethod bool, ctx context.Con
       return nil, err
     }
   } else {
-    i, err := checkAnyOverload(v.args, args, ctx)
+    _, err := checkAnyOverload(v.args, args, ctx)
     if err != nil {
       return nil, err
     }
 
-    ret, err = v.fn(v.args[i], preferMethod, ctx)
+    ret, err = v.fn(args, preferMethod, ctx)
     if err != nil {
       return nil, err
     }

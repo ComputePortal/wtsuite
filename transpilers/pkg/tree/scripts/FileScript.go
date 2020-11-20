@@ -7,7 +7,6 @@ import (
 	"../../files"
 	"../../parsers"
 	"../../tokens/js"
-	"../../tokens/js/values"
 )
 
 type FileScript interface {
@@ -110,8 +109,8 @@ func (s *FileScriptData) ResolveNames(scope js.GlobalScope) error {
 	return s.module.ResolveNames(scope)
 }
 
-func (s *FileScriptData) EvalTypes(globals values.Stack) error {
-	return s.module.EvalTypes(globals)
+func (s *FileScriptData) EvalTypes() error {
+	return s.module.EvalTypes()
 }
 
 func (s *FileScriptData) ResolveActivity(usage js.Usage) error {

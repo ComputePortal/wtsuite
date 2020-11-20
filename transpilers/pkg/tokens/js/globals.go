@@ -16,6 +16,8 @@ var TARGET = "nodejs"
 //  * nodejs
 //  * all (used by refactoring tools)
 
+type FillPackageFunction func(pkg values.Package)
+
 func handleRegistrationError(err error) {
   if err != nil {
     if TARGET != "all" {
@@ -47,7 +49,7 @@ func registerPrototype(scope Scope, proto values.Prototype) {
   name := proto.Name()
 
   if strings.ContainsAny(name, "<>") {
-    panic("registered prototype can't have type parameters")
+    panic("registered prototype can't have type parameters (" + name + ")")
   }
 
   variable := NewVariable(name, true, ctx)
@@ -82,6 +84,14 @@ func registerValue(scope Scope, name string, v values.Value) {
   handleRegistrationError(scope.SetVariable(name, variable))
 }
 
+func registerPackage(scope Scope, name string, fn FillPackageFunction) {
+  pkg := NewBuiltinPackage(name)
+
+  fn(pkg)
+
+  handleRegistrationError(scope.SetVariable(name, pkg))
+}
+
 // scope provided by all js environments
 func FillCoreScope(scope Scope) {
   ReserveMacroNames(scope)
@@ -100,9 +110,7 @@ func FillCoreScope(scope Scope) {
   registerPrototype(scope, pr.NewInt8ArrayPrototype())
   registerPrototype(scope, pr.NewInt16ArrayPrototype())
   registerPrototype(scope, pr.NewInt32ArrayPrototype())
-  registerPrototype(scope, pr.NewJSONPrototype())
   registerPrototype(scope, pr.NewMapPrototype(nil, nil))
-  registerPrototype(scope, pr.NewMathPrototype())
   registerPrototype(scope, pr.NewNumberPrototype())
   registerPrototype(scope, pr.NewObjectPrototype(nil))
   registerPrototype(scope, pr.NewPromisePrototype(nil))
@@ -110,6 +118,7 @@ func FillCoreScope(scope Scope) {
   registerPrototype(scope, pr.NewRegExpArrayPrototype())
   registerPrototype(scope, pr.NewSetPrototype(nil))
   registerPrototype(scope, pr.NewStringPrototype())
+  registerPrototype(scope, pr.NewTuplePrototype(nil))
   registerPrototype(scope, pr.NewUint8ArrayPrototype())
   registerPrototype(scope, pr.NewUint16ArrayPrototype())
   registerPrototype(scope, pr.NewUint32ArrayPrototype())
@@ -119,6 +128,9 @@ func FillCoreScope(scope Scope) {
   registerValue(scope, "console", pr.NewConsole(ctx))
   registerValue(scope, "setInterval", pr.NewSetTimeoutFunction(ctx))
   registerValue(scope, "setTimeout", pr.NewSetTimeoutFunction(ctx))
+
+  registerPackage(scope, "JSON", pr.FillJSONPackage)
+  registerPackage(scope, "Math", pr.FillMathPackage)
 }
 
 func FillBrowserAndWorkerCommonScope(scope Scope) {
@@ -188,10 +200,11 @@ func FillBrowserScope(scope Scope) {
   registerPrototype(scope, pr.NewImagePrototype())
   registerPrototype(scope, pr.NewImageDataPrototype())
   registerPrototype(scope, pr.NewKeyboardEventPrototype(nil))
-  registerPrototype(scope, pr.NewMouseEventPrototype(nil))
+  registerPrototype(scope, pr.NewMouseEventPrototype())
   registerPrototype(scope, pr.NewNodePrototype())
   registerPrototype(scope, pr.NewSearchIndexPrototype())
   registerPrototype(scope, pr.NewSharedWorkerPrototype())
+  registerPrototype(scope, pr.NewStoragePrototype())
   registerPrototype(scope, pr.NewTextPrototype())
   registerPrototype(scope, pr.NewURLPrototype())
   registerPrototype(scope, pr.NewURLSearchParamsPrototype())
@@ -201,15 +214,20 @@ func FillBrowserScope(scope Scope) {
   registerPrototype(scope, pr.NewWebGLRenderingContextPrototype())
   registerPrototype(scope, pr.NewWebGLShaderPrototype())
   registerPrototype(scope, pr.NewWebGLTexturePrototype())
-  registerPrototype(scope, pr.NewWheelEventPrototype(nil))
+  registerPrototype(scope, pr.NewWheelEventPrototype())
+  registerPrototype(scope, pr.NewWorkerPrototype())
 
   ctx := context.NewDummyContext()
 
   uriFn := values.NewFunction([]values.Value{pr.NewString(ctx), pr.NewString(ctx)}, ctx)
 
+  registerValue(scope, "document", pr.NewDocument(ctx))
+  registerValue(scope, "window", pr.NewWindow(ctx))
+
   registerValue(scope, "decodeURIComponent", uriFn)
   registerValue(scope, "encodeURIComponent", uriFn)
   registerValue(scope, "requestIdleCallback", pr.NewRequestIdleCallbackFunction(ctx))
+
 }
 
 func FillNodeJSScope(scope Scope) {
@@ -267,6 +285,14 @@ func WriteGlobalHeaders() string {
 	b.WriteString(NL)
 	b.WriteString("}")
 	b.WriteString(NL)
+
+  b.WriteString("class Tuple extends Array{")
+  b.WriteString(NL)
+  b.WriteString(TAB)
+  b.WriteString("constructor(...x){let n=x.length;super(n);for(let i=0;i<n;i++){this[i]=x[i]}}")
+  b.WriteString(NL)
+  b.WriteString("}")
+  b.WriteString(NL)
 
 	return b.String()
 }

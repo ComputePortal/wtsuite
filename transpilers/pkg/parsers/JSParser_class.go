@@ -1,9 +1,7 @@
 package parsers
 
 import (
-	//"../tokens/context"
 	"../tokens/js"
-	//"../tokens/js/prototypes"
 	"../tokens/patterns"
 	"../tokens/raw"
 )
@@ -27,27 +25,41 @@ func (p *JSParser) buildClassExtendsExpression(ts []raw.Token) (*js.TypeExpressi
 	return extends, ts, nil
 }
 
-func (p *JSParser) buildClassImplementsExpression(ts []raw.Token) (*js.VarExpression, []raw.Token, error) {
+func (p *JSParser) buildClassImplementsExpression(ts []raw.Token) ([]*js.VarExpression, []raw.Token, error) {
+  impls := make([]*js.VarExpression, 0)
+
 	if raw.IsWord(ts[0], "implements") {
-		if len(ts) < 2 {
-			errCtx := raw.MergeContexts(ts...)
-			return nil, nil, errCtx.NewError("Error: bad class implements definition")
-		}
+    needImpl := true
 
-		condensedNameToken, ts, err := p.condensePackagePeriods(ts[1:]) // shortens ts by 1 or more
-		if err != nil {
-			return nil, nil, err
-		}
+    for needImpl {
+      if len(ts) < 2 {
+        errCtx := raw.MergeContexts(ts...)
+        return nil, nil, errCtx.NewError("Error: bad class implements interface")
+      }
 
-		implements, err := p.buildVarExpression(condensedNameToken)
-		if err != nil {
-			return nil, nil, err
-		}
+      var condensedNameToken *raw.Word
+      var err error
+      condensedNameToken, ts, err = p.condensePackagePeriods(ts[1:]) // shortens ts by 1 or more
+      if err != nil {
+        return nil, nil, err
+      }
 
-		return implements, ts, nil
-	} else {
-		return nil, ts, nil
-	}
+      implements, err := p.buildVarExpression(condensedNameToken)
+      if err != nil {
+        return nil, nil, err
+      }
+
+      impls = append(impls, implements)
+
+      if raw.IsSymbol(ts[0], patterns.COMMA) {
+        needImpl = true
+      } else {
+        needImpl = false
+      }
+    }
+	} 
+
+  return impls, ts, nil
 }
 
 func (p *JSParser) buildClassUniversalName(ts []raw.Token) (string, []raw.Token, error) {
@@ -113,7 +125,7 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 		return nil, err
 	}
 
-  class, err := js.NewUniversalClass(clType, extends, []*js.VarExpression{implements}, universalName, clCtx)
+  class, err := js.NewUniversalClass(clType, extends, implements, universalName, clCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -139,23 +151,22 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 
 	Outer:
 		for len(remaining) > 0 {
+      encounteredAbstract := false
 			for i, t := range remaining {
-				if raw.IsBracesGroup(t) {
+        if raw.IsWord(t, "abstract") {
+          encounteredAbstract = true
+        } else if raw.IsBracesGroup(t) {
+          if encounteredAbstract {
+            errCtx := t.Context()
+            return nil, errCtx.NewError("Error: abstract member can't have function body")
+          }
+
 					switch i {
 					case 0, 1:
 						errCtx := t.Context()
 						return nil, errCtx.NewError("Error: bad class member function definition")
 					default:
-						// i is braces group, i-1 is argument group, i-2 is member name
-						/*role, err := p.buildClassMemberRole(remaining[0 : i-2])
-						if err != nil {
-							return nil, err
-						}*/
-
-						//fnCtx := raw.MergeContexts(remaining[0 : i-1]...)
-
 						function, innerRemaining, err := p.buildFunction(remaining[0:i+1], true, false)
-						//raw.Concat(raw.NewValueWord("function", fnCtx), remaining[0:i+1]), false)
 						if err != nil {
 							return nil, err
 						}
@@ -172,11 +183,33 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 						remaining = remaining[i+1:]
 						continue Outer
 					}
-				}
-			}
+				} else if encounteredAbstract && i == len(remaining) -1 && bracesGroup.IsSemiColon() {
+          // append an empty braces group
+          function, innerRemaining, err := p.buildFunction(append(remaining, raw.NewEmptyBracesGroup(t.Context())), true, false)
+          if err != nil {
+            return nil, err
+          }
+
+          if len(innerRemaining) != 0 {
+            errCtx := raw.MergeContexts(innerRemaining...)
+            return nil, errCtx.NewError("Error: unexpected tokens after abstract member function")
+          }
+
+          if err := class.AddFunction(function); err != nil {
+            return nil, err
+          }
+
+          break Outer
+        }
+			} // loop over remaining
 
       // could be a property
       if raw.IsAnyWord(remaining[0]) {
+        if p.isFunctionRoleKeyword(remaining[0]) {
+          errCtx := remaining[0].Context()
+          return nil, errCtx.NewError("Error: unexpected keyword")
+        }
+
         propNameToken, err := raw.AssertWord(remaining[0])
         if err != nil {
           panic(err)

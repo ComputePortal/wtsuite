@@ -266,7 +266,7 @@ func (p *JSParser) buildImplicitLetStatement(ts_ []raw.Token) (*js.VarStatement,
 	ctx := ts[1].Context()
 	letTokens := raw.Concat(raw.NewValueWord("let", ctx),
 		ts[0], raw.NewSymbol(patterns.EQUAL, false, ctx), ts[2:])
-	varStatement, unexpectedRemaining, err := p.buildVarStatement(letTokens, js.LET)
+	varStatement, unexpectedRemaining, err := p.buildVarStatement(letTokens, js.AUTOLET)
 	if err != nil {
 		return nil, nil, err
 	}

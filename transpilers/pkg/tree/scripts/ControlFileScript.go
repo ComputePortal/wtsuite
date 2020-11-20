@@ -7,17 +7,16 @@ import (
 )
 
 type ControlFileScript struct {
-	views []string
 	FileScriptData
 }
 
-func NewControlFileScript(relPath string, caller string, views []string) (*ControlFileScript, error) {
+func NewControlFileScript(relPath string, caller string) (*ControlFileScript, error) {
 	fileScriptData, err := newFileScriptData(relPath, caller)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ControlFileScript{views, fileScriptData}, nil
+	return &ControlFileScript{fileScriptData}, nil
 }
 
 func (s *ControlFileScript) Write() (string, error) {
@@ -49,14 +48,4 @@ func (s *ControlFileScript) Write() (string, error) {
 	b.WriteString("}")
 
 	return b.String(), nil
-}
-
-func (s *ControlFileScript) hasView(v string) bool {
-	for _, view := range s.views {
-		if view == v {
-			return true
-		}
-	}
-
-	return false
 }

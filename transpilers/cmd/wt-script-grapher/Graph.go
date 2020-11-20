@@ -97,7 +97,10 @@ func (g *Graph) IsIncluded(ctx context.Context) bool {
 }
 
 func (g *Graph) addClassParentAndInterface(class *js.Class) error {
-  parent_ := class.GetParent()
+  parent_, err := class.GetParent()
+  if err != nil {
+    return err
+  }
 
   if parent_ != nil {
     if parent, ok := parent_.(*js.Class); ok {
@@ -109,15 +112,20 @@ func (g *Graph) addClassParentAndInterface(class *js.Class) error {
     }
   }
 
-  interface_ := class.GetInterface()
+  interfaces_, err := class.GetInterfaces()
+  if err != nil {
+    return err
+  }
 
-  if interface_ != nil {
-    if interf, ok := interface_.(*js.ClassInterface); ok {
-      if g.IsIncluded(interf.Context()) {
-        // TODO: special interface node for internal nodes?
-        g.AppendNode(NewInterfaceNode(interf))
+  for _, interface_ := range interfaces_ {
+    if interface_ != nil {
+      if interf, ok := interface_.(*js.Interface); ok {
+        if g.IsIncluded(interf.Context()) {
+          // TODO: special interface node for internal nodes?
+          g.AppendNode(NewInterfaceNode(interf))
 
-        g.AppendEdge(NewImplementsEdge(class, interf))
+          g.AppendEdge(NewImplementsEdge(class, interf))
+        }
       }
     }
   }
@@ -167,18 +175,29 @@ func (g *Graph) AddInstance(instance *values.Instance) error {
     g.AppendNode(NewInstanceNode(instance))
 
     // loop the properties
-    props := instance.Properties().InstanceProperties()
+    proto_ := values.GetPrototype(instance)
+    if proto_ != nil {
+      if proto, ok := proto_.(*js.Class); ok {
+        props, err := proto.Properties()
+        if err != nil {
+          return err
+        }
 
-    for label, prop := range props {
-      propProto, _ := prop.GetInstancePrototype()
-      // only user defined classes are used
-      if propClass, ok := propProto.(*js.Class); ok {
+        for label, prop_ := range props {
+          prop_ = values.UnpackContextValue(prop_)
+          if prop, ok := prop_.(*values.Instance); ok {
+            propProto := values.GetPrototype(prop)
+            if propProto != nil {
+              if propClass, ok := propProto.(*js.Class); ok {
+                if g.IsIncluded(propClass.Context()) {
+                  g.AppendEdge(NewPropertyEdge(instance, label, prop))
 
-        if g.IsIncluded(propClass.Context()) {
-          g.AppendEdge(NewPropertyEdge(instance, label, prop))
-
-          if err := g.AddInstance(prop); err != nil {
-            return err
+                  if err := g.AddInstance(prop); err != nil {
+                    return err
+                  }
+                }
+              }
+            }
           }
         }
       }

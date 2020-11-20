@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"runtime/pprof"
   "sort"
-	"strconv"
 	"strings"
 
 	"../../pkg/cache"
@@ -20,7 +19,6 @@ import (
 	tokens "../../pkg/tokens/html"
 	"../../pkg/tokens/js"
 	"../../pkg/tokens/js/macros"
-	"../../pkg/tokens/js/prototypes"
 	"../../pkg/tokens/js/values"
 	"../../pkg/tree"
 	"../../pkg/tree/scripts"
@@ -41,8 +39,6 @@ type CmdArgs struct {
 	autoHref      bool
 	profFile      string
 	xml           bool
-	noCaching     bool
-	animationFile string
 
 	verbosity int // defaults to zero, every -v[v[v]] adds a level
 }
@@ -68,8 +64,6 @@ Options:
 	-y, --exclude-control         Exclude control group or control file. Cannot be combined with -j
 	--math-font-url               Math font url (font name is always FreeSerifMath)
 	-v[v[v[v...]]]                Verbosity
-	--no-caching                  Don't cache js class and function results
-	--animation <animation-config>  Apply page animation scripts to a list of views (activated during browsing by pressing PrintScreen)
 `)
 
 	os.Exit(1)
@@ -100,8 +94,6 @@ func parseArgs() CmdArgs {
 		autoHref:      false,
 		profFile:      "",
 		xml:           false,
-		noCaching:     false,
-		animationFile: "",
 		verbosity:     0,
 	}
 
@@ -188,12 +180,6 @@ func parseArgs() CmdArgs {
 				} else {
 					cmdArgs.xml = true
 				}
-			case "--no-caching":
-				if cmdArgs.noCaching {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.noCaching = true
-				}
 			case "--js-url":
 				if i == n-1 {
 					printMessageAndExit("Error: expected argument after "+arg, true)
@@ -270,16 +256,6 @@ func parseArgs() CmdArgs {
 					cmdArgs.MathFontUrl = os.Args[i+1]
 					i++
 				}
-			case "--animation":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-
-				} else if cmdArgs.animationFile != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.animationFile = os.Args[i+1]
-					i++
-				}
 			default:
 				printMessageAndExit("Error: unrecognized flag "+arg, true)
 			}
@@ -348,19 +324,6 @@ func parseArgs() CmdArgs {
 
 	cmdArgs.OutputDir = absOutputDir
 
-	if cmdArgs.animationFile != "" {
-		if err := files.AssertFile(cmdArgs.animationFile); err != nil {
-			printMessageAndExit("Error: animation file '"+cmdArgs.animationFile+"' "+err.Error(), true)
-		}
-
-		animationFile, err := filepath.Abs(cmdArgs.animationFile)
-		if err != nil {
-			printMessageAndExit("Error: animation file '"+cmdArgs.animationFile+"' "+err.Error(), true)
-		} else {
-			cmdArgs.animationFile = animationFile
-		}
-	}
-
 	return cmdArgs
 }
 
@@ -395,15 +358,10 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 		directives.RegisterDefine(k, v)
 	}
 
-	if cmdArgs.noCaching {
-		values.ALLOW_CACHING = false
-	}
-
 	VERBOSITY = cmdArgs.verbosity
 	directives.VERBOSITY = cmdArgs.verbosity
 	tokens.VERBOSITY = cmdArgs.verbosity
 	js.VERBOSITY = cmdArgs.verbosity
-	prototypes.VERBOSITY = cmdArgs.verbosity
 	values.VERBOSITY = cmdArgs.verbosity
 	parsers.VERBOSITY = cmdArgs.verbosity
 	files.VERBOSITY = cmdArgs.verbosity
@@ -424,7 +382,7 @@ func buildHTMLFile(src, url, dst string, control string, cssUrl string, jsUrl st
 	directives.UnsetActiveURL()
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// update the cache with the cssBundleRules
@@ -436,7 +394,7 @@ func buildHTMLFile(src, url, dst string, control string, cssUrl string, jsUrl st
 
 	// src is just for info
 	if err := files.WriteFile(src, dst, []byte(output)); err != nil {
-		return nil, err
+		return err
 	}
 
 	return nil
@@ -649,10 +607,6 @@ func buildProject(cmdArgs CmdArgs, cfg *config.Config) error {
 	}
 
 	files.JS_MODE = true
-
-	if VERBOSITY >= 2 {
-		fmt.Println("Info: views built")
-	}
 
 	if err := buildProjectControls(cfg, cmdArgs); err != nil {
 		return err

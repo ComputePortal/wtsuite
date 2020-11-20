@@ -18,7 +18,6 @@ import (
 	"../../pkg/parsers"
 	"../../pkg/tokens/context"
 	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/prototypes"
 	"../../pkg/tokens/js/values"
 	"../../pkg/tokens/html"
 	"../../pkg/tree/scripts"
@@ -152,14 +151,12 @@ func setUpEnv(cmdArgs CmdArgs) {
 	js.TARGET = "all"
 	directives.ForceNewViewFileScriptRegistration()
   directives.IGNORE_UNSET_URLS = true
-  js.ALLOW_DUMMY_VIEW_INTERFACE = true
 
   html.PX_PER_REM = 16
 	cache.VERBOSITY = cmdArgs.verbosity
 	files.VERBOSITY = cmdArgs.verbosity
 	parsers.VERBOSITY = cmdArgs.verbosity
 	js.VERBOSITY = cmdArgs.verbosity
-	prototypes.VERBOSITY = cmdArgs.verbosity
 	values.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 

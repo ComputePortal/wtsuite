@@ -47,3 +47,7 @@ func (p *CanvasImageSource) GetPrototypes() ([]values.Prototype, error) {
     //NewSVGImageElementPrototype(),
   }, nil
 }
+
+func (p *CanvasImageSource) IsUniversal() bool {
+  return false
+}

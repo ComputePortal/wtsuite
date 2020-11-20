@@ -3,6 +3,7 @@ package scripts
 import (
 	"errors"
 	"fmt"
+  "sort"
 	"strings"
 
 	"../../files"
@@ -119,7 +120,13 @@ func (b *FileBundle) reportCircularDependency(start FileScript, deps map[string]
 }
 
 // block recursion
+// TODO: improve the sorting
 func (b *FileBundle) ResolveDependencies() error {
+  // first sort the already collected scripts alphabetically by path
+  fss := NewFileScriptSorter(b.scripts)
+  sort.Stable(fss)
+  scripts := fss.Result()
+
 	deps := make(map[string]FileScript)
 
 	sortedScripts := make([]FileScript, 0)
@@ -145,7 +152,8 @@ func (b *FileBundle) ResolveDependencies() error {
 		}
 	}
 
-	for _, s := range b.scripts {
+
+	for _, s := range scripts {
 		if err := b.resolveDependencies(s, &deps); err != nil {
 			return err
 		}
@@ -157,13 +165,20 @@ func (b *FileBundle) ResolveDependencies() error {
 		}
 	}
 
-	for _, fs := range deps {
+  depsKeys := make([]string, 0)
+  for k, _ := range deps {
+    depsKeys = append(depsKeys, k)
+  }
+  sort.Strings(depsKeys)
+
+  for _, k := range depsKeys {
+    fs := deps[k]
 		if allDone(fs) {
 			addToDone(fs)
 		} else {
 			unsortedScripts = append(unsortedScripts, fs)
 		}
-	}
+  }
 
 	for len(unsortedScripts) > 0 {
 		prevUnsortedScripts := unsortedScripts

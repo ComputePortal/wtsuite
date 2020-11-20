@@ -22,6 +22,14 @@ func (p *Window) GetParent() (values.Prototype, error) {
   return NewEventTargetPrototype(), nil
 }
 
+func (p *Window) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Window); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func NewFetchFunction(ctx context.Context) values.Value {
   s := NewString(ctx)
 
@@ -69,8 +77,10 @@ func (p *Window) GetInstanceMember(key string, includePrivate bool, ctx context.
     return NewIDBFactory(ctx), nil
   case "localStorage", "sessionStorage":
     return NewStorage(ctx), nil
+  case "location":
+    return NewLocation(ctx), nil
   case "open":
-    return values.NewOverloadedFunction([][]values.Value{
+    return values.NewOverloadedMethodLikeFunction([][]values.Value{
       []values.Value{s, NewWindow(ctx)},
       []values.Value{s, s, NewWindow(ctx)},
     }, ctx), nil

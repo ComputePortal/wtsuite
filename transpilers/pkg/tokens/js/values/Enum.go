@@ -20,30 +20,32 @@ func (v *Enum) TypeName() string {
 func (v *Enum) Check(other_ Value, ctx context.Context) error {
   other_ = UnpackContextValue(other_)
 
-  if IsAll(other_) {
+  if IsAny(other_) {
     return nil
   } else if other, ok := other_.(*Enum); ok && other == v {
-    if other != v {
-      return ctx.NewError("Error: different enum")
-    }
-
     return nil
-  } else {
-    return ctx.NewError("Error: not an enum")
-  }
+  } 
+
+  return ctx.NewError("Error: have " + other_.TypeName() + ", want " + v.TypeName())
 }
 
 func (v *Enum) EvalConstructor(args []Value, ctx context.Context) (Value, error) {
-  return nil, ctx.NewError("Error: enum can't be constructed")
+  return nil, ctx.NewError("Error: not a constructor")
 }
 
 func (v *Enum) EvalFunction(args []Value, preferMethod bool, ctx context.Context) (Value, error) {
-  return nil, ctx.NewError("Error: can't call a enum")
+  return nil, ctx.NewError("Error: not a function")
 }
 
 func (v *Enum) GetMember(key string, includePrivate bool,
   ctx context.Context) (Value, error) {
-  return v.proto.GetClassMember(key, includePrivate, ctx)
+  if res, err := v.proto.GetClassMember(key, includePrivate, ctx); err != nil {
+    return nil, err
+  } else if res != nil {
+    return res, nil
+  } else {
+    return nil, ctx.NewError("Error: " + v.proto.Name() + "." + key + " not found")
+  }
 }
 
 func (v *Enum) SetMember(key string, includePrivate bool, arg Value,

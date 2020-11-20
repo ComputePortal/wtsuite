@@ -11,7 +11,7 @@ type NodeJS_stream_Readable struct {
 }
 
 func NewNodeJS_stream_ReadablePrototype() values.Prototype {
-  return &NodeJS_stream_Readable{newBuiltinPrototype("stream.Readable")}
+  return &NodeJS_stream_Readable{newBuiltinPrototype("Readable")}
 }
 
 func NewNodeJS_stream_Readable(ctx context.Context) values.Value {
@@ -22,6 +22,14 @@ func (p *NodeJS_stream_Readable) GetParent() (values.Prototype, error) {
   return NewNodeJS_EventEmitterPrototype(), nil
 }
 
+func (p *NodeJS_stream_Readable) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_stream_Readable); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *NodeJS_stream_Readable) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   s := NewString(ctx)
 
@@ -30,8 +38,8 @@ func (p *NodeJS_stream_Readable) GetInstanceMember(key string, includePrivate bo
     return values.NewOverloadedFunction([][]values.Value{
       []values.Value{NewLiteralString("data", ctx), values.NewFunction([]values.Value{
         s, nil,
-      }, ctx)},
-      []values.Value{s, values.NewFunction([]values.Value{nil}, ctx)},
+      }, ctx), nil},
+      []values.Value{s, values.NewFunction([]values.Value{nil}, ctx), nil},
     }, ctx), nil
   case "read":
     i := NewInt(ctx)

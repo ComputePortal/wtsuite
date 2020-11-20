@@ -118,6 +118,11 @@ func (t *Call) EvalExpression() (values.Value, error) {
 		return nil, err
 	}
 
+  if lhsVal == nil {
+    hereCtx := t.lhs.Context()
+    panic(hereCtx.NewError("can't be nil").Error())
+  }
+
 	args, err := t.evalArgs()
 	if err != nil {
 		return nil, err
@@ -125,10 +130,6 @@ func (t *Call) EvalExpression() (values.Value, error) {
 
   res, err := lhsVal.EvalFunction(args, false, t.Context())
   if err != nil {
-		if VERBOSITY >= 1 {
-			context.AppendContextString(err, "Info: called here", t.Context())
-		}
-
     return nil, err
   } else if res == nil {
     errCtx := t.Context()
@@ -151,10 +152,6 @@ func (t *Call) EvalStatement() error {
 
   res, err := lhsVal.EvalFunction(args, true, t.Context())
   if err != nil {
-		if VERBOSITY >= 1 {
-			context.AppendContextString(err, "Info: called here", t.Context())
-		}
-
     return err
   } else if res != nil {
     errCtx := t.Context()

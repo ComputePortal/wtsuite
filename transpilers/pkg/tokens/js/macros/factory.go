@@ -18,9 +18,9 @@ var _classMacros = map[string]MacroGroup{
 		macros: map[string]MacroConstructor{
 			"advanceWidth":  NewMathAdvanceWidth,
 			"boundingBox":   NewMathBoundingBox,
+      "symbolToCodePoint": NewMathSymbolToCodePoint,
 			"degToRad":      NewDegToRad,
 			"radToDeg":      NewRadToDeg,
-			"formatMetrics": NewMathFormatMetrics,
 		},
 	},
 

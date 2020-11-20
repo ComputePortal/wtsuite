@@ -102,15 +102,9 @@ func (t *Index) EvalSet(rhsValue values.Value, ctx context.Context) error {
     return err
   }
 
-  ret, err := fn.EvalFunction([]values.Value{indexValue, rhsValue}, true, t.Context())
-  if err != nil {
+  if _, err := fn.EvalFunction([]values.Value{indexValue, rhsValue}, false, t.Context()); err != nil {
 		context.AppendContextString(err, "Info: container", t.container.Context())
     return err
-  }
-
-  if ret != nil {
-    errCtx := t.Context()
-    return errCtx.NewError("Error: unexpected index return value")
   }
 
 	return nil

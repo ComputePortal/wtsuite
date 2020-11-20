@@ -10,6 +10,7 @@ const (
 	CONST VarType = iota
 	LET
 	VAR
+  AUTOLET
 )
 
 func StringToVarType(s string, ctx context.Context) (VarType, error) {
@@ -29,7 +30,7 @@ func VarTypeToString(varType VarType) string {
 	switch varType {
 	case CONST:
 		return "const"
-	case LET:
+	case LET, AUTOLET:
 		return "let"
 	case VAR:
 		return "var"

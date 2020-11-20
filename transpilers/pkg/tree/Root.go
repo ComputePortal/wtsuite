@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"../tokens/context"
-	"../tokens/js"
 
 	"./scripts"
 )

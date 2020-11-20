@@ -22,6 +22,14 @@ func (p *Date) IsUniversal() bool {
   return true
 }
 
+func (p *Date) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Date); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Date) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   i := NewInt(ctx)
   s := NewString(ctx)

@@ -22,6 +22,14 @@ func (p *NodeJS_mysql_Query) GetParent() (values.Prototype, error) {
   return NewNodeJS_EventEmitterPrototype(), nil
 }
 
+func (p *NodeJS_mysql_Query) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_mysql_Query); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *NodeJS_mysql_Query) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
   return values.NewUnconstructableClass(NewNodeJS_mysql_QueryPrototype(), ctx), nil

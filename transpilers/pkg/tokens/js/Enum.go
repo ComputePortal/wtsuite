@@ -35,12 +35,16 @@ func NewEnum(nameExpr *TypeExpression, parentExpr *TypeExpression, keys []*Word,
     members[i] = &EnumMember{key, vs[i]}
   }
 
-	return &Enum{
+  en := &Enum{
 		nameExpr,
 		parentExpr,
     members,
 		TokenData{ctx},
-	}, nil
+	}
+
+  en.nameExpr.GetVariable().SetObject(en)
+
+  return en, nil
 }
 
 func (t *Enum) Name() string {

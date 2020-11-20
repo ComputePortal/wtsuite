@@ -22,6 +22,14 @@ func (p *NodeJS_http_Server) GetParent() (values.Prototype, error) {
   return NewNodeJS_EventEmitterPrototype(), nil
 }
 
+func (p *NodeJS_http_Server) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_http_Server); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *NodeJS_http_Server) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   i := NewInt(ctx)
   s := NewString(ctx)
@@ -30,9 +38,9 @@ func (p *NodeJS_http_Server) GetInstanceMember(key string, includePrivate bool, 
   case "addListener":
     return values.NewOverloadedFunction([][]values.Value{
       []values.Value{NewLiteralString("request", ctx), values.NewFunction([]values.Value{
-        NewNodeJS_http_IncomingMessage(ctx), NewNodeJS_http_ServerResponse(ctx),
-      }, ctx)},
-      []values.Value{s, values.NewFunction([]values.Value{nil}, ctx)},
+        NewNodeJS_http_IncomingMessage(ctx), NewNodeJS_http_ServerResponse(ctx), nil,
+      }, ctx), nil},
+      []values.Value{s, values.NewFunction([]values.Value{nil}, ctx), nil},
     }, ctx), nil
   case "listen":
     return values.NewOverloadedMethodLikeFunction([][]values.Value{

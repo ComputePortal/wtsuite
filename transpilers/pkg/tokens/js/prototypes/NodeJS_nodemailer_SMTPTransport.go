@@ -11,11 +11,19 @@ type NodeJS_nodemailer_SMTPTransport struct {
 }
 
 func NewNodeJS_nodemailer_SMTPTransportPrototype() values.Prototype {
-  return &NodeJS_nodemailer_SMTPTransport{newBuiltinPrototype("nodemailer.SMTPTransport")}
+  return &NodeJS_nodemailer_SMTPTransport{newBuiltinPrototype("SMTPTransport")}
 }
 
 func NewNodeJS_nodemailer_SMTPTransport(ctx context.Context) values.Value {
   return values.NewInstance(NewNodeJS_nodemailer_SMTPTransportPrototype(), ctx)
+}
+
+func (p *NodeJS_nodemailer_SMTPTransport) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_nodemailer_SMTPTransport); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
 }
 
 func (p *NodeJS_nodemailer_SMTPTransport) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {

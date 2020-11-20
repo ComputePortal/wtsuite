@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"./prototypes"
+  "./values"
 
 	"../context"
 )
@@ -182,8 +183,11 @@ func (t *For) EvalStatement() error {
 		}
 
     variable := lhs.GetVariable()
-    variable.SetValue(rhsVal)
-    variable.SetConstant()
+    variable.SetValue(values.RemoveLiteralness(rhsVal))
+
+    if t.varType == CONST {
+      variable.SetConstant()
+    }
 	}
 
 	for _, incr := range t.incrs {

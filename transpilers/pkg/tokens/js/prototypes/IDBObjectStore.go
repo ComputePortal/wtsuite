@@ -18,11 +18,20 @@ func NewIDBObjectStore(ctx context.Context) values.Value {
   return values.NewInstance(NewIDBObjectStorePrototype(), ctx)
 }
 
+func (p *IDBObjectStore) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*IDBObjectStore); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *IDBObjectStore) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)
   o := NewObject(nil, ctx)
   s := NewString(ctx)
+  blob := NewBlob(ctx)
 
   switch key {
   case "add":
@@ -77,6 +86,9 @@ func (p *IDBObjectStore) GetInstanceMember(key string, includePrivate bool, ctx 
       []values.Value{o, req},
       []values.Value{o, i, req},
       []values.Value{o, s, req},
+      []values.Value{blob, req},
+      []values.Value{blob, i, req},
+      []values.Value{blob, s, req},
     }, ctx), nil
   default:
     return nil, nil

@@ -3,10 +3,7 @@ package tree
 import (
 	"fmt"
 
-	"./styles"
-
 	"../tokens/context"
-	"../tokens/js"
 )
 
 var IsAutoUID func(id string) bool = nil

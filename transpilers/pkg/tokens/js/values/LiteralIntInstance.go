@@ -17,7 +17,7 @@ func NewLiteralIntInstance(interf Interface, i int, ctx context.Context) Value {
 func (v *LiteralIntInstance) Check(other_ Value, ctx context.Context) error {
   other_ = UnpackContextValue(other_)
 
-  if IsAll(other_) {
+  if IsAny(other_) {
     return nil
   } else if other, ok := other_.(*LiteralIntInstance); ok {
     if v.value == other.value {

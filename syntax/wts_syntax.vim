@@ -24,7 +24,7 @@ syn match Constant '\<\zs\d\+\(\.\d\+\([e][-]\?\d\+\)\?\)\?\ze'
 syn keyword Conditional if else switch break continue
 syn keyword Repeat while for do in of
 syn keyword Operator delete instanceof typeof
-syn keyword Type Array Boolean Date Error Function Int Map Math Number Object Promise Set String RegExp 
+syn keyword Type Array Boolean Date Error Function Int Map Number Object Promise Set String RegExp Tuple
 " types that appear so often that it is worthwhile to highlight them
 syn keyword Type Uint8Array Uint16Array Uint32Array Int32Array Float32Array Float64Array Blob
 syn keyword Type Element HTMLElement HTMLImageElement HTMLInputElement HTMLTextAreaElement HTMLCanvasElement HTMLSelectElement HTMLLinkElement HTMLIFrameElement
@@ -40,7 +40,7 @@ syn keyword Constant null
 syn keyword Keyword console document super this window
 syn keyword Label case default
 syn keyword Exception try catch finally throw
-syn keyword Keyword abstract any as async await class const constructor enum export extends from function get implements import interface let new private set static universe var void
+syn keyword Keyword abstract any as async await cast class const constructor enum export extends from function get implements import interface let new private set static universe var void
 
 "All initial capitalized words are usually types
 " syn match javaScriptType '::\zs[A-Z][a-zA-Z0-9_]*\ze'

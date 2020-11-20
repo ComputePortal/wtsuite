@@ -47,8 +47,9 @@ func (m *BigIntCall) EvalExpression() (values.Value, error) {
 		return nil, err
 	}
 
-  if len(args) != 1 {
-    return nil, ctx.NewError("Error: expected 1 argument")
+  if !(prototypes.IsString(args[0]) || prototypes.IsInt(args[0])) {
+    errCtx := args[0].Context()
+    return nil, errCtx.NewError("Error: expected String or Int as argument")
   }
 
 	return prototypes.NewBigInt(ctx), nil

@@ -15,14 +15,16 @@ func checkOverload(overload []Value, ts []Value, ctx context.Context) error {
       } else if j == len(overload) - 1 && arg != nil && ts[j] == nil {
         errCtx := ctx
         return errCtx.NewError("Error: unexpected void return value")
-      } else if err := arg.Check(ts[j], ctx); err != nil {
+      } else if j == len(overload) - 1 && arg == nil && ts[j] == nil {
+        // ok
+      } else if err := arg.Check(ts[j], ts[j].Context()); err != nil {
         return err
       }
     }
 
     return nil
   } else {
-    return ctx.NewError("Error: incompatible function interface")
+    return ctx.NewError(fmt.Sprintf("Error: expected %d arguments, got %d", len(overload), len(ts)))
   }
 }
 
@@ -36,7 +38,9 @@ func checkAnyOverload(overloads [][]Value, ts []Value, ctx context.Context) (int
           detectedError = ctx.NewError("Error: expected void return value")
         } else if j == len(overload) - 1 && arg != nil && ts[j] == nil {
           detectedError = ctx.NewError("Error: unexpected void return value")
-        } else if err := arg.Check(ts[j], ctx); err != nil {
+        } else if j == len(overload) - 1 && arg == nil && ts[j] == nil {
+          // ok
+        } else if err := arg.Check(ts[j], ts[j].Context()); err != nil {
           detectedError = err
         }
 
@@ -87,7 +91,9 @@ func checkAllOverloads(overloads [][]Value, tss [][]Value, ctx context.Context) 
 
             ok = false
             break
-          } else if err := arg.Check(ts[j], ctx); err != nil {
+          } else if j == len(ts) - 1 && arg == nil && ts[j] == nil {
+            // nothing
+          } else if err := arg.Check(ts[j], ts[j].Context()); err != nil {
             if len(tss) == 1 {
               return err
             }
@@ -101,8 +107,8 @@ func checkAllOverloads(overloads [][]Value, tss [][]Value, ctx context.Context) 
           overloadFound = true
           break
         }
-      } else if len(tss) == 1 {
-        return ctx.NewError("Error: function has different number of arguments")
+      } else if len(tss) == 1 && len(overloads) == 1 {
+        return ctx.NewError(fmt.Sprintf("Error: function has different number of arguments (expected %d, got %d)", len(overload) - 1, len(tss[0]) - 1))
       }
     }
 

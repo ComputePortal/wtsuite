@@ -55,10 +55,6 @@ func (t *Return) HoistNames(scope Scope) error {
 }
 
 func (t *Return) ResolveStatementNames(scope Scope) error {
-	if t.expr != nil {
-		return t.expr.ResolveExpressionNames(scope)
-	}
-
   fn := scope.GetFunction()
   if fn == nil {
     errCtx := t.Context()
@@ -66,9 +62,11 @@ func (t *Return) ResolveStatementNames(scope Scope) error {
   }
 
   t.fn = fn
-  if t.expr != nil {
+
+	if t.expr != nil {
     t.fn.RegisterReturn(t)
-  }
+		return t.expr.ResolveExpressionNames(scope)
+	}
 
 	return nil
 }
@@ -91,7 +89,13 @@ func (t *Return) EvalStatement() error {
     }
   }
 
-  retVal, err := t.fn.GetReturnValue()
+  if t.fn == nil {
+    hereCtx := t.Context()
+    here := hereCtx.NewError("fn should've been found")
+    panic(here.Error())
+  }
+
+  retVal, err := t.fn.getReturnValue()
   if err != nil {
     return err
   }

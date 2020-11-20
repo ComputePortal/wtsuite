@@ -15,7 +15,6 @@ import (
 	"../../pkg/parsers"
 	"../../pkg/tokens/js"
 	"../../pkg/tokens/js/macros"
-	"../../pkg/tokens/js/prototypes"
 	"../../pkg/tokens/js/values"
 	"../../pkg/tree/scripts"
 )
@@ -218,7 +217,6 @@ func setUpEnv(cmdArgs CmdArgs) {
 	files.VERBOSITY = cmdArgs.verbosity
 	parsers.VERBOSITY = cmdArgs.verbosity
 	js.VERBOSITY = cmdArgs.verbosity
-	prototypes.VERBOSITY = cmdArgs.verbosity
 	values.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 

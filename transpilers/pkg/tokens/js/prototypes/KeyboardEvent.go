@@ -24,6 +24,14 @@ func NewKeyboardEvent(target values.Value, ctx context.Context) values.Value {
   return values.NewInstance(NewKeyboardEventPrototype(target), ctx)
 }
 
+func (p *KeyboardEvent) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*KeyboardEvent); ok {
+    return p.AbstractEvent.checkTarget(other.target, ctx)
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *KeyboardEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   s := NewString(ctx)

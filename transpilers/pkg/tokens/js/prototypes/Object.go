@@ -19,7 +19,9 @@ type Object struct {
 func NewObjectPrototype(members map[string]values.Value) values.Prototype {
   obj := &Object{false, nil, members, newBuiltinPrototype("Object")}
 
-  obj.common = values.CommonValue(obj.getValues())
+  vals := obj.getValues()
+
+  obj.common = values.CommonValue(vals, context.NewDummyContext())
 
   return obj
 }
@@ -43,9 +45,19 @@ func NewConfigObject(members map[string]values.Value, ctx context.Context) value
 
   proto := &Object{true, nil, members, newBuiltinPrototype("Object")}
 
-  proto.common = values.CommonValue(proto.getValues())
+  vals := proto.getValues()
+
+  proto.common = values.CommonValue(vals, ctx)
 
   return values.NewInstance(proto, ctx)
+}
+
+func IsObject(v values.Value) bool {
+  ctx := context.NewDummyContext()
+
+  checkVal := NewObject(nil, ctx)
+
+  return checkVal.Check(v, ctx) == nil
 }
 
 func (p *Object) IsUniversal() bool {
@@ -73,7 +85,7 @@ func (p *Object) IsUniversal() bool {
 
 func (p *Object) Check(other_ values.Interface, ctx context.Context) error {
   if other, ok := other_.(*Object); ok {
-    if p.members == nil {
+    if p.members == nil || len(p.members) == 0 {
       if p.common == nil {
         return nil
       } else {
@@ -115,6 +127,16 @@ func (p *Object) Check(other_ values.Interface, ctx context.Context) error {
   }
 }
 
+func (p *Object) hasMember(k string) bool {
+  if p.members != nil {
+    if _, ok := p.members[k]; ok {
+      return true
+    } 
+  }
+
+  return false
+}
+
 func (p *Object) getMember(k string, ctx context.Context) (values.Value, error) {
   if p.members != nil {
     if v, ok := p.members[k]; ok {
@@ -124,9 +146,9 @@ func (p *Object) getMember(k string, ctx context.Context) (values.Value, error) 
     }
   }
 
-  common := p.getCommonValue()
+  common := p.getCommonValue(ctx)
 
-  return values.NewContextValue(common, ctx), nil
+  return common, nil
 }
 
 func (p *Object) getValues() []values.Value {
@@ -138,19 +160,21 @@ func (p *Object) getValues() []values.Value {
     }
 
     return vs
+  } else if p.common != nil {
+    return []values.Value{p.common}
   } else {
     return []values.Value{values.NewAny(p.Context())}
   }
 }
 
-func (p *Object) getCommonValue() values.Value {
-  return p.common
+func (p *Object) getCommonValue(ctx context.Context) values.Value {
+  return values.NewContextValue(p.common, ctx)
 }
 
 func (p *Object) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   a := values.NewAny(ctx)
   s := NewString(ctx)
-  common := p.getCommonValue()
+  common := p.getCommonValue(ctx)
 
   switch key {
   case ".getindex":
@@ -158,24 +182,23 @@ func (p *Object) GetInstanceMember(key string, includePrivate bool, ctx context.
       if k, ok := args[0].LiteralStringValue(); ok {
         return p.getMember(k, ctx_)
       } else {
-        return values.NewContextValue(common, ctx_), nil
+        return common, nil
       }
     }, ctx), nil
   case ".setindex":
     return values.NewCustomFunction([]values.Value{s, a}, func(args []values.Value, preferMethod bool, ctx_ context.Context) (values.Value, error) {
       if k, ok := args[0].LiteralStringValue(); ok {
-        m, err := p.getMember(k, ctx_)
-        if err != nil {
-          return nil, err
-        }
+        if p.hasMember(k) {
+          if v, err := p.getMember(k, ctx_); err == nil {
+            return nil, v.Check(args[1], ctx_)
+          } else {
+            return nil, err
+          }
+        } 
+      }
 
-        if err := m.Check(args[1], ctx_); err != nil {
-          return nil, err
-        }
-      } else {
-        if err := common.Check(args[1], ctx_); err != nil {
-          return nil, err
-        }
+      if p.common != nil {
+        return nil, p.common.Check(args[1], ctx_)
       }
 
       return nil, nil
@@ -238,7 +261,7 @@ func (p *Object) GetClassMember(key string, includePrivate bool, ctx context.Con
 
             return NewObject(members, ctx_), nil
           } else {
-            common := values.CommonValue([]values.Value{proto1.common, proto2.common})
+            common := values.CommonValue([]values.Value{proto1.common, proto2.common}, ctx_)
 
             return NewMapLikeObject(common, ctx_), nil
           }
@@ -261,5 +284,5 @@ func (p *Object) GetClassValue() (*values.Class, error) {
 
   return values.NewClass([][]values.Value{
     []values.Value{},
-  }, NewMapLikeObjectPrototype(values.NewAll(ctx)), ctx), nil
+  }, NewMapLikeObjectPrototype(values.NewAny(ctx)), ctx), nil
 }

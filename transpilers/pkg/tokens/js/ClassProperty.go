@@ -23,7 +23,11 @@ func (p *ClassProperty) Name() string {
 }
 
 func (p *ClassProperty) Role() prototypes.FunctionRole {
-  return prototypes.PRIVATE | prototypes.PROPERTY
+  if strings.HasPrefix("_", p.Name()) {
+    return prototypes.PRIVATE | prototypes.PROPERTY
+  } else {
+    return prototypes.PROPERTY
+  }
 }
 
 func (p *ClassProperty) IsUniversal() bool {
@@ -101,8 +105,12 @@ func (p *ClassProperty) SetValue(v values.Value, ctx context.Context) error {
   }
 }
 
-func (p *ClassProperty) EvalExpression() (values.Value, error) {
-  return p.GetValue(p.Context())
+func (p *ClassProperty) Eval() error {
+  if _, err := p.GetValue(p.Context()); err != nil {
+    return err
+  }
+
+  return nil
 } 
 
 func (p *ClassProperty) ResolveActivity(usage Usage) error {

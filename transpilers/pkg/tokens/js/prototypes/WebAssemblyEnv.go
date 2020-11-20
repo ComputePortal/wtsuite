@@ -26,6 +26,14 @@ func IsWebAssemblyEnv(v values.Value) bool {
   return checkVal.Check(v, ctx) == nil
 }
 
+func (p *WebAssemblyEnv) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*WebAssemblyEnv); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *WebAssemblyEnv) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
   return values.NewClass([][]values.Value{

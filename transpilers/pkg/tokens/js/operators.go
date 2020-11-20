@@ -262,7 +262,7 @@ func NewBinaryOp(op string, a Expression, b Expression, ctx context.Context) (Op
 	case op == "in":
 		return &InOp{BinaryOp{op, a, b, TokenData{ctx}}}, nil
 	case op == "instanceof":
-		return NewInstanceOf(a, b, ctx), nil
+		return NewInstanceOf(a, b, ctx)
 	case op == "==":
 		return &StrictEqOp{EqCompareOp{BinaryOp{"===", a, b, TokenData{ctx}}}}, nil
 	case op == "!=":
@@ -790,6 +790,14 @@ func (t *BinaryOp) evalArgs() (values.Value, values.Value, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+
+  if a == nil {
+    hereCtx := t.a.Context()
+    panic(hereCtx.NewError("a can't be nil").Error())
+  } else if b == nil {
+    hereCtx := t.b.Context()
+    panic(hereCtx.NewError("b can't be nil").Error())
+  }
 
 	return a, b, nil
 }
@@ -1381,7 +1389,7 @@ func (t *LogicalBinaryOp) EvalExpression() (values.Value, error) {
 	case prototypes.IsNumber(a) && prototypes.IsNumber(b):
 		return prototypes.NewNumber(ctx), nil
 	default:
-		err := ctx.NewError("Error: expected two Booleans, or two Numbers")
+		err := ctx.NewError("Error: expected two Booleans, or two Numbers (got " + a.TypeName() + " and " + b.TypeName() + ")")
 		return nil, err
 	}
 }
@@ -1450,7 +1458,7 @@ func (t *IfElseOp) EvalExpression() (values.Value, error) {
 		return nil, ctx.NewError("Error: expected Boolean first argument, got " + a.TypeName())
 	}
 
-  common := values.CommonValue([]values.Value{b, c})
+  common := values.CommonValue([]values.Value{b, c}, t.Context())
 	return values.NewContextValue(common, ctx), nil
 }
 

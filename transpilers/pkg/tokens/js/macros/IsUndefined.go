@@ -18,6 +18,10 @@ type IsUndefined struct {
 }
 
 func NewIsUndefined(args []js.Expression, ctx context.Context) (js.Expression, error) {
+	if len(args) != 1 {
+		return nil, ctx.NewError("Error: expected 1 argument")
+	}
+
 	return &IsUndefined{false, false, newMacro(args, ctx)}, nil
 }
 
@@ -42,11 +46,6 @@ func (m *IsUndefined) WriteExpression() string {
 }
 
 func (m *IsUndefined) ResolveExpressionNames(scope js.Scope) error {
-	if len(m.args) != 1 {
-		errCtx := m.Context()
-		return errCtx.NewError("Error: expected 1 argument")
-	}
-
 	arg_ := m.args[0]
 	if arg, ok := arg_.(*js.VarExpression); ok {
 		name := arg.Name()
@@ -69,10 +68,6 @@ func (m *IsUndefined) EvalExpression() (values.Value, error) {
 	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
-	}
-
-	if len(args) != 1 {
-		return nil, ctx.NewError("Error: expected 1 argument")
 	}
 
 	if values.IsLiteral(args[0]) {

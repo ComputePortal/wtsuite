@@ -13,11 +13,19 @@ import (
 
 type ObjectToInstance struct {
 	ToInstance
-	Macro
 }
 
 func NewObjectToInstance(args []js.Expression, ctx context.Context) (js.Expression, error) {
-	return &ObjectToInstance{newToInstance(), newMacro(args, ctx)}, nil
+	if len(args) != 2 {
+		return nil, ctx.NewError("Error: expected 2 arguments")
+	}
+
+  interfExpr, err := getTypeExpression(args[1])
+  if err != nil {
+    return nil, err
+  }
+
+  return &ObjectToInstance{newToInstance(args[0:1], interfExpr, ctx)}, nil
 }
 
 func (m *ObjectToInstance) Dump(indent string) string {
@@ -36,23 +44,17 @@ func (m *ObjectToInstance) WriteExpression() string {
 }
 
 func (m *ObjectToInstance) EvalExpression() (values.Value, error) {
-	args, err := m.evalArgs()
+  args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
 	}
 
-	if len(args) != 2 {
-		errCtx := m.Context()
-		err := errCtx.NewError("Error: expected 2 arguments")
-		return nil, err
-	}
-
-  objectCheck := prototypes.NewObject(nil, args[0].Context())
-  if err := objectCheck.Check(args[0], args[0].Context()); err != nil {
-    return nil, err
+  if !prototypes.IsObject(args[0]) {
+    errCtx := args[0].Context()
+    return nil, errCtx.NewError("Error: expected Object, got " + args[0].TypeName())
   }
 
-	return args[1].EvalConstructor(nil, m.Context())
+	return values.NewInstance(m.interf, m.Context()), nil
 }
 
 func (m *ObjectToInstance) ResolveExpressionActivity(usage js.Usage) error {

@@ -2,14 +2,11 @@ package js
 
 import (
   "./prototypes"
-  "./values"
 
 	"../context"
 )
 
-type FillNodeJSPackageFunction func(pkg values.Package)
-
-var nodeJSPackages map[string]FillNodeJSPackageFunction = map[string]FillNodeJSPackageFunction{
+var nodeJSPackages map[string]FillPackageFunction = map[string]FillPackageFunction{
   "crypto": prototypes.FillNodeJS_cryptoPackage,
   "fs": prototypes.FillNodeJS_fsPackage,
   "http": prototypes.FillNodeJS_httpPackage,

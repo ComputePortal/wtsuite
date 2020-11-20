@@ -22,6 +22,14 @@ func (p *NodeJS_http_IncomingMessage) GetParent() (values.Prototype, error) {
   return NewNodeJS_stream_ReadablePrototype(), nil
 }
 
+func (p *NodeJS_http_IncomingMessage) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_http_IncomingMessage); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *NodeJS_http_IncomingMessage) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)
@@ -31,7 +39,7 @@ func (p *NodeJS_http_IncomingMessage) GetInstanceMember(key string, includePriva
   case "aborted", "complete":
     return b, nil
   case "headers":
-    return NewObject(nil, ctx), nil
+    return NewMapLikeObject(s, ctx), nil
   case "httpVersion", "method", "statusMessage", "url":
     return s, nil
   case "rawHeaders":

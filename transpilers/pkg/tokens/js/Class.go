@@ -13,7 +13,7 @@ import (
 type Class struct {
 	nameExpr         *TypeExpression
 	parentExpr       *TypeExpression  // can be nil
-	interfExprs      []*VarExpression // can't be nil, can be zero length
+	interfExprs      []*VarExpression // can't be nil, can be zero length, can't contain nil
   constructor      *Function
 	members          []ClassMember    // list because getter and setter can have same name
 	universalName    string
@@ -41,6 +41,12 @@ func NewUniversalClass(nameExpr *TypeExpression, parentExpr *TypeExpression, int
 	if err != nil {
 		panic(err)
 	}
+
+  for _, interfExpr := range interfExprs {
+    if interfExpr == nil {
+      panic("interfExpr can't be nil")
+    }
+  }
 
 	cl.interfExprs = interfExprs
 	cl.universalName = universalName
@@ -76,7 +82,12 @@ func (t *Class) GetParent() (values.Prototype, error) {
     return nil, nil
   }
 
-  proto := t.parentExpr.GetPrototype()
+  val, err := t.parentExpr.EvalExpression()
+  if err != nil {
+    return nil, err
+  }
+
+  proto := values.GetPrototype(val)
 
   if proto != nil {
     return proto, nil
@@ -143,6 +154,23 @@ func (t *Class) AddProperty(name *Word, expr *TypeExpression) error {
   return nil
 }
 
+func (t *Class) Properties() (map[string]values.Value, error) {
+  ctx := t.Context()
+  props := make(map[string]values.Value)
+  for _, member := range t.members {
+    if prop, ok := member.(*ClassProperty); ok {
+      v, err := prop.GetValue(ctx)
+      if err != nil {
+        return nil, err
+      }
+
+      props[member.Name()] = v
+    }
+  }
+
+  return props, nil
+}
+
 func (t *Class) AddConstructor(fn *Function) error {
   if t.constructor != nil {
     errCtx := fn.Context()
@@ -169,14 +197,14 @@ func (t *Class) AddFunction(fn *Function) error {
   }
 
   if prototypes.IsGetter(fn) {
-    if prev := t.getMember(fn.Name(), false); prev != nil && !prototypes.IsSetter(fn) {
+    if prev := t.getMember(fn.Name(), false); prev != nil && !prototypes.IsSetter(prev) {
       errCtx := fn.Context()
       err := errCtx.NewError("Error: already have a member named " + fn.Name())
       err.AppendContextString("Info: previously declared here", prev.Context())
       return err
     }
   } else if prototypes.IsSetter(fn) {
-    if prev := t.getMember(fn.Name(), false); prev != nil && !prototypes.IsGetter(fn) {
+    if prev := t.getMember(fn.Name(), false); prev != nil && !prototypes.IsGetter(prev) {
       errCtx := fn.Context()
       err := errCtx.NewError("Error: already have a member named " + fn.Name())
       err.AppendContextString("Info: previously declared here", prev.Context())
@@ -235,6 +263,10 @@ func (t *Class) Dump(indent string) string {
 
 	b.WriteString("\n")
 
+  if t.constructor != nil {
+		b.WriteString(t.constructor.Dump(indent + "  "))
+  }
+
 	b.WriteString(indent)
 	for _, member := range t.members {
 		b.WriteString(member.Dump(indent + "  "))
@@ -266,6 +298,14 @@ func (t *Class) WriteStatement(indent string) string {
 	b.WriteString("{")
 
 	hasContent := false
+  if t.constructor != nil {
+    b.WriteString(NL)
+    b.WriteString(indent + TAB)
+    b.WriteString("constructor")
+    b.WriteString(t.constructor.writeBody(indent + TAB, NL, TAB))
+    hasContent = true
+  }
+
 	for _, member := range t.members {
 		s := member.WriteStatement(indent + TAB)
 
@@ -333,6 +373,11 @@ func (t *Class) resolveConstructorNames(scope Scope) error {
         return err
       }
 
+      if parentClassVal == nil {
+        errCtx := t.parentExpr.Context()
+        return errCtx.NewError("Error: parent constructor not found")
+      }
+
       superVal, err := values.NewSuper(parentClassVal, t.parentExpr.Context())
       if err != nil {
         return err
@@ -344,33 +389,14 @@ func (t *Class) resolveConstructorNames(scope Scope) error {
     }
 
     thisVar := t.constructor.GetThisVariable()
-
-    thisClassVal, err := t.GetClassValue()
-    if err != nil {
-      return err
-    }
-
-    thisVal, err := thisClassVal.EvalConstructor(nil, t.Context())
-    if err != nil {
-      return err
-    }
-
+    thisVal := values.NewInstance(t, t.Context())
     thisValWrapper := values.NewThis(thisVal, t.Context())
-
     thisVar.SetValue(thisValWrapper)
 
     if err := t.constructor.ResolveExpressionNames(subScope); err != nil {
       return err
     }
 
-    // check that all properties are "touched"
-    for _, member := range t.members {
-      if prototypes.IsProperty(member) {
-        if err := thisValWrapper.AssertTouched(member.Name(), member.Context()); err != nil {
-          return err
-        }
-      }
-    }
   }
 
   return nil
@@ -390,17 +416,8 @@ func (t *Class) resolveMemberNames(scope Scope) error {
           return err
         }
 
-        superClassVal, err := parent.GetClassValue()
-        if err != nil {
-          return err
-        } 
-
-        if superClassVal != nil {
-          superVal, err := superClassVal.EvalConstructor(nil, member.Context())
-          if err != nil {
-            return err
-          }
-
+        if parent != nil {
+          superVal := values.NewInstance(parent, member.Context())
           superVar := NewVariable("super", true, t.parentExpr.Context())
           superVar.SetValue(superVal)
 
@@ -412,17 +429,7 @@ func (t *Class) resolveMemberNames(scope Scope) error {
 
       if !prototypes.IsStatic(member) {
         thisVar := member.GetThisVariable()
-
-        thisClassVal, err := t.GetClassValue()
-        if err != nil {
-          return err
-        }
-
-        thisVal, err := thisClassVal.EvalConstructor(nil, member.Context())
-        if err != nil {
-          return err
-        }
-
+        thisVal := values.NewInstance(t, member.Context())
         thisVar.SetValue(thisVal)
       }
 
@@ -467,29 +474,11 @@ func (t *Class) ResolveExpressionNames(scope Scope) error {
 		}
 	}
 
-	if t.interfExprs != nil {
-    for _, interfExpr := range t.interfExprs {
-      if err := interfExpr.ResolveExpressionNames(scope); err != nil {
-        return err
-      }
-
-      interf := interfExpr.GetInterface()
-      isPrototype := interfExpr.GetPrototype() != nil
-      if isPrototype {
-        errCtx := interfExpr.Context()
-        return errCtx.NewError("Error: can't implement other class")
-      }
-
-      if interf == nil {
-        errCtx := interfExpr.Context()
-        return errCtx.NewError("Error: not an interface")
-      }
-
-      if err := interf.Check(t, interfExpr.Context()); err != nil {
-        return err
-      }
+  for _, interfExpr := range t.interfExprs {
+    if err := interfExpr.ResolveExpressionNames(scope); err != nil {
+      return err
     }
-	}
+  }
 
   if err := t.resolveConstructorNames(scope); err != nil {
     return err
@@ -559,26 +548,49 @@ func (t *Class) GetClassValue() (*values.Class, error) {
 
 func (t *Class) evalInternal() error {
   if t.constructor != nil {
-    if ret, err := t.constructor.EvalExpression(); err != nil {
+    // the returned value is the function itself
+    if _, err := t.constructor.EvalExpression(); err != nil {
       return err
-    } else if ret != nil {
-      errCtx := ret.Context()
-      return errCtx.NewError("Error: unexpected constructor return value")
+    } 
+
+    thisVar := t.constructor.GetThisVariable()
+    thisVal, _ := thisVar.GetValue().(*values.This)
+
+    // check that all properties are "touched"
+    for _, member := range t.members {
+      if prototypes.IsProperty(member) {
+        if err := thisVal.AssertTouched(member.Name(), member.Context()); err != nil {
+          return err
+        }
+      }
     }
   }
 
   for _, member := range t.members {
-    if _, err := member.EvalExpression(); err != nil {
+    if err := member.Eval(); err != nil {
       return err
     }
   }
 
   for _, interfExpr := range t.interfExprs {
-    if _, err := interfExpr.EvalExpression(); err != nil {
-      return err
-    } 
+    // interfExpr.EvalExpression would give an error, because no value is set
+    interf := interfExpr.GetInterface()
+    isPrototype := interfExpr.GetPrototype() != nil
+    if isPrototype {
+      errCtx := interfExpr.Context()
+      return errCtx.NewError("Error: can't implement other class")
+    }
 
-    // implementation registration was already done during resolve names stage
+    if interf == nil {
+      errCtx := interfExpr.Context()
+      return errCtx.NewError("Error: not an interface")
+    }
+
+    // implementation registration is done inside the check
+    if err := interf.Check(t, interfExpr.Context()); err != nil {
+      return err
+    }
+
   }
 
   return nil
@@ -593,10 +605,6 @@ func (t *Class) EvalExpression() (values.Value, error) {
 }
 
 func (t *Class) EvalStatement() error {
-  if err := t.evalInternal(); err != nil {
-    return err
-  }
-
   variable := t.GetVariable()
   classVal, err := t.GetClassValue()
   if err != nil {
@@ -604,6 +612,10 @@ func (t *Class) EvalStatement() error {
   }
 
   variable.SetValue(classVal)
+
+  if err := t.evalInternal(); err != nil {
+    return err
+  }
 
 	return nil
 }
@@ -654,7 +666,12 @@ func (t *Class) SetInstanceMember(key string, includePrivate bool, arg values.Va
   if t.parentExpr == nil {
     return ctx.NewError("Error: setable member not found")
   } else {
-    return t.SetInstanceMember(key, includePrivate, arg, ctx)
+    parent, err := t.GetParent()
+    if err != nil {
+      return err
+    }
+
+    return parent.SetInstanceMember(key, includePrivate, arg, ctx)
   }
 }
 

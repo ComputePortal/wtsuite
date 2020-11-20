@@ -49,7 +49,7 @@ func (p *GLEnum) Check(other_ values.Interface, ctx context.Context) error {
       return ctx.NewError("Error: expected literal " + p.Name() + ", got " + other.Name()) 
     }
   } else {
-    return ctx.NewError("Error: expected GLEnum, got " + other_.Name())
+    return checkParent(p, other_, ctx)
   }
 }
 

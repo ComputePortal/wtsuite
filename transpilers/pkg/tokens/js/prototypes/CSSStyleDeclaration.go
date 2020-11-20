@@ -18,6 +18,14 @@ func NewCSSStyleDeclaration(ctx context.Context) values.Value {
   return values.NewInstance(NewCSSStyleDeclarationPrototype(), ctx)
 }
 
+func (p *CSSStyleDeclaration) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*CSSStyleDeclaration); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *CSSStyleDeclaration) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   s := NewString(ctx)
 
@@ -36,6 +44,17 @@ func (p *CSSStyleDeclaration) GetInstanceMember(key string, includePrivate bool,
     }, ctx), nil
   default:
     return nil, nil
+  }
+}
+
+func (p *CSSStyleDeclaration) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  s := NewString(ctx)
+
+  switch key {
+  case "display", "height", "width", "top", "bottom", "left", "right", "position":
+    return s.Check(arg, ctx)
+  default:
+    return ctx.NewError("Error: CSSStyleDeclaration." + key + " not setable")
   }
 }
 

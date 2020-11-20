@@ -18,6 +18,14 @@ func NewNodeJS_EventEmitter(ctx context.Context) values.Value {
   return values.NewInstance(NewNodeJS_EventEmitterPrototype(), ctx)
 }
 
+func (p *NodeJS_EventEmitter) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_EventEmitter); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *NodeJS_EventEmitter) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   s := NewString(ctx)
 

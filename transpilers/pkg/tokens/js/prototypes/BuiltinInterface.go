@@ -33,12 +33,22 @@ func (p *AbstractBuiltinInterface) Context() context.Context {
   return context.NewDummyContext()
 }
 
+func (p *AbstractBuiltinInterface) IsUniversal() bool {
+  for _, proto := range p.implementations {
+    if !proto.IsUniversal() {
+      return false
+    }
+  }
+
+  return true
+}
+
 func (p *AbstractBuiltinInterface) GetInterfaces() ([]values.Interface, error) {
   return []values.Interface{}, nil
 }
 
 func (p *AbstractBuiltinInterface) GetPrototypes() ([]values.Prototype, error) {
-  return []values.Prototype{}, nil
+  return p.implementations, nil
 }
 
 func (p *AbstractBuiltinInterface) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {

@@ -33,6 +33,10 @@ func NewPackage(path string, ctx context.Context) *Package {
 	return &Package{"", path, make(map[string]Variable), TokenData{ctx}}
 }
 
+func (t *Package) IsBuiltin() bool {
+  return t.path == "" && t.name != ""
+}
+
 func (t *Package) addMember(key string, v Variable) error {
 	if other, ok := t.members[key]; ok {
 		errCtx := v.Context()

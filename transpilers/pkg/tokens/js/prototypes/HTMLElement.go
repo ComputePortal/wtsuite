@@ -22,6 +22,14 @@ func (p *HTMLElement) GetParent() (values.Prototype, error) {
   return NewElementPrototype(), nil
 }
 
+func (p *HTMLElement) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*HTMLElement); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *HTMLElement) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   i := NewInt(ctx)
   s := NewString(ctx)

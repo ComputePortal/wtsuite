@@ -1,10 +1,6 @@
 package directives
 
 import (
-	//"../files"
-	//"../tokens/context"
-	//tokens "../tokens/html"
-	"../tokens/js"
 	"../tree"
 	"../tree/scripts"
 )
@@ -12,7 +8,7 @@ import (
 func NewRoot(path string, url string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
 	_, node, err := BuildFile(path, "", true)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	root_ := node.tag

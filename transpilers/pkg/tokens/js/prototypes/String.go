@@ -34,6 +34,14 @@ func IsStringable(v values.Value) bool {
   return IsString(v) || IsNumber(v) || IsBoolean(v)
 }
 
+func (p *String) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*String); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *String) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)
@@ -166,4 +174,8 @@ func (p *String) GetClassValue() (*values.Class, error) {
   return values.NewClass([][]values.Value{
     []values.Value{a},
   }, NewStringPrototype(), ctx), nil
+}
+
+func (p *String) IsUniversal() bool {
+  return true
 }

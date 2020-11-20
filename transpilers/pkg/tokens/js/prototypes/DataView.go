@@ -18,6 +18,14 @@ func NewDataView(ctx context.Context) values.Value {
   return values.NewInstance(NewDataViewPrototype(), ctx)
 }
 
+func (p *DataView) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*DataView); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *DataView) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)

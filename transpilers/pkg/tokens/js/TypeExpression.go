@@ -166,7 +166,7 @@ func (t *TypeExpression) generateClass() (values.Value, error) {
 
   // overloads of constructor args
   var cArgs [][]values.Value = nil
-  var proto values.Prototype = nil
+  var interf values.Interface = nil
 
   if t.parameters != nil {
     if len(t.parameters) < 1 {
@@ -201,14 +201,14 @@ func (t *TypeExpression) generateClass() (values.Value, error) {
       return nil, err
     }
 
-    proto := values.GetPrototype(newVal)
-    if proto == nil {
+    interf = values.GetInterface(newVal)
+    if interf == nil {
       errCtx := t.parameters[n-1].typeExpr.Context()
-      return nil, errCtx.NewError("Error: expected instance of prototype")
+      return nil, errCtx.NewError("Error: expected instance, got " + newVal.TypeName())
     }
   }
 
-  return values.NewClass(cArgs, proto, ctx), nil
+  return values.NewClass(cArgs, interf, ctx), nil
 }
 
 // function<..., retType>
@@ -297,6 +297,61 @@ func (t *TypeExpression) generateDoubleParameterValue() (values.Value, values.Va
   return content[0], content[1], nil
 }
 
+func (t *TypeExpression) generatePromise() (values.Value, error) {
+  ctx := t.Context()
+
+  if t.parameters != nil {
+    if len(t.parameters) != 1 {
+      return nil, ctx.NewError("Error: expected 1 type parameters")
+    }
+
+    p := t.parameters[0]
+
+    arg, err := p.typeExpr.EvalExpression()
+    if err != nil {
+      return nil, err
+    }
+
+    if arg == nil {
+      return prototypes.NewVoidPromise(ctx), nil
+    } else {
+      return prototypes.NewPromise(arg, ctx), nil
+    }
+  } else {
+    return prototypes.NewPromise(nil, ctx), nil
+  }
+}
+
+func (t *TypeExpression) generateTuple() (values.Value, error) {
+  if t.parameters == nil {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: expected at least 2 type parameters")
+  }
+
+  if len(t.parameters) < 2 {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: expected at least 2 type parameters")
+  }
+
+  if t.hasKeys() {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: unexpected named type parameters")
+  }
+
+  content := make([]values.Value, len(t.parameters))
+
+  for i, p := range t.parameters {
+    val, err := p.typeExpr.EvalExpression()
+    if err != nil {
+      return nil, err
+    }
+
+    content[i] = val
+  }
+
+  return prototypes.NewTuple(content, t.Context()), nil
+}
+
 func (t *TypeExpression) generateObject() (values.Value, error) {
   var props map[string]values.Value = nil
 
@@ -314,6 +369,8 @@ func (t *TypeExpression) generateObject() (values.Value, error) {
 
       return prototypes.NewMapLikeObject(common, t.Context()), nil
     } else {
+      props = make(map[string]values.Value)
+
       for _, p := range t.parameters {
         key := p.key.Value()
         val, err := p.typeExpr.EvalExpression()
@@ -378,20 +435,7 @@ func (t *TypeExpression) EvalExpression() (values.Value, error) {
 
     return prototypes.NewMap(key, val, ctx), nil
   case "Promise":
-    content, err := t.generateSingleParameterValue()
-    if err != nil {
-      return nil, err
-    }
-
-    if content == nil {
-      if t.parameters != nil {
-        return prototypes.NewVoidPromise(ctx), nil
-      } else {
-        return prototypes.NewPromise(nil, ctx), nil
-      }
-    } else {
-      return  prototypes.NewPromise(content, ctx), nil
-    }
+    return t.generatePromise()
   case "Event":
     content, err := t.generateSingleParameterValue()
     if err != nil {
@@ -408,6 +452,8 @@ func (t *TypeExpression) EvalExpression() (values.Value, error) {
     return prototypes.NewIDBRequest(content, ctx), nil
   case "Object":
     return t.generateObject()
+  case "Tuple":
+    return t.generateTuple()
   default:
     if t.parameters != nil {
 			errCtx := ctx
@@ -416,7 +462,7 @@ func (t *TypeExpression) EvalExpression() (values.Value, error) {
 
     interf := t.GetInterface()
     if interf == nil {
-      return nil, ctx.NewError("Error: expeceted an interface")
+      return nil, ctx.NewError("Error: expected an interface")
     }
 
     return values.NewInstance(interf, ctx), nil
@@ -451,4 +497,17 @@ func (t *TypeExpressionMember) Walk(fn WalkFunc) error {
   }
 
   return nil
+}
+
+func GetTypeExpression(expr_ Expression) (*TypeExpression, error) {
+  switch expr := expr_.(type) {
+  case *TypeExpression:
+    return expr, nil
+  case *VarExpression:
+    return expr.ToTypeExpression()
+  case *Member:
+    return expr.ToTypeExpression()
+  default:
+    return nil, nil
+  }
 }

@@ -5,17 +5,15 @@ import (
 )
 
 type Any struct {
-  isAll bool 
-
 	ValueData
 }
 
 func NewAny(ctx context.Context) Value {
-	return &Any{false, ValueData{ctx}}
+	return &Any{ValueData{ctx}}
 }
 
 func NewAll(ctx context.Context) Value {
-  return &Any{true, ValueData{ctx}}
+  return &Any{ValueData{ctx}}
 }
 
 func (v *Any) TypeName() string {
@@ -46,12 +44,11 @@ func (v *Any) SetMember(key string, includePrivate bool, arg Value, ctx context.
   return nil
 }
 
-func IsAll(v_ Value) bool {
+func IsAny(v_ Value) bool {
   v_ = UnpackContextValue(v_)
-
-  v, ok := v_.(*Any)
-  if ok {
-    return v.isAll
+  
+  if _, ok := v_.(*Any); ok {
+    return true
   } else {
     return false
   }

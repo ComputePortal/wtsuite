@@ -26,6 +26,14 @@ func IsBlob(v values.Value) bool {
   return blobCheck.Check(v, ctx) == nil
 }
 
+func (p *Blob) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Blob); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Blob) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   i := NewInt(ctx)
   s := NewString(ctx)

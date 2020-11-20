@@ -48,7 +48,7 @@ func (ce *ContextError) prepareContextString(msg string, c Context) string {
 	b.WriteString(msg)
 	b.WriteString(" \u001b[0m(\u001b[35m")
 	b.WriteString(Abbreviate(c.path))
-	b.WriteString(")\u001b[0m\n")
+	b.WriteString("\u001b[0m)\n")
 
 	cl := c.newContextLines()
 	cl.pad(1)
@@ -68,6 +68,10 @@ func (ce *ContextError) AppendContextString(msg string, c Context) {
 	if !strings.HasSuffix(ce.err, s) {
 		ce.err += s
 	}
+}
+
+func (ce *ContextError) AppendError(other *ContextError) {
+  ce.err += "\n" + other.err
 }
 
 func (ce *ContextError) PrependContextString(msg string, c Context) {
@@ -167,6 +171,16 @@ func AppendContextString(err error, msg string, c Context) {
 	case *ContextError:
 		e.AppendContextString(msg, c)
 	}
+}
+
+func AppendError(err_ error, other_ error) {
+  err, ok := err_.(*ContextError)
+  if ok {
+    other, ok := other_.(*ContextError)
+    if ok {
+      err.AppendError(other)
+    }
+  }
 }
 
 func PrependContextString(err error, msg string, c Context) {

@@ -18,24 +18,35 @@ func NewSearchIndex(ctx context.Context) values.Value {
   return values.NewInstance(NewSearchIndexPrototype(), ctx)
 }
 
+func (p *SearchIndex) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*SearchIndex); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *SearchIndex) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)
   s := NewString(ctx)
+  ss := NewArray(s, ctx)
 
   switch key {
+  case "onready":
+    return nil, ctx.NewError("Error: only a setter")
   case "ignore":
     return values.NewFunction([]values.Value{s, b}, ctx), nil
   case "page":
     return values.NewFunction([]values.Value{i, NewObject(map[string]values.Value{
       "url": s,
       "title": s,
-      "content": s,
+      "content": ss,
     }, ctx)}, ctx), nil
   case "match", "matchPrefix", "matchSuffix", "matchSubstring":
     return values.NewFunction([]values.Value{s, NewSet(i, ctx)}, ctx), nil
   case "fuzzy", "fuzzyPrefix", "fuzzySuffix", "fuzzySubstring":
-    return values.NewFunction([]values.Value{s, NewArray(NewSet(i, ctx), ctx)}, ctx), nil
+    return values.NewFunction([]values.Value{s, i, NewArray(NewSet(i, ctx), ctx)}, ctx), nil
   default:
     return nil, nil
   }

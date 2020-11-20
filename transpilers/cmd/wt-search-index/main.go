@@ -17,7 +17,6 @@ import (
 	"../../pkg/parsers"
 	tokens "../../pkg/tokens/html"
 	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/prototypes"
 	"../../pkg/tree"
 	"../../pkg/tree/scripts"
 	"../../pkg/tree/styles"
@@ -263,7 +262,6 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 	directives.VERBOSITY = cmdArgs.verbosity
 	tokens.VERBOSITY = cmdArgs.verbosity
 	js.VERBOSITY = cmdArgs.verbosity
-	prototypes.VERBOSITY = cmdArgs.verbosity
 	parsers.VERBOSITY = cmdArgs.verbosity
 	files.VERBOSITY = cmdArgs.verbosity
 	cache.VERBOSITY = cmdArgs.verbosity
@@ -377,7 +375,7 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 
 			directives.SetActiveURL(url)
 
-			r, _, _, err := directives.NewRoot(src, url, "", cfg.CssUrl, cfg.JsUrl)
+			r, _, err := directives.NewRoot(src, url, "", cfg.CssUrl, cfg.JsUrl)
 			if err != nil {
 				return nil, err
 			}

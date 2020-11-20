@@ -18,14 +18,22 @@ func NewDOMRect(ctx context.Context) values.Value {
   return values.NewInstance(NewDOMRectPrototype(), ctx)
 }
 
-func (p *DOMRect) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
-  s := NewString(ctx)
+func (p *DOMRect) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*DOMRect); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
+func (p *DOMRect) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
+  f := NewNumber(ctx)
 
   switch key {
   case "bottom", "height", "left", "right", "top", "width", "x", "y":
-    return s.Check(arg, ctx)
+    return f, nil
   default:
-    return ctx.NewError("Error: DOMRect." + key + " not setable")
+    return nil, nil
   }
 }
 

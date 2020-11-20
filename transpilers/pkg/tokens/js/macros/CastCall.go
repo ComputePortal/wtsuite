@@ -11,6 +11,7 @@ import (
 )
 
 type CastCall struct {
+  typeExpr *js.TypeExpression
   Macro
 }
 
@@ -21,7 +22,12 @@ func NewCastCall(args []js.Expression, ctx context.Context) (js.Expression, erro
     return nil, errCtx.NewError(fmt.Sprintf("Error: expected 2 arguments, got %d", len(args)))
   }
 
-  return &CastCall{newMacro(args, ctx)}, nil
+  typeExpr, err := getTypeExpression(args[1])
+  if err != nil {
+    return nil, err
+  }
+
+  return &CastCall{typeExpr, newMacro(args[0:1], ctx)}, nil
 }
 
 func (m *CastCall) Dump(indent string) string {
@@ -31,7 +37,7 @@ func (m *CastCall) Dump(indent string) string {
   b.WriteString("cast(...)")
   b.WriteString("\n")
   b.WriteString(m.args[0].Dump(indent + "  "))
-  b.WriteString(m.args[1].Dump(indent + "  "))
+  b.WriteString(m.typeExpr.WriteExpression())
   b.WriteString("\n")
 
   return b.String()
@@ -41,11 +47,24 @@ func (m *CastCall) WriteExpression() string {
   return m.args[0].WriteExpression()
 }
 
+func (m *CastCall) ResolveExpressionNames(scope js.Scope) error { 
+  // last argument
+  if err := m.Macro.ResolveExpressionNames(scope); err != nil {
+    return err
+  }
+
+  if err := m.typeExpr.ResolveExpressionNames(scope); err != nil {
+    return err
+  }
+
+  return nil
+}
+
 func (m *CastCall) EvalExpression() (values.Value, error) {
-  // value of first argument doesnt matter
-  if _, err := m.args[0].EvalExpression(); err != nil {
+  // value of args doesnt matter
+  if _, err := m.evalArgs(); err != nil {
     return nil, err
   }
 
-  return m.args[1].EvalExpression()
+  return m.typeExpr.EvalExpression()
 }

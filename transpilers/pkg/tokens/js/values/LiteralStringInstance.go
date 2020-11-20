@@ -17,19 +17,19 @@ func NewLiteralStringInstance(interf Interface, str string, ctx context.Context)
 func (v *LiteralStringInstance) Check(other_ Value, ctx context.Context) error {
   other_ = UnpackContextValue(other_)
 
-  if IsAll(other_) {
+  if IsAny(other_) {
     return nil
-  } else if other, ok := other_.(*LiteralStringInstance); ok {
-    if v.value == other.value {
-      return nil
-    } else {
-      return ctx.NewError("Error: expected literal string \"" + v.value + "\", got \"" + other.value + "\"")
-    }
-  } else {
-    return ctx.NewError("Error: not a literal string instance")
-  }
+  } else if other, ok := other_.(*LiteralStringInstance); ok && v.value == other.value {
+    return nil
+  } 
+
+  return ctx.NewError("Error: not a literal string instance")
 }
 
 func (v *LiteralStringInstance) LiteralStringValue() (string, bool) {
   return v.value, true
+}
+
+func (v *LiteralStringInstance) TypeName() string {
+  return "String<\"" + v.value + "\">"
 }

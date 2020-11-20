@@ -26,6 +26,14 @@ func IsCanvasPattern(v values.Value) bool {
   return checkVal.Check(v, ctx) == nil
 }
 
+func (p *CanvasPattern) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*CanvasPattern); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *CanvasPattern) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
   return values.NewUnconstructableClass(NewCanvasPatternPrototype(), ctx), nil

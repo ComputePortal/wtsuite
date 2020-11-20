@@ -18,11 +18,21 @@ func NewIDBTransaction(ctx context.Context) values.Value {
   return values.NewInstance(NewIDBTransactionPrototype(), ctx)
 }
 
+func (p *IDBTransaction) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*IDBTransaction); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *IDBTransaction) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   s := NewString(ctx)
   store := NewIDBObjectStore(ctx)
 
   switch key {
+  case "oncomplete", "onerror":
+    return nil, ctx.NewError("Error: is only a setter")
   case "commit":
     return values.NewFunction([]values.Value{nil}, ctx), nil
   case "objectStore":

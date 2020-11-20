@@ -11,6 +11,9 @@ type Interface interface {
 
   Check(other Interface, ctx context.Context) error
 
+  // if true: can be exported to databases etc.
+  IsUniversal() bool // for actual interfaces: all implementations need to be universal
+
   // get extended interfaces in case of js.Interface, get implements interfaces in case of js.Class
   GetInterfaces() ([]Interface, error)
 
@@ -29,6 +32,12 @@ func GetInterface(v_ Value) Interface {
 
   switch v := v_.(type) {
   case *Instance:
+    return v.GetInterface()
+  case *LiteralIntInstance:
+    return v.GetInterface()
+  case *LiteralBooleanInstance:
+    return v.GetInterface()
+  case *LiteralStringInstance:
     return v.GetInterface()
   default:
     return nil

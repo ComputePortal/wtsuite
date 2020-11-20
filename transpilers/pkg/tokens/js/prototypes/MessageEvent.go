@@ -19,12 +19,22 @@ func NewMessageEvent(ctx context.Context) values.Value {
   return values.NewInstance(NewMessageEventPrototype(), ctx)
 }
 
-func (p *MessageEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
-  a := values.NewAny(ctx)
+func (p *MessageEvent) Name() string {
+  return "MessageEvent"
+}
 
+func (p *MessageEvent) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*MessageEvent); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
+func (p *MessageEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   switch key {
   case "data": 
-    return a, nil
+    return NewObject(nil, ctx), nil
   case "ports":
     return NewArray(p.target, ctx), nil
   default:

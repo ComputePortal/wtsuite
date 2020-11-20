@@ -201,7 +201,7 @@ func (t *Switch) EvalStatement() error {
 		return err
 	}
 
-  if values.IsInstance(exprVal) {
+  if !values.IsInstance(exprVal) {
 		errCtx := exprVal.Context()
 		return errCtx.NewError("Error: not a switchable value (" + exprVal.TypeName() + ")")
   }

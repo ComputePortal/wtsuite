@@ -30,6 +30,14 @@ func IsArray(v values.Value) bool {
   return arrayCheck.Check(v, ctx) == nil
 }
 
+func (p *Array) getContent(ctx context.Context) values.Value {
+  if p.content == nil {
+    return values.NewAny(ctx)
+  } else {
+    return values.NewContextValue(p.content, ctx)
+  }
+}
+
 func (p *Array) Name() string {
   var b strings.Builder
 
@@ -65,20 +73,8 @@ func (p *Array) Check(other_ values.Interface, ctx context.Context) error {
     } else {
       return nil
     }
-  } else if other, ok := other_.(values.Prototype); ok {
-    if otherParent, err := other.GetParent(); err != nil {
-      return err
-    } else if otherParent != nil {
-      if p.Check(otherParent, ctx) != nil {
-        return ctx.NewError("Error: expected Array, got " + other_.Name())
-      } else {
-        return nil
-      }
-    } else {
-      return ctx.NewError("Error: expected Array, got " + other_.Name())
-    }
   } else {
-    return ctx.NewError("Error: expected Array, got " + other_.Name())
+    return checkParent(p, other_, ctx)
   }
 }
 
@@ -87,18 +83,17 @@ func (p *Array) GetInstanceMember(key string, includePrivate bool, ctx context.C
   a := values.NewAny(ctx)
   b := NewBoolean(ctx)
   i := NewInt(ctx)
+  f := NewNumber(ctx)
   s := NewString(ctx)
 
-  self := values.NewInstance(p, ctx)
-  var content values.Value = nil
-  if p.content != nil {
-    content = a
-  }
+  content := p.getContent(ctx)
+  self := NewArray(content, ctx)
 
   switch key {
   case ".getindex":
     return values.NewFunction([]values.Value{i, content}, ctx), nil
   case ".setindex":
+    // TODO: use this, instead of basing on .getindex
     return values.NewFunction([]values.Value{i, content, nil}, ctx), nil
   case ".getin":
     return nil, ctx.NewError("Error: can't iterate over Array using 'in' (hint: use regular 'for', or 'for of' if your are only interested in the items)")
@@ -183,11 +178,11 @@ func (p *Array) GetInstanceMember(key string, includePrivate bool, ctx context.C
           panic("expected function")
         }
 
-        if ret != nil {
+        if ret == nil {
           panic("expected return value")
         }
         
-        return ret, nil
+        return NewArray(ret, ctx), nil
       }, ctx), nil
   case "pop", "shift":
     return values.NewFunction([]values.Value{content}, ctx), nil
@@ -216,7 +211,8 @@ func (p *Array) GetInstanceMember(key string, includePrivate bool, ctx context.C
     return values.NewOverloadedMethodLikeFunction(
       [][]values.Value{
         []values.Value{self},
-        []values.Value{values.NewFunction([]values.Value{content, content, b}, ctx), self},
+        []values.Value{values.NewFunction([]values.Value{content, content, i}, ctx), self},
+        []values.Value{values.NewFunction([]values.Value{content, content, f}, ctx), self},
       }, ctx), nil
   case "splice":
     return values.NewOverloadedMethodLikeFunction(
@@ -274,5 +270,5 @@ func (p *Array) GetClassValue() (*values.Class, error) {
       []values.Value{a, a, a, a, a, a, a, a},
       []values.Value{a, a, a, a, a, a, a, a, a},
       []values.Value{a, a, a, a, a, a, a, a, a, a},
-    }, NewArrayPrototype(values.NewAll(ctx)), ctx), nil
+    }, NewArrayPrototype(values.NewAny(ctx)), ctx), nil
 }

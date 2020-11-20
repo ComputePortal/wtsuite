@@ -22,7 +22,7 @@ func (p *BuiltinPrototype) Context() context.Context {
   return context.NewDummyContext()
 }
 
-func (p *BuiltinPrototype) Check(other_ values.Interface, ctx context.Context) error {
+/*func (p *BuiltinPrototype) Check(other_ values.Interface, ctx context.Context) error {
   if other, ok := other_.(*BuiltinPrototype); ok {
     if p == other {
       return nil
@@ -31,20 +31,23 @@ func (p *BuiltinPrototype) Check(other_ values.Interface, ctx context.Context) e
     }
   } else if other, ok := other_.(values.Prototype); ok {
     if otherParent, err := other.GetParent(); err != nil {
+      fmt.Println("1. ", other_.Name(), otherParent.Name())
       return err
     } else if otherParent != nil {
+      fmt.Println("2. ", other_.Name(), otherParent.Name())
       if p.Check(otherParent, ctx) != nil {
         return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
       } else {
         return nil
       }
     } else {
+      fmt.Println("3. ", other_.Name(), otherParent.Name())
       return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
     }
   } else {
     return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
   }
-}
+}*/
 
 func (p *BuiltinPrototype) GetInterfaces() ([]values.Interface, error) {
   return []values.Interface{}, nil

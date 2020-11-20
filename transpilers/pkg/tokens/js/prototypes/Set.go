@@ -32,20 +32,8 @@ func (p *Set) Check(other_ values.Interface, ctx context.Context) error {
     } else {
       return nil
     }
-  } else if other, ok := other_.(values.Prototype); ok {
-    if otherParent, err := other.GetParent(); err != nil {
-      return err
-    } else if otherParent != nil {
-      if p.Check(otherParent, ctx) != nil {
-        return ctx.NewError("Error: expected Set, got " + other_.Name())
-      } else {
-        return nil
-      }
-    } else {
-      return ctx.NewError("Error: expected Set, got " + other_.Name())
-    }
   } else {
-    return ctx.NewError("Error: expected Set, got " + other_.Name())
+    return checkParent(p, other_, ctx)
   }
 }
 
@@ -64,7 +52,7 @@ func (p *Set) GetInstanceMember(key string, includePrivate bool, ctx context.Con
   self := values.NewInstance(p, ctx)
 
   switch key {
-  case ".content":
+  case ".content", ".getof":
     return content, nil
   case "add":
     return values.NewMethodLikeFunction([]values.Value{content, self}, ctx), nil
@@ -85,5 +73,5 @@ func (p *Set) GetClassValue() (*values.Class, error) {
   return values.NewClass(
     [][]values.Value{
       []values.Value{},
-    }, NewSetPrototype(values.NewAll(ctx)), ctx), nil
+    }, NewSetPrototype(values.NewAny(ctx)), ctx), nil
 }

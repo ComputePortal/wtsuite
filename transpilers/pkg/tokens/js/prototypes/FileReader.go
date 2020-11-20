@@ -18,10 +18,20 @@ func NewFileReader(ctx context.Context) values.Value {
   return values.NewInstance(NewFileReaderPrototype(), ctx)
 }
 
+func (p *FileReader) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*FileReader); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *FileReader) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   switch key {
+  case "onload", "onerror":
+    return nil, ctx.NewError("Error: is a setter only")
   case "readAsArrayBuffer":
-    return values.NewFunction([]values.Value{NewBlob(ctx)}, ctx), nil
+    return values.NewFunction([]values.Value{NewBlob(ctx), nil}, ctx), nil
   case "result":
     return NewArrayBuffer(ctx), nil
   default:
@@ -30,8 +40,13 @@ func (p *FileReader) GetInstanceMember(key string, includePrivate bool, ctx cont
 }
 
 func (p *FileReader) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  self := NewFileReader(ctx)
+
   switch key {
-  case "onload", "onerror":
+  case "onload":
+    callback := values.NewFunction([]values.Value{NewEvent(self, ctx), nil}, ctx)
+    return callback.Check(arg, ctx)
+  case "onerror":
     callback := values.NewFunction([]values.Value{NewEvent(nil, ctx), nil}, ctx)
     return callback.Check(arg, ctx)
   default:

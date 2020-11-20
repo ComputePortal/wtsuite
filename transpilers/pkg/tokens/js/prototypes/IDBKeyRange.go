@@ -18,6 +18,14 @@ func NewIDBKeyRange(ctx context.Context) values.Value {
   return values.NewInstance(NewIDBKeyRangePrototype(), ctx)
 }
 
+func (p *IDBKeyRange) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*IDBKeyRange); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *IDBKeyRange) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)

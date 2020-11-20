@@ -10,12 +10,25 @@ type MouseEvent struct {
   AbstractEvent
 }
 
-func NewMouseEventPrototype(target values.Value) values.Prototype {
-  return &MouseEvent{newAbstractEventPrototype("MouseEvent", target)}
+func NewMouseEventPrototype() values.Prototype {
+  ctx := context.NewDummyContext()
+  return &MouseEvent{newAbstractEventPrototype("MouseEvent", NewHTMLElement(ctx))}
 }
 
-func NewMouseEvent(target values.Value, ctx context.Context) values.Value {
-  return values.NewInstance(NewMouseEventPrototype(target), ctx)
+func NewMouseEvent(ctx context.Context) values.Value {
+  return values.NewInstance(NewMouseEventPrototype(), ctx)
+}
+
+func (p *MouseEvent) Name() string {
+  return "MouseEvent"
+}
+
+func (p *MouseEvent) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*MouseEvent); ok {
+    return p.AbstractEvent.checkTarget(other.target, ctx)
+  } else {
+    return checkParent(p, other_, ctx)
+  }
 }
 
 func (p *MouseEvent) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
@@ -34,5 +47,5 @@ func (p *MouseEvent) GetInstanceMember(key string, includePrivate bool, ctx cont
 
 func (p *MouseEvent) GetClassValue() (*values.Class, error) {
   ctx := context.NewDummyContext()
-  return values.NewUnconstructableClass(NewMouseEventPrototype(values.NewAll(ctx)), ctx), nil
+  return values.NewUnconstructableClass(NewMouseEventPrototype(), ctx), nil
 }

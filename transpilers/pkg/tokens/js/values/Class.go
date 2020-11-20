@@ -10,25 +10,25 @@ import (
 type Class struct {
   args [][]Value // various constructor overloads, can be nil in generic case
 
-  fn func(args []Value, ctx_ context.Context) (Prototype, error)
+  fn func(args []Value, ctx_ context.Context) (Interface, error)
 
-  proto Prototype
+  interf Interface
 
 	ValueData
 }
 
-func NewClass(args [][]Value, proto Prototype, ctx context.Context) *Class {
-	return &Class{args, nil, proto, ValueData{ctx}}
+func NewClass(args [][]Value, interf Interface, ctx context.Context) *Class {
+	return &Class{args, nil, interf, ValueData{ctx}}
 }
 
-func NewCustomClass(args [][]Value, fn func(args []Value, ctx_ context.Context) (Prototype, error), ctx context.Context) *Class {
+func NewCustomClass(args [][]Value, fn func(args []Value, ctx_ context.Context) (Interface, error), ctx context.Context) *Class {
   return &Class{args, fn, nil, ValueData{ctx}}
 }
 
-func NewUnconstructableClass(proto Prototype, ctx context.Context) *Class {
-  return &Class{[][]Value{[]Value{}}, func(args []Value, ctx_ context.Context) (Prototype, error) {
+func NewUnconstructableClass(interf Interface, ctx context.Context) *Class {
+  return &Class{[][]Value{[]Value{}}, func(args []Value, ctx_ context.Context) (Interface, error) {
     if args == nil {
-      return proto, nil
+      return interf, nil
     } else {
       return nil, ctx_.NewError("Error: doesn't have a constructor")
     }
@@ -39,20 +39,32 @@ func (v *Class) GetConstructorArgs() [][]Value {
   return v.args
 }
 
-func (v *Class) getPrototype() Prototype {
-  if v.proto == nil {
+func (v *Class) getInterface() Interface {
+  if v.interf == nil {
     if v.fn != nil {
-      proto, err := v.fn(nil, context.NewDummyContext())
+      interf, err := v.fn(nil, context.NewDummyContext())
       if err != nil {
         panic(err)
       }
 
-      return proto
+      return interf
     } else {
       return nil
     }
   } else {
-    return v.proto
+    return v.interf
+  }
+}
+
+func (v *Class) getPrototype() Prototype {
+  interf := v.getInterface()
+
+  if interf == nil {
+    return nil
+  } else if proto, ok := interf.(Prototype); ok {
+    return proto
+  } else {
+    return nil
   }
 }
 
@@ -75,8 +87,8 @@ func (v *Class) TypeName() string {
       b.WriteString(",")
     }
 
-    proto := v.getPrototype()
-    b.WriteString(proto.Name())
+    interf := v.getInterface()
+    b.WriteString(interf.Name())
 
     b.WriteString(">")
   }
@@ -88,21 +100,21 @@ func (v *Class) TypeName() string {
 func (v *Class) Check(other_ Value, ctx context.Context) error {
   other_ = UnpackContextValue(other_)
 
-  if IsAll(other_) {
+  if IsAny(other_) {
     return nil
   } else if other, ok := other_.(*Class); ok {
     if err := checkAllOverloads(v.args, other.args, ctx); err != nil {
       return err
     }
 
-    proto := v.getPrototype()
-    otherProto := other.getPrototype()
-    if proto == nil {
+    interf := v.getInterface()
+    otherInterf := other.getInterface()
+    if interf == nil {
       return nil
-    } else if otherProto == nil {
-      return ctx.NewError("Error: unspecified prototype")
+    } else if otherInterf == nil {
+      return ctx.NewError("Error: unspecified interface")
     } else {
-      return proto.Check(otherProto, ctx)
+      return interf.Check(otherInterf, ctx)
     }
   } else {
     return ctx.NewError("Error: not a class")
@@ -110,25 +122,36 @@ func (v *Class) Check(other_ Value, ctx context.Context) error {
 }
 
 func (v *Class) EvalConstructor(args []Value, ctx context.Context) (Value, error) {
-  if _, err := checkAnyOverload(v.args, args, ctx); err != nil {
-    return nil, err
+  if args != nil {
+    if _, err := checkAnyOverload(v.args, args, ctx); err != nil {
+
+      for _, overload := range v.args {
+        n := len(overload)
+
+        if errSub := checkOverload(overload[0:n-1], args, ctx); err != nil {
+          context.AppendError(err, errSub)
+        }
+      }
+
+      return nil, err
+    }
   }
 
-  var proto Prototype
-  if v.fn != nil {
+  var interf Interface
+  if v.fn != nil && args != nil {
     var err error
-    proto, err = v.fn(args, ctx)
+    interf, err = v.fn(args, ctx)
     if err != nil {
       return nil, err
     }
-  } else if v.proto != nil {
-    proto = v.proto
+  } else if v.interf != nil {
+    interf = v.interf
   }
 
-  if proto == nil {
+  if interf == nil {
     return NewAny(ctx), nil
   } else {
-    return NewInstance(proto, ctx), nil
+    return NewInstance(interf, ctx), nil
   }
 }
 
@@ -140,10 +163,18 @@ func (v *Class) GetMember(key string, includePrivate bool,
   ctx context.Context) (Value, error) {
   proto := v.getPrototype()
 
-  if proto == nil {
+  if proto == nil && v.interf == nil {
     return NewAny(ctx), nil
+  } else if proto != nil {
+    if res, err := proto.GetClassMember(key, includePrivate, ctx); err != nil {
+      return nil, err
+    } else if res != nil {
+      return res, nil
+    } else {
+      return nil, ctx.NewError("Error: " + proto.Name() + "." + key + " not found")
+    }
   } else {
-    return proto.GetClassMember(key, includePrivate, ctx)
+    return nil, ctx.NewError("Error: static " + v.interf.Name() + "." + key + " not available because it is an interface")
   }
 }
 

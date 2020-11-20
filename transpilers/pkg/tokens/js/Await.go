@@ -82,10 +82,15 @@ func (t *Await) evalInternal() (values.Value, error) {
 	// expecting a Promise
 	if !prototypes.IsPromise(promise) {
 		errCtx := t.Context()
-		return nil, errCtx.NewError("Error: expected a Promise, got a " + promise.TypeName())
+		return nil, errCtx.NewError("Error: expected Promise, got " + promise.TypeName())
 	}
 
-	return promise.GetMember(".resolve", false, t.Context())
+  fnRes, err := promise.GetMember(".resolve", false, t.Context())
+  if err != nil {
+    return nil, err
+  }
+
+  return fnRes.EvalFunction([]values.Value{}, false, t.Context())
 }
 
 func (t *Await) EvalExpression() (values.Value, error) {

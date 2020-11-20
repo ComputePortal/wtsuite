@@ -18,6 +18,14 @@ func NewURLSearchParams(ctx context.Context) values.Value {
   return values.NewInstance(NewURLSearchParamsPrototype(), ctx)
 }
 
+func (p *URLSearchParams) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*URLSearchParams); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *URLSearchParams) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   s := NewString(ctx)

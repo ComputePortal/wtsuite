@@ -14,6 +14,10 @@ type URLCurrent struct {
 }
 
 func NewURLCurrent(args []js.Expression, ctx context.Context) (js.Expression, error) {
+	if len(args) != 0 {
+		return nil, ctx.NewError("Error: expected 0 arguments")
+	}
+
 	return &URLCurrent{newMacro(args, ctx)}, nil
 }
 
@@ -28,13 +32,8 @@ func (m *URLCurrent) WriteExpression() string {
 func (m *URLCurrent) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-	args, err := m.evalArgs()
-	if err != nil {
+	if _, err := m.evalArgs(); err != nil {
 		return nil, err
-	}
-
-	if len(args) != 0 {
-		return nil, ctx.NewError("Error: expected 0 arguments")
 	}
 
 	return prototypes.NewURL(ctx), nil

@@ -20,7 +20,6 @@ import (
 
 type ViewVariable interface {
 	js.Variable
-	Value() values.Value
 	Write() string
 }
 
@@ -216,19 +215,7 @@ func (s *ViewFileScript) ResolveNames(scope js.GlobalScope) error {
 	return nil
 }
 
-func (s *ViewFileScript) EvalTypes(globals values.Stack) error {
-	// add the imported vars to the stack
-	if s.module.isDummy() {
-		// simply don't add, in order to get ref errors for non-browser targets
-		return nil
-	}
-
-	for _, v := range s.module.imported {
-		if err := globals.SetValue(v, v.Value(), false, s.module.Context()); err != nil {
-			panic(err)
-		}
-	}
-
+func (s *ViewFileScript) EvalTypes() error {
 	return nil
 }
 
@@ -291,12 +278,16 @@ func (v *ViewVariableData) GetObject() interface{} {
 func (v *ViewVariableData) SetObject(interface{}) {
 }
 
+func (v *ViewVariableData) SetValue(_ values.Value) {
+  panic("cant be set")
+}
+
 func (v *ViewNull) Dump(indent string) string {
 	return indent + "ViewNull"
 }
 
-func (v *ViewNull) Value() values.Value {
-	return values.NewAllNull(v.Context())
+func (v *ViewNull) GetValue() values.Value {
+	return values.NewAll(v.Context())
 }
 
 func (v *ViewNull) Write() string {
@@ -307,7 +298,7 @@ func (v *ViewString) Dump(indent string) string {
 	return indent + "ViewString(" + v.value + ")"
 }
 
-func (v *ViewString) Value() values.Value {
+func (v *ViewString) GetValue() values.Value {
 	return prototypes.NewLiteralString(v.value, v.Context())
 }
 
@@ -319,7 +310,7 @@ func (v *ViewInt) Dump(indent string) string {
 	return "ViewInt(" + strconv.Itoa(v.value) + ")"
 }
 
-func (v *ViewInt) Value() values.Value {
+func (v *ViewInt) GetValue() values.Value {
 	return prototypes.NewLiteralInt(v.value, v.Context())
 }
 
@@ -335,7 +326,7 @@ func (v *ViewBool) Dump(indent string) string {
 	}
 }
 
-func (v *ViewBool) Value() values.Value {
+func (v *ViewBool) GetValue() values.Value {
 	return prototypes.NewLiteralBoolean(v.value, v.Context())
 }
 
@@ -351,8 +342,8 @@ func (v *ViewNumber) Dump(indent string) string {
 	return fmt.Sprintf("ViewNumber(%g)", v.value)
 }
 
-func (v *ViewNumber) Value() values.Value {
-	return prototypes.NewLiteralNumber(v.value, v.Context())
+func (v *ViewNumber) GetValue() values.Value {
+	return prototypes.NewNumber(v.Context())
 }
 
 func (v *ViewNumber) Write() string {
@@ -363,15 +354,10 @@ func (v *ViewColor) Dump(indent string) string {
 	return fmt.Sprintf("ViewColor(%g,%g,%g,%g)", v.r, v.g, v.b, v.a)
 }
 
-func (v *ViewColor) Value() values.Value {
+func (v *ViewColor) GetValue() values.Value {
 	ctx := v.Context()
 
-	return prototypes.NewLiteralArray([]values.Value{
-		prototypes.NewLiteralNumber(v.r, ctx),
-		prototypes.NewLiteralNumber(v.g, ctx),
-		prototypes.NewLiteralNumber(v.b, ctx),
-		prototypes.NewLiteralNumber(v.a, ctx),
-	}, ctx)
+	return prototypes.NewArray(prototypes.NewNumber(ctx), ctx)
 }
 
 func (v *ViewColor) Write() string {
@@ -390,14 +376,14 @@ func (v *ViewArray) Dump(indent string) string {
 	return b.String()
 }
 
-func (v *ViewArray) Value() values.Value {
+func (v *ViewArray) GetValue() values.Value {
 	items := make([]values.Value, len(v.values))
 
 	for i, item := range v.values {
-		items[i] = item.Value()
+		items[i] = item.GetValue()
 	}
 
-	return prototypes.NewLiteralArray(items, v.Context())
+	return prototypes.NewArray(values.CommonValue(items, v.Context()), v.Context())
 }
 
 func (v *ViewArray) Write() string {
@@ -433,11 +419,11 @@ func (v *ViewObject) Dump(indent string) string {
 	return b.String()
 }
 
-func (v *ViewObject) Value() values.Value {
+func (v *ViewObject) GetValue() values.Value {
 	items := make(map[string]values.Value)
 
 	for k, item := range v.values {
-		items[k] = item.Value()
+		items[k] = item.GetValue()
 	}
 
 	return prototypes.NewObject(items, v.Context())

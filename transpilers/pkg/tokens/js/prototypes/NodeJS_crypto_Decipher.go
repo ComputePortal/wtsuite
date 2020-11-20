@@ -22,6 +22,14 @@ func (p *NodeJS_crypto_Decipher) GetParent() (values.Prototype, error) {
   return NewNodeJS_EventEmitterPrototype(), nil
 }
 
+func (p *NodeJS_crypto_Decipher) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_crypto_Decipher); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *NodeJS_crypto_Decipher) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   s := NewString(ctx)
 

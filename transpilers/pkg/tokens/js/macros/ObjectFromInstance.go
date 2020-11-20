@@ -16,6 +16,10 @@ type ObjectFromInstance struct {
 }
 
 func NewObjectFromInstance(args []js.Expression, ctx context.Context) (js.Expression, error) {
+	if len(args) != 1 {
+		return nil, ctx.NewError("Error: expected 1 argument")
+	}
+
 	return &ObjectFromInstance{newMacro(args, ctx)}, nil
 }
 
@@ -35,7 +39,9 @@ func (m *ObjectFromInstance) WriteExpression() string {
 }
 
 func isAnObject(v values.Value) bool {
-	if values.IsInstance(v) {
+  if values.IsAny(v) {
+    return true
+  } else if values.IsInstance(v) {
     if prototypes.IsNumber(v) || 
       prototypes.IsString(v) ||
       prototypes.IsArray(v) ||
@@ -57,10 +63,6 @@ func (m *ObjectFromInstance) EvalExpression() (values.Value, error) {
 	args, err := m.evalArgs()
 	if err != nil {
 		return nil, err
-	}
-
-	if len(args) != 1 {
-		return nil, ctx.NewError("Error: expected 1 argument")
 	}
 
 	if !isAnObject(args[0]) {

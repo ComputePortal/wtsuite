@@ -65,7 +65,9 @@ func (t *VariableData) SetConstant() {
 
 func (t *VariableData) GetValue() values.Value {
   if t.value == nil {
-    panic("value unset")
+    hereCtx := t.Context()
+    here := hereCtx.NewError("here: " + t.Name())
+    panic(here.Error())
   }
 
   return t.value

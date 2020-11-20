@@ -17,16 +17,16 @@ func NewLiteralBooleanInstance(interf Interface, b bool, ctx context.Context) Va
 func (v *LiteralBooleanInstance) Check(other_ Value, ctx context.Context) error {
   other_ = UnpackContextValue(other_)
 
-  if IsAll(other_) {
+  if IsAny(other_) {
     return nil
   } else if other, ok := other_.(*LiteralBooleanInstance); ok {
     if v.value == other.value {
       return nil
     } else {
-      return ctx.NewError("Error: expected other literal bool")
+      return ctx.NewError("Error: have other literal bool")
     }
   } else {
-    return ctx.NewError("Error: not a literal bool instance")
+    return ctx.NewError("Error: have " + other_.TypeName() + ", want " + v.TypeName())
   }
 }
 

@@ -18,15 +18,23 @@ func NewHTMLCollection(ctx context.Context) values.Value {
   return values.NewInstance(NewHTMLCollectionPrototype(), ctx)
 }
 
+func (p *HTMLCollection) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*HTMLCollection); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *HTMLCollection) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   i := NewInt(ctx)
   s := NewString(ctx)
   elem := NewHTMLElement(ctx)
 
   switch key {
-  case ".getitem", "item":
+  case ".getindex", "item":
     return values.NewFunction([]values.Value{i, elem}, ctx), nil
-  case ".setitem":
+  case ".setindex":
     return values.NewFunction([]values.Value{i, elem, nil}, ctx), nil
   case "length":
     return i, nil

@@ -12,6 +12,10 @@ type Super struct {
 }
 
 func NewSuper(cl *Class, ctx context.Context) (Value, error) {
+  if cl == nil {
+    return nil, ctx.NewError("Error: super not found")
+  }
+
   val, err := cl.EvalConstructor(nil, ctx)
   if err != nil {
     return nil, err

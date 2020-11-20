@@ -18,10 +18,20 @@ func NewWorker(ctx context.Context) values.Value {
   return values.NewInstance(NewWorkerPrototype(), ctx)
 }
 
+func (p *Worker) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Worker); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Worker) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   a := values.NewAny(ctx)
 
   switch key {
+  case "onmessage", "onmessageerror":
+    return nil, ctx.NewError("Error: only a setter")
   case "postMessage":
     return values.NewFunction([]values.Value{a, nil}, ctx), nil
   default:

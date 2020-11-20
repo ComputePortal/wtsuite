@@ -43,8 +43,17 @@ func (t *VarExpression) GetVariable() Variable {
 	return t.variable
 }
 
+func (t *VarExpression) ToTypeExpression() (*TypeExpression, error) {
+  return NewTypeExpression(t.Name(), nil, nil, t.Context())
+}
+
 func (t *VarExpression) GetInterface() values.Interface {
   obj_ := t.GetVariable().GetObject()
+  if obj_ == nil {
+    // eg. for random expression
+    return nil
+  }
+
   obj, ok := obj_.(values.Interface)
   if ok {
     return obj
@@ -192,7 +201,7 @@ func (t *VarExpression) Walk(fn WalkFunc) error {
 // the following function is used where variables are declared (VarStatement, NodeJSModule require)
 func (t *VarExpression) uniqueDeclarationName(ns Namespace, varType VarType) error {
   switch varType {
-  case CONST, LET:
+  case CONST, LET, AUTOLET:
     ns.LetName(t.variable)
   case VAR:
     ns.VarName(t.variable)

@@ -19,7 +19,7 @@ type ClassMember interface {
 
   GetValue(ctx context.Context) (values.Value, error)
   SetValue(v values.Value, ctx context.Context) error
-  EvalExpression() (values.Value, error)
+  Eval() error
 
   ResolveActivity(usage Usage) error
   UniversalNames(ns Namespace) error

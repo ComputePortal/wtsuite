@@ -94,20 +94,8 @@ func (p *Map) Check(other_ values.Interface, ctx context.Context) error {
         return nil
       }
     }
-  } else if other, ok := other_.(values.Prototype); ok {
-    if otherParent, err := other.GetParent(); err != nil {
-      return err
-    } else if otherParent != nil {
-      if p.Check(otherParent, ctx) != nil {
-        return ctx.NewError("Error: expected Map, got " + other_.Name())
-      } else {
-        return nil
-      }
-    } else {
-      return ctx.NewError("Error: expected Map, got " + other_.Name())
-    }
   } else {
-    return ctx.NewError("Error: expected Map, got " + other_.Name())
+    return checkParent(p, other_, ctx)
   }
 }
 
@@ -118,6 +106,8 @@ func (p *Map) GetInstanceMember(key string, includePrivate bool, ctx context.Con
   item := p.getItemValue(ctx)
 
   switch key {
+  case ".getof":
+    return NewTuple([]values.Value{k, item}, ctx), nil
   case "clear":
     return values.NewFunction([]values.Value{nil}, ctx), nil
   case "delete":
@@ -141,5 +131,5 @@ func (p *Map) GetClassValue() (*values.Class, error) {
   return values.NewClass(
     [][]values.Value{
       []values.Value{},
-    }, NewMapPrototype(values.NewAll(ctx), values.NewAll(ctx)), ctx), nil
+    }, NewMapPrototype(values.NewAny(ctx), values.NewAny(ctx)), ctx), nil
 }

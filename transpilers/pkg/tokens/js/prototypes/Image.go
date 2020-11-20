@@ -18,6 +18,14 @@ func NewImage(ctx context.Context) values.Value {
   return values.NewInstance(NewImagePrototype(), ctx)
 }
 
+func (p *Image) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Image); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Image) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
   f := NewNumber(ctx)

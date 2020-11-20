@@ -12,9 +12,7 @@ import (
 	"../../pkg/directives"
 	"../../pkg/files"
 	"../../pkg/parsers"
-	"../../pkg/tokens/context"
 	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/prototypes"
 	"../../pkg/tokens/js/values"
 	"../../pkg/tokens/html"
 	"../../pkg/tree/scripts"
@@ -202,14 +200,12 @@ func setUpEnv(cmdArgs CmdArgs) {
 	js.TARGET = "all"
 	directives.ForceNewViewFileScriptRegistration()
   directives.IGNORE_UNSET_URLS = true
-  js.ALLOW_DUMMY_VIEW_INTERFACE = true
 
   html.PX_PER_REM = 16
 	cache.VERBOSITY = cmdArgs.verbosity
 	files.VERBOSITY = cmdArgs.verbosity
 	parsers.VERBOSITY = cmdArgs.verbosity
 	js.VERBOSITY = cmdArgs.verbosity
-	prototypes.VERBOSITY = cmdArgs.verbosity
 	values.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
@@ -281,10 +277,8 @@ func createClassGraph(bundle *scripts.FileBundle, entryFile string,
 
 func createInstanceGraph(bundle *scripts.FileBundle, entryFile string, 
   analyzedFiles map[string]string, outputFile string) error {
-  globalStack := js.NewFilledGlobalStack(js.NewCacheStack())
-
   // needed so nodejs imports are set right
-  if err := bundle.EvalTypes(globalStack); err != nil {
+  if err := bundle.EvalTypes(); err != nil {
     return err
   }
 
@@ -295,8 +289,6 @@ func createInstanceGraph(bundle *scripts.FileBundle, entryFile string,
     graph = NewGraph(analyzedFiles)
   }
 
-  fmt.Println("HERE: ", entryFile, analyzedFiles)
-
   if err := bundle.Walk(func(scriptPath string, obj_ interface{}) error {
     if scriptPath != entryFile {
       // skip
@@ -306,11 +298,14 @@ func createInstanceGraph(bundle *scripts.FileBundle, entryFile string,
     switch obj := obj_.(type) {
     case *js.Class:
       // try to instaniate the class (only instantiable classes are added)
-      instance_, err := obj.GenerateInstance(globalStack, nil, nil, context.NewDummyContext())
+      classVal, err := obj.GetClassValue()
       if err == nil {
-        if instance, ok := instance_.(*values.Instance); ok {
-          if err := graph.AddInstance(instance); err != nil { // the used name will be 
-            return err
+        instance_, err := classVal.EvalConstructor(nil, obj.Context())
+        if err == nil {
+          if instance, ok := instance_.(*values.Instance); ok {
+            if err := graph.AddInstance(instance); err != nil { // the used name will be 
+              return err
+            }
           }
         }
       }

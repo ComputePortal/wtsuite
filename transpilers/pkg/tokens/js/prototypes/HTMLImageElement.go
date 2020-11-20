@@ -22,10 +22,20 @@ func (p *HTMLImageElement) GetParent() (values.Prototype, error) {
   return NewHTMLElementPrototype(), nil
 }
 
+func (p *HTMLImageElement) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*HTMLImageElement); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *HTMLImageElement) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   i := NewInt(ctx)
 
   switch key {
+  case "onload", "src":
+    return nil, ctx.NewError("Error: is only a setter")
   case "height", "width":
     return i, nil
   default:
@@ -34,10 +44,13 @@ func (p *HTMLImageElement) GetInstanceMember(key string, includePrivate bool, ct
 }
 
 func (p *HTMLImageElement) SetInstanceMember(key string, includePrivate bool, arg values.Value, ctx context.Context) error {
+  i := NewInt(ctx)
   s := NewString(ctx)
   self := values.NewInstance(p, ctx)
 
   switch key {
+  case "height", "width":
+    return i.Check(arg, ctx)
   case "onload":
     callback := values.NewFunction([]values.Value{NewEvent(self, ctx), nil}, ctx)
 

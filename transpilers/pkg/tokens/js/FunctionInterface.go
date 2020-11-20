@@ -63,7 +63,7 @@ func (fi *FunctionInterface) SetReturnType(ret *TypeExpression) {
 // can be called after resolve names phase
 // returns nil if void
 // used by return to check type, is used before async (so not a promise)
-func (fi *FunctionInterface) GetReturnValue() (values.Value, error) {
+func (fi *FunctionInterface) getReturnValue() (values.Value, error) {
   if fi.ret == nil {
     return nil, nil
   } else {
@@ -74,6 +74,28 @@ func (fi *FunctionInterface) GetReturnValue() (values.Value, error) {
 
     return val, nil
   }
+}
+
+// post async
+func (fi *FunctionInterface) GetReturnValue() (values.Value, error) {
+  ret, err := fi.getReturnValue()
+  if err != nil {
+    return nil, err
+  }
+
+  if prototypes.IsAsync(fi) {
+    if ret == nil {
+      return prototypes.NewVoidPromise(fi.Context()), nil
+    } else {
+      return prototypes.NewPromise(ret, fi.ret.Context()), nil
+    }
+  } else {
+    return ret, nil
+  }
+}
+
+func (fi *FunctionInterface) IsVoid() bool {
+  return fi.ret == nil
 }
 
 func (fi *FunctionInterface) Dump() string {
@@ -215,17 +237,9 @@ func (fi *FunctionInterface) GetFunctionValue() (*values.Function, error) {
   // each argument with a default creates an overload
   argsAndRet := make([][]values.Value, nOverloads)
 
-  retValue, err := fi.ret.EvalExpression()
+  retValue, err := fi.GetReturnValue()
   if err != nil {
     return nil, err
-  }
-
-  if prototypes.IsAsync(fi) {
-    if retValue == nil {
-      retValue = prototypes.NewVoidPromise(fi.ret.Context())
-    } else {
-      retValue = prototypes.NewPromise(retValue, fi.ret.Context())
-    }
   }
 
   for i := 0; i < nOverloads; i++ {

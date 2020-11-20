@@ -52,31 +52,23 @@ func (p *AbstractEvent) GetParent() (values.Prototype, error) {
   return NewEventPrototype(p.target), nil
 }
 
-func (p *AbstractEvent) Check(other_ values.Interface, ctx context.Context) error {
-  if other, ok := other_.(*AbstractEvent); ok {
-    if p.target == nil {
-      return nil
-    } else if other.target == nil{
-      return ctx.NewError("Error: expected " + p.Name() + ", got " + other.Name())
-    } else if p.target.Check(other.target, ctx) != nil {
-      return ctx.NewError("Error: expected " + p.Name() + ", got " + other.Name())
-    } else {
-      return nil
-    }
-  } else if other, ok := other_.(values.Prototype); ok {
-    if otherParent, err := other.GetParent(); err != nil {
-      return err
-    } else if otherParent != nil {
-      if p.Check(otherParent, ctx) != nil {
-        return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
-      } else {
-        return nil
-      }
-    } else {
-      return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
-    }
+func (p *Event) Check(other_ values.Interface, ctx context.Context) error {
+  if other, ok := other_.(*Event); ok {
+    return p.AbstractEvent.checkTarget(other.target, ctx)
   } else {
-    return ctx.NewError("Error: expected " + p.Name() + ", got " + other_.Name())
+    return checkParent(p, other_, ctx)
+  }
+}
+
+func (p *AbstractEvent) checkTarget(otherTarget values.Value, ctx context.Context) error {
+  if p.target == nil {
+    return nil
+  } else if otherTarget == nil && !values.IsAny(p.target) {
+    return ctx.NewError("Error: expected " + p.Name() + ", got Event<any>")
+  } else if p.target.Check(otherTarget, ctx) != nil {
+    return ctx.NewError("Error: expected " + p.Name() + ", got Event<" + otherTarget.TypeName() + ">")
+  } else {
+    return nil
   }
 }
 

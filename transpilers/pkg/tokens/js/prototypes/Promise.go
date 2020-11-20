@@ -71,32 +71,16 @@ func (p *Promise) Check(other_ values.Interface, ctx context.Context) error {
     } else {
       return nil
     }
-  } else if other, ok := other_.(values.Prototype); ok {
-    if otherParent, err := other.GetParent(); err != nil {
-      return err
-    } else if otherParent != nil {
-      if p.Check(otherParent, ctx) != nil {
-        return ctx.NewError("Error: expected Promise, got " + other_.Name())
-      } else {
-        return nil
-      }
-    } else {
-      return ctx.NewError("Error: expected Promise, got " + other_.Name())
-    }
   } else {
-    return ctx.NewError("Error: expected Promise, got " + other_.Name())
+    return checkParent(p, other_, ctx)
   }
 }
 
-func (p *Promise) getContentValue() values.Value {
+func (p *Promise) getContent(ctx context.Context) values.Value {
   if p.content == nil {
-    if p.isVoid {
-      return nil
-    } else {
-      return values.NewAny(p.Context())
-    }
+    return values.NewAny(p.Context())
   } else {
-    return p.content
+    return values.NewContextValue(p.content, ctx)
   }
 }
 
@@ -104,7 +88,7 @@ func (p *Promise) GetInstanceMember(key string, includePrivate bool, ctx context
   a := values.NewAny(ctx)
   e := NewError(ctx)
   self := values.NewInstance(p, ctx)
-  c := values.NewContextValue(p.getContentValue(), ctx)
+  content := p.getContent(ctx)
 
   switch key {
   case "catch":
@@ -148,12 +132,16 @@ func (p *Promise) GetInstanceMember(key string, includePrivate bool, ctx context
     } else {
       return values.NewOverloadedMethodLikeFunction(
         [][]values.Value{
-          []values.Value{values.NewFunction([]values.Value{c, nil}, ctx), self},
-          []values.Value{values.NewFunction([]values.Value{c, self}, ctx), self},
+          []values.Value{values.NewFunction([]values.Value{content, nil}, ctx), self},
+          []values.Value{values.NewFunction([]values.Value{content, self}, ctx), self},
         }, ctx), nil
     }
   case ".resolve":
-    return c, nil
+    if p.isVoid {
+      return values.NewFunction([]values.Value{nil}, ctx), nil
+    } else {
+      return values.NewFunction([]values.Value{content}, ctx), nil
+    }
   default:
     return nil, nil
   }
@@ -170,7 +158,12 @@ func (p *Promise) GetClassMember(key string, includePrivate bool, ctx context.Co
         return nil, err
       }
 
-      res, err := prom.GetMember(".resolve", false, ctx)
+      resFn, err := prom.GetMember(".resolve", false, ctx)
+      if err != nil {
+        return nil, err
+      }
+
+      res, err := resFn.EvalFunction([]values.Value{}, false, ctx)
       if err != nil {
         return nil, err
       }
@@ -188,19 +181,34 @@ func (p *Promise) GetClassValue() (*values.Class, error) {
   e := NewError(ctx)
 
   return values.NewCustomClass(
-    [][]values.Value{[]values.Value{
-      values.NewFunction([]values.Value{a, nil}, ctx),
-      values.NewFunction([]values.Value{e, nil}, ctx),
-    }}, func(args []values.Value, ctx_ context.Context) (values.Prototype, error) {
+    [][]values.Value{
+      []values.Value{values.NewFunction([]values.Value{
+        values.NewFunction([]values.Value{a, nil}, ctx),
+        values.NewFunction([]values.Value{e, nil}, ctx),
+      nil}, ctx)},
+      []values.Value{values.NewFunction([]values.Value{
+        values.NewFunction([]values.Value{nil}, ctx),
+        values.NewFunction([]values.Value{e, nil}, ctx),
+      nil}, ctx)},
+    }, func(args []values.Value, ctx_ context.Context) (values.Interface, error) {
       if args == nil {
-        return NewPromisePrototype(a), nil
+        return NewPromisePrototype(values.NewAny(ctx)), nil
       } else {
-        val, err := args[0].GetMember(".arg1", false, ctx)
+        val, err := args[0].GetMember(".arg0", false, ctx)
         if err != nil {
           panic(err)
         }
 
-        return NewPromisePrototype(val), nil
+        val, err = val.GetMember(".arg0", false, ctx)
+        if err == nil {
+          if val == nil {
+            return NewVoidPromisePrototype(), nil
+          } else {
+            return NewPromisePrototype(val), nil
+          }
+        } 
+
+        return NewPromisePrototype(values.NewAny(ctx)), nil
       }
     }, ctx), nil
 }

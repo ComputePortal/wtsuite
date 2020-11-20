@@ -22,6 +22,14 @@ func (p *Document) GetParent() (values.Prototype, error) {
   return NewEventTargetPrototype(), nil
 }
 
+func (p *Document) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Document); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Document) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   s := NewString(ctx)

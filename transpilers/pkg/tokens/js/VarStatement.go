@@ -159,7 +159,7 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
     variable.SetValue(val)
 
 		switch t.varType {
-		case LET, CONST:
+		case LET, CONST, AUTOLET:
 			if err := t.assertUnique(scope, name); err != nil {
 				return err
 			}
@@ -184,6 +184,10 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
     value := values.NewAny(expr_.Context())
 
     if typeExpr != nil {
+      if t.varType == AUTOLET {
+        panic("AUTOLET can't have typeExpr")
+      }
+
       if err := typeExpr.ResolveExpressionNames(scope); err != nil {
         return err
       }
@@ -193,6 +197,8 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
       } else {
         value = typeVal
       }
+    } else if t.varType == AUTOLET {
+      value = nil
     }
 
 		switch expr := expr_.(type) {
@@ -202,14 +208,18 @@ func (t *VarStatement) ResolveStatementNames(scope Scope) error {
 				return err
 			}
 
-			if err := setVar(lhs.Name(), lhs.GetVariable(), value); err != nil {
-				return err
-			}
+      if err := expr.rhs.ResolveExpressionNames(scope); err != nil {
+        return err
+      }
 
-			if err := expr.rhs.ResolveExpressionNames(scope); err != nil {
-				return err
-			}
+      if err := setVar(lhs.Name(), lhs.GetVariable(), value); err != nil {
+        return err
+      }
 		case *VarExpression:
+      if t.varType == AUTOLET {
+        panic("AUTOLET must be combined with Assign")
+      }
+
 			if err := setVar(expr.Name(), expr.GetVariable(), value); err != nil {
 				return err
 			}
@@ -236,10 +246,15 @@ func (t *VarStatement) EvalStatement() error {
 			}
 
 			variable := nameExpr.GetVariable()
-      lhsValue := variable.GetValue()
 
-      if err := lhsValue.Check(rhsValue, rhsValue.Context()); err != nil {
-        return err
+      if t.varType == AUTOLET {
+        rhsValue = values.RemoveLiteralness(rhsValue)
+        variable.SetValue(rhsValue)
+      }  else {
+        lhsValue := variable.GetValue()
+        if err := lhsValue.Check(rhsValue, rhsValue.Context()); err != nil {
+          return err
+        }
       }
 		case *VarExpression:
       // no types to check

@@ -45,6 +45,11 @@ func NewTemplateGroup(ctx context.Context) *Group {
 	return &Group{TEMPLATE, TMPCONTENT, []Token{}, [][]Token{}, TokenData{ctx}}
 }
 
+// eg. empty function body for abstract functions
+func NewEmptyBracesGroup(ctx context.Context) *Group {
+  return &Group{BRACES, SEMICOLON, []Token{}, [][]Token{}, TokenData{ctx}}
+}
+
 func NewGroupFromTokens(raw []Token) (*Group, error) {
 	n := len(raw)
 

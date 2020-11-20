@@ -13,11 +13,19 @@ import (
 
 type BlobToInstance struct {
 	ToInstance
-	Macro
 }
 
 func NewBlobToInstance(args []js.Expression, ctx context.Context) (js.Expression, error) {
-	return &BlobToInstance{newToInstance(), newMacro(args, ctx)}, nil
+	if len(args) != 2 {
+		return nil, ctx.NewError("Error: expected 2 arguments")
+	}
+
+  interfExpr, err := getTypeExpression(args[1])
+  if err != nil {
+    return nil, err
+  }
+
+  return &BlobToInstance{newToInstance(args[0:1], interfExpr, ctx)}, nil
 }
 
 func (m *BlobToInstance) Dump(indent string) string {
@@ -36,14 +44,8 @@ func (m *BlobToInstance) WriteExpression() string {
 }
 
 func (m *BlobToInstance) EvalExpression() (values.Value, error) {
-	args, err := m.evalArgs()
+  args, err := m.evalArgs()
 	if err != nil {
-		return nil, err
-	}
-
-	if len(args) != 2 {
-		errCtx := m.Context()
-		err := errCtx.NewError("Error: expected 2 arguments")
 		return nil, err
 	}
 
@@ -52,10 +54,7 @@ func (m *BlobToInstance) EvalExpression() (values.Value, error) {
 		return nil, errCtx.NewError("Error: expected Blob, got " + args[0].TypeName())
 	}
 
-	res, err := args[1].EvalConstructor(nil, m.Context())
-	if err != nil {
-		return nil, err
-	}
+  res := values.NewInstance(m.interf, m.Context())
 
 	return prototypes.NewPromise(res, m.Context()), nil
 }

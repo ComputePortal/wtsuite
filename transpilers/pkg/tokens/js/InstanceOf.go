@@ -16,11 +16,23 @@ type InstanceOf struct {
 	interf       values.Interface // starts as nil
 }
 
-func NewInstanceOf(a Expression, b Expression, ctx context.Context) *InstanceOf {
-	return &InstanceOf{
-		BinaryOp{"instanceof", a, b, TokenData{ctx}},
-		nil,
-	}
+func NewInstanceOf(a Expression, b Expression, ctx context.Context) (*InstanceOf, error) {
+  bTypeExpr, err := GetTypeExpression(b)
+  if err != nil {
+    return nil, err
+  }
+
+  if bTypeExpr != nil {
+    return &InstanceOf{
+      BinaryOp{"instanceof", a, bTypeExpr, TokenData{ctx}},
+      nil,
+    }, nil
+  } else {
+    return &InstanceOf{
+      BinaryOp{"instanceof", a, b, TokenData{ctx}},
+      nil,
+    }, nil
+  }
 }
 
 func (t *InstanceOf) WriteExpression() string {
@@ -118,9 +130,14 @@ func (t *InstanceOf) ResolveExpressionNames(scope Scope) error {
 		return err
 	}
 
-	if b, ok := t.b.(*VarExpression); ok {
-    t.interf = b.GetInterface()
-	}
+	if b, ok := t.b.(*TypeExpression); ok {
+    bVal, err := b.EvalExpression()
+    if err != nil {
+      return err
+    }
+
+    t.interf = values.GetInterface(bVal)
+	} 
 
 	return nil
 }

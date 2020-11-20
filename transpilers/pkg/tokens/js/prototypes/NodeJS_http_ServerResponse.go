@@ -22,6 +22,14 @@ func (p *NodeJS_http_ServerResponse) GetParent() (values.Prototype, error) {
   return NewNodeJS_EventEmitterPrototype(), nil
 }
 
+func (p *NodeJS_http_ServerResponse) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*NodeJS_http_ServerResponse); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *NodeJS_http_ServerResponse) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   i := NewInt(ctx)
@@ -31,6 +39,8 @@ func (p *NodeJS_http_ServerResponse) GetInstanceMember(key string, includePrivat
   resp := NewNodeJS_http_ServerResponse(ctx)
 
   switch key {
+  case "statusCode", "statusMessage":
+    return nil, ctx.NewError("Error: only a setter")
   case "end":
     return values.NewOverloadedMethodLikeFunction([][]values.Value{
       []values.Value{resp},

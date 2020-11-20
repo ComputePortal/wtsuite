@@ -45,17 +45,17 @@ func (v *ValueData) LiteralStringValue() (string, bool) {
 }
 
 // TODO: use parent prototypes too
-func CommonValue(vs []Value) Value {
-  ctx := context.NewDummyContext()
-
+func CommonValue(vs []Value, ctx context.Context) Value {
   if len(vs) == 0 {
-    panic("expected at least 1")
+    return NewAny(ctx)
   } else if len(vs) == 1 {
-    return vs[0]
+    return RemoveLiteralness(vs[0])
   } else {
     for i, v := range vs {
+      v = RemoveLiteralness(v)
       found := true
       for j, other := range vs {
+        other = RemoveLiteralness(other)
         if i != j {
           if err := v.Check(other, ctx); err != nil {
             found = false
@@ -65,10 +65,10 @@ func CommonValue(vs []Value) Value {
       }
 
       if found {
-        return v
+        return NewContextValue(v, ctx)
       }
     }
 
-    return NewAny(vs[0].Context())
+    return NewAny(ctx)
   }
 }

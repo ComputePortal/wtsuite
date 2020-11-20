@@ -7,8 +7,6 @@ import (
 type Prototype interface {
 	Interface
 
-  IsUniversal() bool // if true: can be exported to databases etc.
-
   // returns nil if it doesn't have a parent
   GetParent() (Prototype, error)
 
@@ -25,6 +23,27 @@ func GetPrototype(v_ Value) Prototype {
 
   switch v := v_.(type) {
   case *Instance:
+    interf := v.GetInterface()
+    if proto, ok := interf.(Prototype); ok {
+      return proto
+    } else {
+      return nil
+    }
+  case *LiteralIntInstance:
+    interf := v.GetInterface()
+    if proto, ok := interf.(Prototype); ok {
+      return proto
+    } else {
+      return nil
+    }
+  case *LiteralBooleanInstance:
+    interf := v.GetInterface()
+    if proto, ok := interf.(Prototype); ok {
+      return proto
+    } else {
+      return nil
+    }
+  case *LiteralStringInstance:
     interf := v.GetInterface()
     if proto, ok := interf.(Prototype); ok {
       return proto

@@ -116,6 +116,18 @@ func (p *JSParser) buildFunctionArgument(ts []raw.Token,
 	}
 }
 
+func (p *JSParser) isFunctionRoleKeyword(t raw.Token) bool {
+  if !raw.IsAnyWord(t) {
+    return false
+  }
+
+  if _, err := p.buildFunctionRole([]raw.Token{t}); err == nil {
+    return true
+  } else {
+    return false
+  }
+}
+
 func (p *JSParser) buildFunctionRole(ts []raw.Token) (prototypes.FunctionRole, error) {
 	role := prototypes.NORMAL
 	rolesDone := make(map[string]*raw.Word)

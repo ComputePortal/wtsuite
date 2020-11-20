@@ -2,7 +2,6 @@ package scripts
 
 import (
 	"../../tokens/js"
-	"../../tokens/js/values"
 )
 
 type InitFileScript struct {
@@ -18,8 +17,8 @@ func NewInitFileScript(relPath string, caller string) (*InitFileScript, error) {
 	return &InitFileScript{fileScriptData}, nil
 }
 
-func (s *InitFileScript) EvalTypes(globals values.Stack) error {
-	return s.module.EvalAsEntryPoint(globals)
+func (s *InitFileScript) EvalTypes() error {
+	return s.module.EvalTypes()
 }
 
 func (s *InitFileScript) UniqueEntryPointNames(ns js.Namespace) error {

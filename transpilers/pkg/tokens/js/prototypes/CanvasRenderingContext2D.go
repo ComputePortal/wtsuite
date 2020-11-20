@@ -18,12 +18,22 @@ func NewCanvasRenderingContext2D(ctx context.Context) values.Value {
   return values.NewInstance(NewCanvasRenderingContext2DPrototype(), ctx)
 }
 
+func (p *CanvasRenderingContext2D) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*CanvasRenderingContext2D); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *CanvasRenderingContext2D) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   f := NewNumber(ctx)
   s := NewString(ctx)
 
   switch key {
+  case "direction", "fillStyle", "strokeStyle", "font", "globalCompositeOperator", "lineCap", "lineJoin", "shadowColor", "textAlign", "textBaseline", "globalAlpha", "lineWidth", "miterLimit", "shadowBlur", "shadowOffsetX", "shadowOffsetY":
+    return nil, ctx.NewError("Error: is a setter only")
   case "arc":
     return values.NewOverloadedFunction([][]values.Value{
       []values.Value{f, f, f, f, f, nil},

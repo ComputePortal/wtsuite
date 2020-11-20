@@ -22,6 +22,14 @@ func (p *HTMLIFrameElement) GetParent() (values.Prototype, error) {
   return NewHTMLElementPrototype(), nil
 }
 
+func (p *HTMLIFrameElement) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*HTMLIFrameElement); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *HTMLIFrameElement) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   s := NewString(ctx)
 

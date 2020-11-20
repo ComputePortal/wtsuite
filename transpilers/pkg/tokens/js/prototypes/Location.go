@@ -18,6 +18,14 @@ func NewLocation(ctx context.Context) values.Value {
   return values.NewInstance(NewLocationPrototype(), ctx)
 }
 
+func (p *Location) Check(other_ values.Interface, ctx context.Context) error {
+  if _, ok := other_.(*Location); ok {
+    return nil
+  } else {
+    return checkParent(p, other_, ctx)
+  }
+}
+
 func (p *Location) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   s := NewString(ctx)
 

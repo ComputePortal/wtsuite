@@ -1,8 +1,6 @@
 package js
 
 import (
-	"reflect"
-
 	"../context"
 )
 
@@ -52,30 +50,10 @@ func IsCallable(t Token) bool {
 	}
 }
 
-func IsIndexable(t Token) bool {
-	switch t.(type) {
-	case *VarExpression, *Call, *LiteralString, *Index, *Member, *Parens, *LiteralArray, *LiteralObject:
-		return true
-	case *LiteralBoolean, *LiteralInt, *LiteralFloat, Op, *Function, *Class:
-		return false
-	default:
-		panic("unhandled" + reflect.TypeOf(t).String())
-	}
-}
-
 func AssertCallable(t Token) error {
 	if !IsCallable(t) {
 		errCtx := t.Context()
 		return errCtx.NewError("Error: not callable")
-	}
-
-	return nil
-}
-
-func AssertIndexable(t Token) error {
-	if !IsIndexable(t) {
-		errCtx := t.Context()
-		return errCtx.NewError("Error: not indexable")
 	}
 
 	return nil

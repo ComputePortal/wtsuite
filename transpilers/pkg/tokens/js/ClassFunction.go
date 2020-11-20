@@ -124,8 +124,14 @@ func (m *ClassFunction) SetValue(v values.Value, ctx context.Context) error {
   }
 }
 
-func (m *ClassFunction) EvalExpression() (values.Value, error) {
-  return m.function.EvalExpression()
+func (m *ClassFunction) Eval() error {
+  if !prototypes.IsAbstract(m) {
+    if _, err :=  m.function.EvalExpression(); err != nil {
+      return err
+    }
+  } 
+
+  return nil
 }
 
 func (m *ClassFunction) ResolveActivity(usage Usage) error {
