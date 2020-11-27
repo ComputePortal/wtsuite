@@ -69,18 +69,20 @@ func WriteHeaders() string {
 
 	// order probably not important due to hoisting
 	all := []Header{
+    checkTypeHeader,
 		objectFromInstanceHeader,
 		objectToInstanceHeader,
 		blobFromInstanceHeader,
 		blobToInstanceHeader,
 		sharedWorkerPostHeader,
 		xmlPostHeader,
+    rpcContextHeader,
+    rpcClientHeader,
+    rpcServerHeader,
 		webAssemblyEnvHeader,
 		searchIndexHeader,
     mathFontHeader,
 	}
-
-	//ResolveHeaderActivity(SearchIndexHeader, context.NewDummyContext())
 
 	for _, h := range all {
 		if h.GetVariable() != nil {

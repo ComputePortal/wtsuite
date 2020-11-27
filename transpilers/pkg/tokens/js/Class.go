@@ -66,6 +66,10 @@ func (t *Class) IsUniversal() bool {
 	return t.universalName != ""
 }
 
+func (t *Class) IsRPC() bool {
+  return false
+}
+
 func (t *Class) GetVariable() Variable {
 	return t.nameExpr.GetVariable()
 }
@@ -296,6 +300,23 @@ func (t *Class) WriteStatement(indent string) string {
 	}
 
 	b.WriteString("{")
+
+  if t.IsUniversal() {
+    // runtime propertytype information
+    b.WriteString(indent + TAB)
+    b.WriteString("static __propertyTypes__={")
+    b.WriteString(NL)
+
+    for _, member_ := range t.members{
+      if member, ok := member_.(*ClassProperty); ok {
+        b.WriteString(member.writeUniversalPropertyType(indent + TAB))
+      }
+    }
+
+    b.WriteString(indent + TAB)
+    b.WriteString("};")
+    b.WriteString(NL)
+  }
 
 	hasContent := false
   if t.constructor != nil {

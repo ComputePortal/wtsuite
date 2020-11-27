@@ -69,6 +69,24 @@ func (p *ClassProperty) WriteStatement(indent string) string {
   return ""
 }
 
+func (p *ClassProperty) writeUniversalPropertyType(indent string) string {
+  var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString(p.Name())
+  b.WriteString(":")
+
+  if p.typeExpr == nil {
+    panic("should only be called by universal class, when typeexpr should be defined")
+  }
+
+  b.WriteString(p.typeExpr.WriteUniversalRuntimeType())
+  b.WriteString(",")
+  b.WriteString(NL)
+
+  return b.String()
+}
+
 func (p *ClassProperty) ResolveNames(scope Scope) error {
   if p.typeExpr != nil {
     if err := p.typeExpr.ResolveExpressionNames(scope); err != nil {

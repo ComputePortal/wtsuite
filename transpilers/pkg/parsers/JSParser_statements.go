@@ -410,6 +410,8 @@ func (p *JSParser) buildStatement(ts []raw.Token) (js.Statement, []raw.Token, er
 			ilast := p.nextSeparatorPosition(ts, patterns.SEMICOLON)
 
 			switch {
+      case raw.IsWord(ts[0], "rpc") && raw.IsWord(ts[1], "interface"):
+        return p.buildInterfaceStatement(ts)
 			case raw.IsSymbolThatEndsWith(ts[1], patterns.EQUAL) &&
 				!raw.IsSymbol(ts[1], patterns.COLON_EQUAL):
 				return p.buildAssignStatement(ts)

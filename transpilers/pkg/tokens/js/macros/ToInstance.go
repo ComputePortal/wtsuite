@@ -1,6 +1,8 @@
 package macros
 
 import (
+  "strings"
+
 	"../values"
 
   "../../context"
@@ -29,6 +31,24 @@ func getTypeExpression(expr_ js.Expression) (*js.TypeExpression, error) {
   }
 
   return expr, nil
+}
+
+func (m *ToInstance) wrapWithCheckType(s string) string {
+  if js.TARGET == "nodejs" { // this safety check is only needed server-side
+    // XXX: maybe one day javascript will be used in peer2peer way, then all targets will require type checking of deserialized objects
+    var b strings.Builder
+
+    b.WriteString(checkTypeHeader.Name())
+    b.WriteString("(")
+    b.WriteString(s)
+    b.WriteString(",")
+    b.WriteString(m.interfExpr.WriteUniversalRuntimeType())
+    b.WriteString(")")
+
+    return b.String()
+  } else {
+    return s
+  }
 }
 
 func (m *ToInstance) ResolveExpressionNames(scope js.Scope) error {

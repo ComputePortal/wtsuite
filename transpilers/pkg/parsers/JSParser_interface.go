@@ -18,6 +18,12 @@ func (p *JSParser) buildInterface(ts []raw.Token) (*js.Interface, error) {
 		return nil, errCtx.NewError("Error: bad interface definition")
 	}
 
+  isRPC := false
+  if raw.IsWord(ts[0], "rpc") {
+    isRPC = true
+    ts = ts[1:]
+  }
+
 	clType, ts, err := p.buildClassOrExtendsTypeExpression(ts[1:])
 	if err != nil {
 		return nil, err
@@ -31,7 +37,7 @@ func (p *JSParser) buildInterface(ts []raw.Token) (*js.Interface, error) {
 		}
 	}
 
-	classInterface, err := js.NewInterface(clType, []*js.TypeExpression{extends}, interfCtx)
+	classInterface, err := js.NewInterface(clType, []*js.TypeExpression{extends}, isRPC, interfCtx)
 	if err != nil {
 		return nil, err
 	}

@@ -37,7 +37,6 @@ func (m *XMLHttpRequestPost) WriteExpression() string {
 func (m *XMLHttpRequestPost) EvalExpression() (values.Value, error) {
 	ctx := m.Context()
 
-
   args, err := m.evalArgs()
 	if err != nil {
 		return nil, err

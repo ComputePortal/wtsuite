@@ -13,6 +13,7 @@ type Interface interface {
 
   // if true: can be exported to databases etc.
   IsUniversal() bool // for actual interfaces: all implementations need to be universal
+  IsRPC() bool // 
 
   // get extended interfaces in case of js.Interface, get implements interfaces in case of js.Class
   GetInterfaces() ([]Interface, error)

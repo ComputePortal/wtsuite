@@ -61,6 +61,10 @@ func (p *BuiltinPrototype) IsUniversal() bool {
   return false
 }
 
+func (p *BuiltinPrototype) IsRPC() bool {
+  return false
+}
+
 func (p *BuiltinPrototype) GetParent() (values.Prototype, error) {
   return nil, nil
 }

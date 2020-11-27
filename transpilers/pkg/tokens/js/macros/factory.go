@@ -71,6 +71,11 @@ var _callMacros = map[string]MacroConstructor{
 	//"WebAssemblyEnv": NewWebAssemblyEnvCall,
 }
 
+var _constructorMacros = map[string]MacroConstructor{
+  "RPCClient": NewRPCClient,
+  "RPCServer": NewRPCServer,
+}
+
 func IsClassMacroGroup(gname string) bool {
 	_, ok := _classMacros[gname]
 	return ok
@@ -88,6 +93,11 @@ func IsClassMacro(gname string, name string) bool {
 func IsCallMacro(name string) bool {
 	_, ok := _callMacros[name]
 	return ok
+}
+
+func IsConstructorMacro(name string) bool {
+  _, ok := _constructorMacros[name]
+  return ok
 }
 
 func MemberIsClassMacro(m *js.Member) bool {
@@ -141,6 +151,23 @@ func NewCallMacroFromCall(call *js.Call,
 	return NewCallMacro(name, args, ctx)
 }
 
+func NewConstructorMacro(name string, args []js.Expression,
+  ctx context.Context) (js.Expression, error) {
+  return _constructorMacros[name](args, ctx)
+}
+
+func NewConstructorMacroFromCall(call *js.Call,
+  ctx context.Context) (js.Expression, error) {
+	name := call.Name()
+	if name == "" {
+		panic("should've been handled before")
+	}
+
+	args := call.Args()
+
+	return NewConstructorMacro(name, args, ctx)
+}
+
 func RegisterActivateMacroHeadersCallback() bool {
 	js.ActivateMacroHeaders = func(name string) {
 		switch name {
@@ -148,6 +175,8 @@ func RegisterActivateMacroHeadersCallback() bool {
 			ActivateWebAssemblyEnvHeader()
 		case "SearchIndex":
 			ActivateSearchIndexHeader()
+    case "__checkType__":
+      ActivateCheckTypeHeader()
 		}
 	}
 

@@ -435,8 +435,12 @@ func (p *JSParser) buildExportStatement(ts []raw.Token,
 		case "interface":
 			return p.buildExportInterfaceStatement(ts, isDefault)
 		default:
+      if len(ts) > 3 && raw.IsWord(ts[1], "rpc") && raw.IsWord(ts[2], "interface") {
+        return p.buildExportInterfaceStatement(ts, isDefault)
+      }
+
 			errCtx := ts[1].Context()
-			return nil, errCtx.NewError("Error: not yet handled")
+			return nil, errCtx.NewError("Error: unrecognized export statement")
 		}
 	// aggregate exports
 	case raw.IsWord(ts[2], "from"):

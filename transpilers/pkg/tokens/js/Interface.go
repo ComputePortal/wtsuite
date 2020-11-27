@@ -1,6 +1,7 @@
 package js
 
 import (
+  "fmt"
 	"strings"
 
 	"./prototypes"
@@ -17,10 +18,12 @@ type Interface struct {
 
   prototypes    []values.Prototype // also used by InstanceOf <interface>
 
+  isRPC bool
+
 	TokenData
 }
 
-func NewInterface(nameExpr *TypeExpression, parents []*TypeExpression,
+func NewInterface(nameExpr *TypeExpression, parents []*TypeExpression, isRPC bool,
 	ctx context.Context) (*Interface, error) {
   if parents == nil {
     panic("parents can't be nil")
@@ -31,6 +34,7 @@ func NewInterface(nameExpr *TypeExpression, parents []*TypeExpression,
 		parents,
 		make([]*FunctionInterface, 0),
     make([]values.Prototype, 0),
+    isRPC,
 		TokenData{ctx},
 	}
 
@@ -94,8 +98,114 @@ func (t *Interface) Dump(indent string) string {
 	return b.String()
 }
 
+func (t *Interface) writeRPCNew(indent string) string {
+  var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString("static new(channel,ctx){")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("return {")
+  b.WriteString(NL)
+
+  for _, member := range t.members {
+    b.WriteString(member.writeRPCNewEntry(indent + TAB + TAB))
+  }
+
+  b.WriteString(indent + TAB)
+  b.WriteString("}")
+  b.WriteString(NL)
+
+  b.WriteString(indent)
+  b.WriteString("}")
+  b.WriteString(NL)
+
+  return b.String()
+}
+
+// obj: is the actual instance on which the functions are called
+// msg: incoming JSON {id: ..., name: ..., arg0: ..., arg1: ...} (arg0 etc. have already been turned into instances)
+// ctx: __rpcContext__
+// return value: {value: ...} (if value is left out then void)
+func (t *Interface) writeRPCCall(indent string) string {
+  var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString("static async rpc(obj,msg,ctx){")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("try{")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("let fn={")
+  b.WriteString(NL)
+
+  for _, member := range t.members {
+    b.WriteString(member.writeRPCCallEntry(indent + TAB + TAB))
+  }
+
+  b.WriteString(indent + TAB)
+  b.WriteString("}[msg.name];")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("if(fn==undefined){throw new Error(msg.name+\" not found\")}")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("await fn();")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("}catch(e){ctx.respond(e)};")
+  b.WriteString(NL)
+
+  b.WriteString(indent)
+  b.WriteString("}")
+  b.WriteString(NL)
+
+  return b.String()
+}
+
 func (t *Interface) WriteStatement(indent string) string {
-	return ""
+  if !(t.IsRPC() || t.IsUniversal()) {
+    fmt.Println(t.IsRPC(), t.IsUniversal())
+    return ""
+  } else {
+    var b strings.Builder
+
+    b.WriteString(indent)
+    b.WriteString("class ")
+    b.WriteString(t.nameExpr.WriteExpression())
+    b.WriteString("{")
+    b.WriteString(NL)
+
+    if t.IsUniversal() {
+      b.WriteString(indent + TAB)
+      b.WriteString("static __implementations__=[")
+      for i, proto := range t.prototypes {
+        b.WriteString(proto.Name())
+        if i < len(t.prototypes) - 1 {
+          b.WriteString(",")
+        }
+      }
+      b.WriteString("];")
+      b.WriteString(NL)
+    }
+
+    if t.IsRPC() {
+      b.WriteString(t.writeRPCNew(indent + TAB))
+      b.WriteString(t.writeRPCCall(indent + TAB))
+    }
+
+    b.WriteString("}")
+    b.WriteString(NL)
+
+    return b.String()
+  }
 }
 
 func (t *Interface) HoistNames(scope Scope) error {
@@ -211,6 +321,10 @@ func (t *Interface) Check(other_ values.Interface, ctx context.Context) error {
 }
 
 func (t *Interface) ResolveStatementNames(scope Scope) error {
+  if t.IsRPC() {
+    ActivateMacroHeaders("__checkType__")
+  }
+
 	if scope.HasVariable(t.Name()) {
 		errCtx := t.Context()
 		err := errCtx.NewError("Error: '" + t.Name() + "' already defined " +
@@ -241,6 +355,15 @@ func (t *Interface) EvalStatement() error {
 			return err
 		}
 	}
+
+  if t.isRPC {
+    // each return value must be a promise
+    for _, member := range t.members {
+      if err := member.CheckRPC(); err != nil {
+        return err
+      }
+    }
+  }
 
 	return nil
 }
@@ -318,6 +441,10 @@ func (t *Interface) IsUniversal() bool {
   return true
 }
 
+func (t *Interface) IsRPC() bool {
+  return t.isRPC
+}
+
 func (t *Interface) ResolveStatementActivity(usage Usage) error {
 	return nil
 }
@@ -327,6 +454,12 @@ func (t *Interface) UniversalStatementNames(ns Namespace) error {
 }
 
 func (t *Interface) UniqueStatementNames(ns Namespace) error {
+  if t.IsRPC() || t.IsUniversal() {
+    if err := ns.ClassName(t.nameExpr.GetVariable()); err != nil {
+      return err
+    }
+  }
+
 	return nil
 }
 

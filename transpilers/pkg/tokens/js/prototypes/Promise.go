@@ -147,6 +147,15 @@ func (p *Promise) GetInstanceMember(key string, includePrivate bool, ctx context
   }
 }
 
+func GetPromiseContent(v values.Value) (values.Value, error) {
+  resolveFn, err := v.GetMember(".resolve", false, v.Context())
+  if err != nil {
+    return nil, err
+  }
+
+  return resolveFn.EvalFunction([]values.Value{}, false, v.Context())
+}
+
 func (p *Promise) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   switch key {
   case "all":

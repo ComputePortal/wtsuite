@@ -405,6 +405,10 @@ func (t *Enum) IsUniversal() bool {
 	return parent.IsUniversal()
 }
 
+func (t *Enum) IsRPC() bool {
+  return false
+}
+
 func (t *Enum) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   parent, err := t.GetParent()
   if err != nil {

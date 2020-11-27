@@ -1,6 +1,7 @@
 package js
 
 import (
+  "strconv"
 	"strings"
 
 	"./prototypes"
@@ -145,6 +146,184 @@ func (fi *FunctionInterface) Write() string {
 	return b.String()
 }
 
+func (fi *FunctionInterface) writeRPCNewEntry(indent string) string {
+  var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString(fi.Name())
+  b.WriteString(":")
+  b.WriteString("async function(")
+  for i, _ := range fi.args {
+    b.WriteString("arg")
+    b.WriteString(strconv.Itoa(i))
+    if i < len(fi.args) - 1 {
+      b.WriteString(",")
+    }
+  }
+  b.WriteString("){")
+  b.WriteString(NL)
+
+  // create the msg
+  b.WriteString(indent + TAB)
+  b.WriteString("let packet={channel:channel,name:\"")
+  b.WriteString(fi.Name())
+  b.WriteString("\"")
+
+  for i, arg := range fi.args {
+    b.WriteString(",")
+    b.WriteString("arg")
+    b.WriteString(strconv.Itoa(i))
+    b.WriteString(":")
+
+    te := arg.typeExpr
+
+    interf := te.GetInterface()
+    if interf == nil {
+      panic("unexpected")
+    }
+
+    if interf.IsRPC() {
+      b.WriteString("ctx.register(")
+      b.WriteString(interf.Name())
+      b.WriteString(",arg")
+      b.WriteString(strconv.Itoa(i))
+      b.WriteString(")")
+    } else {
+      b.WriteString("arg")
+      b.WriteString(strconv.Itoa(i))
+    }
+  }
+  b.WriteString("};")
+  b.WriteString(NL)
+
+  // prepare a return value
+  promise, err := fi.GetReturnValue()
+  if err != nil {
+    panic("should've been detected before")
+  }
+
+  ret, err := prototypes.GetPromiseContent(promise)
+  if err != nil {
+    panic("should've been detected before")
+  }
+
+  // perform the actual request
+  b.WriteString(indent + TAB)
+  if ret != nil {
+    b.WriteString("let result=")
+  }
+  b.WriteString("await ctx.request(packet,[")
+  // we also need to tell ctx which new channels have been created (so they can be deleted when the request is fullfilled)
+  for i, arg := range fi.args {
+    te := arg.typeExpr
+    interf := te.GetInterface()
+    if interf.IsRPC() {
+      b.WriteString("packet.arg")
+      b.WriteString(strconv.Itoa(i))
+      b.WriteString(",")
+    }
+  }
+  b.WriteString("]);")
+  b.WriteString(NL)
+
+  // type check?
+  if ret != nil {
+    b.WriteString(indent + TAB)
+    b.WriteString("return __checkType__(result.value,")
+    b.WriteString(fi.ret.WriteUniversalRuntimeType())
+    b.WriteString(");")
+    b.WriteString(NL)
+  }
+
+  b.WriteString(indent)
+  b.WriteString("},")
+  b.WriteString(NL)
+
+  return b.String()
+}
+
+func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
+  var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString(fi.Name())
+  b.WriteString(":async function(){")
+  b.WriteString(NL)
+
+  // each argument is extracted from the msg, and type checked
+  for i, arg := range fi.args {
+    b.WriteString(indent + TAB)
+    b.WriteString("let arg") 
+    b.WriteString(strconv.Itoa(i))
+    b.WriteString("=")
+
+    te := arg.typeExpr
+
+    interf := te.GetInterface() 
+    if interf == nil {
+      panic("unexpected")
+    }
+
+    if interf.IsRPC() {
+      b.WriteString(interf.Name())
+      b.WriteString(".new(parseInt(__checkType__(msg.arg")
+      b.WriteString(strconv.Itoa(i))
+      b.WriteString(",Number)),ctx);")
+    } else {
+      b.WriteString("__checkType__(msg.arg")
+      b.WriteString(strconv.Itoa(i))
+      b.WriteString(",")
+      b.WriteString(te.WriteUniversalRuntimeType())
+      b.WriteString(");")
+    }
+
+    b.WriteString(NL)
+  }
+
+  // prepare a return value
+  promise, err := fi.GetReturnValue()
+  if err != nil {
+    panic("should've been detected before")
+  }
+
+  ret, err := prototypes.GetPromiseContent(promise)
+  if err != nil {
+    panic("should've been detected before")
+  }
+
+  // now call the actual function
+  b.WriteString(indent + TAB)
+  if ret != nil {
+    b.WriteString("let r=")
+  }
+  b.WriteString("await obj.")
+  b.WriteString(fi.Name())
+  b.WriteString("(")
+  for i, _ := range fi.args {
+    b.WriteString("arg")
+    b.WriteString(strconv.Itoa(i))
+    if i < len(fi.args) - 1 {
+      b.WriteString(",")
+    }
+  }
+  b.WriteString(");")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("ctx.respond({id:msg.id,")
+  if ret != nil {
+    b.WriteString("value:r")
+  }
+  b.WriteString("});")
+  b.WriteString(NL)
+
+  b.WriteString(indent)
+  b.WriteString("},")
+  b.WriteString(NL)
+
+  return b.String()
+}
+
 func (fi *FunctionInterface) performChecks() error {
 	// check that arg names are unique, and check that default arguments come last
   detectedDefault := false
@@ -276,6 +455,55 @@ func (fi *FunctionInterface) Eval() error {
   }
 
 	return nil
+}
+
+func (fi *FunctionInterface) CheckRPC() error {
+  retVal, err := fi.GetReturnValue()
+  if err != nil {
+    return err
+  }
+
+  if retVal == nil {
+    errCtx := fi.Context()
+    return errCtx.NewError("Error: rpc member return value expected Promise, got void")
+  }
+
+  if !prototypes.IsPromise(retVal) {
+    errCtx := fi.Context()
+    return errCtx.NewError("Error: rpc member return value expected Promise, got " + retVal.TypeName())
+  }
+
+  promiseContent, err := prototypes.GetPromiseContent(retVal)
+  if err != nil {
+    return err
+  }
+
+  if promiseContent != nil {
+    promiseContentInterf := values.GetInterface(promiseContent)
+    if promiseContentInterf == nil {
+      errCtx := retVal.Context()
+      return errCtx.NewError("Error: rpc member returns non-universal Promise")
+    }
+  }
+
+  // each arg's interface must be universal or rpc, any is not allowed
+  for _, arg := range fi.args {
+    argVal, err := arg.GetValue()
+    if err != nil {
+      return err
+    }
+
+    interf := values.GetInterface(argVal)
+    if interf == nil {
+      errCtx := argVal.Context()
+      return errCtx.NewError("Error: expected universal/rpc arg, got " + argVal.TypeName())
+    } else if !(interf.IsUniversal() || interf.IsRPC()) {
+      errCtx := argVal.Context()
+      return errCtx.NewError("Error: expected universal/rpc arg, got " + argVal.TypeName())
+    }
+  }
+
+  return nil
 }
 
 func (fi *FunctionInterface) UniversalNames(ns Namespace) error {

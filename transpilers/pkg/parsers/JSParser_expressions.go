@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"../tokens/js"
+	"../tokens/js/macros"
 	"../tokens/patterns"
 	"../tokens/raw"
 )
@@ -238,6 +239,16 @@ func (p *JSParser) buildUnaryOpExpression(t raw.Token) (js.Expression, error) {
 	if err != nil {
 		return nil, err
 	}
+
+  // can be a constructor macro
+  if op.Name() == "prenew" {
+    if aCall, ok := a.(*js.Call); ok {
+      aName := aCall.Name()
+      if macros.IsConstructorMacro(aName) {
+        return macros.NewConstructorMacroFromCall(aCall, t.Context())
+      }
+    }
+  } 
 
 	if strings.HasPrefix(op.Name(), "post") {
 		return js.NewPostUnaryOp(jsName, a, op.Context())

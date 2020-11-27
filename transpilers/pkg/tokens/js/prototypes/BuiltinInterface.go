@@ -43,6 +43,10 @@ func (p *AbstractBuiltinInterface) IsUniversal() bool {
   return true
 }
 
+func (p *AbstractBuiltinInterface) IsRPC() bool {
+  return false
+}
+
 func (p *AbstractBuiltinInterface) GetInterfaces() ([]values.Interface, error) {
   return []values.Interface{}, nil
 }

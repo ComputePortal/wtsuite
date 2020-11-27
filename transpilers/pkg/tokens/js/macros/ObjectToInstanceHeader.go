@@ -8,7 +8,7 @@ func (h *ObjectToInstanceHeader) Dependencies() []Header {
 	return []Header{}
 }
 
-// TODO: create untrusted variant for server-side use
+// combine with __checkType__ for server-side use
 func (h *ObjectToInstanceHeader) Write() string {
 	b := NewHeaderBuilder()
 

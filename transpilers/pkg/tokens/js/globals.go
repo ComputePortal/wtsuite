@@ -36,6 +36,9 @@ func ReserveMacroNames(scope Scope) {
   reserveMacroName(scope, "cast")
   reserveMacroName(scope, "import")
   reserveMacroName(scope, "SyntaxTree") // to be replaced by __dump__
+  reserveMacroName(scope, "__checkType__")
+  reserveMacroName(scope, "__rpcContext__")
+  reserveMacroName(scope, "RPCClient")
 }
 
 func registerPrototype(scope Scope, proto values.Prototype) {
@@ -116,6 +119,7 @@ func FillCoreScope(scope Scope) {
   registerPrototype(scope, pr.NewPromisePrototype(nil))
   registerPrototype(scope, pr.NewRegExpPrototype())
   registerPrototype(scope, pr.NewRegExpArrayPrototype())
+  registerPrototype(scope, pr.NewRPCServerPrototype())
   registerPrototype(scope, pr.NewSetPrototype(nil))
   registerPrototype(scope, pr.NewStringPrototype())
   registerPrototype(scope, pr.NewTuplePrototype(nil))

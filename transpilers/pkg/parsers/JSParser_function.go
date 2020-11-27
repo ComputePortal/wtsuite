@@ -188,6 +188,7 @@ func (p *JSParser) buildFunctionInterface(ts []raw.Token,
 	parensPos := -1
 	for i, t := range ts {
 		if raw.IsParensGroup(t) {
+      ctx = t.Context()
 			parensPos = i
 			break
 		}
@@ -206,6 +207,7 @@ func (p *JSParser) buildFunctionInterface(ts []raw.Token,
 			}
 
 			fnName = nameToken.Value()
+      ctx = nameToken.Context()
 			rolePos -= 1
 		} else {
 			errCtx := raw.MergeContexts(ts...)

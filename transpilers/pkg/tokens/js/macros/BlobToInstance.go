@@ -40,7 +40,7 @@ func (m *BlobToInstance) WriteExpression() string {
 	b.WriteString(m.args[0].WriteExpression())
 	b.WriteString(")")
 
-	return b.String()
+	return m.wrapWithCheckType(b.String())
 }
 
 func (m *BlobToInstance) EvalExpression() (values.Value, error) {

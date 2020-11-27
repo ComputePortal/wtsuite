@@ -393,6 +393,83 @@ func (t *TypeExpression) generateObject() (values.Value, error) {
   return prototypes.NewObject(props, t.Context()), nil
 }
 
+func (t *TypeExpression) WriteUniversalRuntimeType() string {
+  var b strings.Builder
+  
+  switch t.Name() {
+  case "any", "class", "function", "void", "Set", "Map", "Promise", "Event", "IDBRequest":
+    panic("not a universal type")
+  case "Array":
+    if t.parameters == nil {
+      panic("not a universal array")
+    }
+
+    b.WriteString("[")
+    b.WriteString(t.parameters[0].typeExpr.WriteUniversalRuntimeType())
+    b.WriteString("]")
+
+    return b.String()
+  case "Tuple":
+    if t.parameters == nil {
+      panic("not a universal tuple")
+    }
+
+    b.WriteString("[")
+    for i, param := range t.parameters {
+      b.WriteString(param.typeExpr.WriteUniversalRuntimeType())
+      if i < len(t.parameters) - 1 {
+        b.WriteString(",")
+      }
+    }
+    b.WriteString("]")
+
+    return b.String()
+  case "Object":
+    if t.parameters == nil {
+      panic("not a universal object")
+    }
+
+    b.WriteString("{")
+    if t.parameters[0].key == nil {
+      b.WriteString("\"\":")
+      b.WriteString(t.parameters[0].typeExpr.WriteUniversalRuntimeType())
+    } else {
+      for i, param := range t.parameters {
+        b.WriteString(param.key.Value())
+        b.WriteString(":")
+        b.WriteString(param.typeExpr.WriteUniversalRuntimeType())
+
+        if i < len(t.parameters) - 1 {
+          b.WriteString(",")
+        }
+      }
+    }
+    b.WriteString("}")
+  default:
+    if t.parameters != nil {
+			panic("unexpected type parameters")
+    }
+
+    interf := t.GetInterface()
+    if interf == nil {
+      panic("expected an interface")
+    }
+
+    if enum, ok := interf.(*Enum); ok {
+      enumParent, err := enum.GetParent()
+      if err != nil {
+        panic(err)
+      }
+
+      b.WriteString(enumParent.Name())
+    } else {
+      b.WriteString(interf.Name())
+    }
+  }
+
+  return b.String()
+}
+
 // Acts as the new generate instance
 func (t *TypeExpression) EvalExpression() (values.Value, error) {
   ctx := t.Context()
