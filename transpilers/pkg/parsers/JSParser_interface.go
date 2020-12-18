@@ -7,6 +7,43 @@ import (
 	"../tokens/raw"
 )
 
+func (p *JSParser) buildInterfaceExtendsExpression(ts []raw.Token) ([]*js.VarExpression, []raw.Token, error) {
+  parents := make([]*js.VarExpression, 0)
+
+	if raw.IsWord(ts[0], "extends") {
+    needExpr := true
+
+    for needExpr {
+      if len(ts) < 2 {
+        errCtx := raw.MergeContexts(ts...)
+        return nil, nil, errCtx.NewError("Error: bad interface extends")
+      }
+
+      var condensedNameToken *raw.Word
+      var err error
+      condensedNameToken, ts, err = p.condensePackagePeriods(ts[1:]) // shortens ts by 1 or more
+      if err != nil {
+        return nil, nil, err
+      }
+
+      parent, err := p.buildVarExpression(condensedNameToken)
+      if err != nil {
+        return nil, nil, err
+      }
+
+      parents = append(parents, parent)
+
+      if raw.IsSymbol(ts[0], patterns.COMMA) {
+        needExpr = true
+      } else {
+        needExpr = false
+      }
+    }
+	} 
+
+  return parents, ts, nil
+}
+
 func (p *JSParser) buildInterface(ts []raw.Token) (*js.Interface, error) {
 	interfCtx := raw.MergeContexts(ts...)
 
@@ -29,15 +66,13 @@ func (p *JSParser) buildInterface(ts []raw.Token) (*js.Interface, error) {
 		return nil, err
 	}
 
-	var extends *js.TypeExpression = nil
-	if raw.IsWord(ts[0], "extends") {
-		extends, ts, err = p.buildClassOrExtendsTypeExpression(ts[1:])
-		if err != nil {
-			return nil, err
-		}
-	}
+  var parents []*js.VarExpression
+  parents, ts, err = p.buildInterfaceExtendsExpression(ts)
+  if err != nil {
+    return nil, err
+  }
 
-	classInterface, err := js.NewInterface(clType, []*js.TypeExpression{extends}, isRPC, interfCtx)
+	classInterface, err := js.NewInterface(clType, parents, isRPC, interfCtx)
 	if err != nil {
 		return nil, err
 	}

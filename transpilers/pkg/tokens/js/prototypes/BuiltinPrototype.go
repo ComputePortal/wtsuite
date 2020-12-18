@@ -65,6 +65,14 @@ func (p *BuiltinPrototype) IsRPC() bool {
   return false
 }
 
+func (p *BuiltinPrototype) IsFinal() bool {
+  return false
+}
+
+func (p *BuiltinPrototype) IsAbstract() bool {
+  return false
+}
+
 func (p *BuiltinPrototype) GetParent() (values.Prototype, error) {
   return nil, nil
 }

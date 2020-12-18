@@ -162,6 +162,7 @@ func FillBrowserAndWorkerCommonScope(scope Scope) {
   registerPrototype(scope, pr.NewTextEncoderPrototype())
   registerPrototype(scope, pr.NewWebAssemblyPrototype())
   registerPrototype(scope, pr.NewWebAssemblyEnvPrototype())
+  registerPrototype(scope, pr.NewXMLHttpRequestPrototype())
 
   ctx := context.NewDummyContext()
 

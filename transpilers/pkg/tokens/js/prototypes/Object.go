@@ -66,10 +66,10 @@ func (p *Object) IsUniversal() bool {
       return false
     } else {
       for _, v := range p.members {
-        vProto := values.GetPrototype(v)
-        if vProto == nil {
+        vInterf := values.GetInterface(v)
+        if vInterf == nil {
           return false
-        } else if !vProto.IsUniversal() {
+        } else if !vInterf.IsUniversal() {
           return false
         }
       }

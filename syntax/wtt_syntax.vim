@@ -33,7 +33,7 @@ syn match Statement '^\zsexport\ze\s\+'
 " syn keyword StatementKeywords from in 
 
 syn keyword ClassKeywords contained class extends blocks super
-syn region Class start='class' end='super' contains=ClassKeywords,Block,Action,Constant,String, Comment keepend
+syn region Class start='class' end='super' contains=ClassKeywords,Block,VarAction,Constant,String, Comment keepend
 syn keyword ClassKeywords this
 
 syn keyword VarKeywords contained var 
@@ -90,6 +90,7 @@ syn region Block start='\[' end='\]' contains=Block, Action, Comment, String, Co
 
 syn match Action '\zs[\$]\?[a-zA-Z_][a-zA-Z0-9_\.\-]*\ze[(\[]' contained
 syn match Action '\zs[\$][a-zA-Z_][a-zA-Z0-9_\.\-]*\ze' contained
+syn match VarAction '\zs[\$][a-zA-Z_][a-zA-Z0-9_\.\-]*\ze' contained
 
 "syn match Statement '^\zs\(export\|import\)\ze\s\+'
 "syn keyword Statement class var if ifelse else for in switch case default dummy
@@ -127,6 +128,7 @@ syn region	Comment	start="/\*" end="\*/" extend contains=Todo
 "hi def link FunctionDef2 Normal
 
 hi def link Action PreProc
+hi def link VarAction PreProc
 
 hi def link ClassKeywords Statement
 hi def link VarKeywords Statement

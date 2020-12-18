@@ -16,40 +16,32 @@ type Class struct {
 	interfExprs      []*VarExpression // can't be nil, can be zero length, can't contain nil
   constructor      *Function
 	members          []ClassMember    // list because getter and setter can have same name
+  isAbstract       bool // can't be combined with final
+  isFinal          bool // can't be combined with abstract
 	universalName    string
 	TokenData
 }
 
-func NewClass(nameExpr *TypeExpression, parentExpr *TypeExpression, ctx context.Context) (*Class, error) {
-	cl := &Class{
-		nameExpr,
-		parentExpr,
-    make([]*VarExpression, 0),
-		nil, // set later
-		make([]ClassMember, 0),
-		"",
-		TokenData{ctx},
-	}
-
-	cl.nameExpr.GetVariable().SetObject(cl)
-
-	return cl, nil
-}
-
-func NewUniversalClass(nameExpr *TypeExpression, parentExpr *TypeExpression, interfExprs []*VarExpression, universalName string, ctx context.Context) (*Class, error) {
-	cl, err := NewClass(nameExpr, parentExpr, ctx)
-	if err != nil {
-		panic(err)
-	}
-
+func NewClass(nameExpr *TypeExpression, parentExpr *TypeExpression, interfExprs []*VarExpression, isAbstract bool, isFinal bool, universalName string, ctx context.Context) (*Class, error) {
   for _, interfExpr := range interfExprs {
     if interfExpr == nil {
       panic("interfExpr can't be nil")
     }
   }
 
-	cl.interfExprs = interfExprs
-	cl.universalName = universalName
+	cl := &Class{
+		nameExpr,
+		parentExpr,
+    interfExprs,
+		nil, // set later
+		make([]ClassMember, 0),
+		isAbstract,
+    isFinal,
+    universalName,
+		TokenData{ctx},
+	}
+
+	cl.nameExpr.GetVariable().SetObject(cl)
 
 	return cl, nil
 }
@@ -68,6 +60,14 @@ func (t *Class) IsUniversal() bool {
 
 func (t *Class) IsRPC() bool {
   return false
+}
+
+func (t *Class) IsAbstract() bool {
+  return t.isAbstract
+}
+
+func (t *Class) IsFinal() bool {
+  return t.isFinal
 }
 
 func (t *Class) GetVariable() Variable {
@@ -107,7 +107,24 @@ func (t *Class) GetInterfaces() ([]values.Interface, error) {
   for _, interfExpr := range t.interfExprs {
     interf := interfExpr.GetInterface()
     if interf != nil {
-      interfs = append(interfs, interf)
+      subInterfs, err := interf.GetInterfaces()
+      if err != nil {
+        return nil, err
+      }
+
+      // it is ok to implement an interface twice via implements, but don't include it twice
+      for _, subInterf := range subInterfs {
+        unique := true
+        for _, checkInterf := range interfs {
+          if subInterf == checkInterf {
+            unique = false
+            break
+          }
+        }
+        if unique {
+          interfs = append(interfs, subInterf)
+        }
+      }
     } else {
       errCtx := interfExpr.Context()
       return nil, errCtx.NewError("Error: not an interface")
@@ -345,6 +362,25 @@ func (t *Class) WriteStatement(indent string) string {
 	}
 	b.WriteString("}")
 
+  if (t.IsUniversal()) {
+    interfs, err := t.GetInterfaces()
+    if err != nil {
+      panic("should've been caught before")
+    }
+
+    for _, interf := range interfs {
+      if interf.IsUniversal() {
+        b.WriteString(";")
+        b.WriteString(NL)
+        b.WriteString(indent)
+        b.WriteString(interf.Name())
+        b.WriteString(".__implementations__.push(")
+        b.WriteString(t.Name())
+        b.WriteString(")")
+      }
+    }
+  }
+
 	return b.String()
 }
 
@@ -356,28 +392,6 @@ func (t *Class) HoistNames(scope Scope) error {
 	return nil
 }
 
-// reused by enum
-/*func getExtendsClass(v Variable, ctx context.Context) (values.Prototype, error) {
-	extendsClass_ := v.GetObject()
-	if extendsClass_ == nil {
-		return nil, ctx.NewError("Error: bad extends (object not set)")
-	}
-
-	switch extendsClass := extendsClass_.(type) {
-	case *Class:
-		return extendsClass, nil
-	case values.Prototype:
-		return extendsClass, nil
-	case *ClassInterface:
-		return nil, ctx.NewError("Error: can't extend interface")
-	case *Enum:
-		return nil, ctx.NewError("Error: cannot inherit from enum")
-
-	default:
-		return nil, ctx.NewError("Error: bad extends (" + reflect.TypeOf(extendsClass_).String() + ")")
-	}
-}*/
-
 func (t *Class) resolveConstructorNames(scope Scope) error {
   // resolve the constructor
   if t.constructor != nil {
@@ -386,6 +400,11 @@ func (t *Class) resolveConstructorNames(scope Scope) error {
       parent, err := t.GetParent()
       if err != nil {
         return err
+      }
+
+      if parent.IsFinal() {
+        errCtx := t.parentExpr.Context()
+        return errCtx.NewError("Error: can't extend final class " + parent.Name())
       }
 
       super := NewVariable("super", true, t.parentExpr.Context())
@@ -457,6 +476,11 @@ func (t *Class) resolveMemberNames(scope Scope) error {
       if err := member.ResolveNames(subScope); err != nil {
         return err
       }
+
+      if prototypes.IsAbstract(member) && !t.IsAbstract() {
+        errCtx := member.Context()
+        return errCtx.NewError("Error: abstract member in non-abstract class")
+      }
     case *ClassProperty:
       if err := member.ResolveNames(scope); err != nil {
         return err
@@ -467,6 +491,86 @@ func (t *Class) resolveMemberNames(scope Scope) error {
 	}
 
 	return nil
+}
+
+func (t *Class) collectAbstractMembers() ([]*ClassFunction, error) {
+  result := make([]*ClassFunction, 0)
+
+  nonAbstractMembers := make([]*ClassFunction, 0)
+
+  // add own first, then add parents' 
+  for _, member_ := range t.members {
+    if member, ok := member_.(*ClassFunction); ok {
+      if prototypes.IsAbstract(member) {
+        result = append(result, member)
+      } else {
+        nonAbstractMembers = append(nonAbstractMembers, member)
+      }
+    }
+  }
+
+  parent_, err := t.GetParent()
+  if err != nil {
+    return nil, err
+  }
+
+  if parent_ != nil && parent_.IsAbstract() {
+    parent, ok := parent_.(*Class)
+    if !ok {
+      panic("unexpected, only *js.Class instances can be abstract")
+    }
+
+    parentAbstractMembers, err := parent.collectAbstractMembers()
+    if err != nil {
+      return nil, err
+    }
+
+    for _, member := range parentAbstractMembers {
+      isImplemented := false
+      for _, checkMember := range nonAbstractMembers {
+        if checkMember.Name() == member.Name() {
+          vSelf := values.NewInstance(t, t.Context())
+          if err := checkInterfaceMember(member.function.fi, vSelf, true, checkMember.Context()); err != nil {
+            return nil, err
+          }
+
+          isImplemented = true
+          break
+        }
+      }
+
+      if isImplemented {
+        continue
+      }
+
+      for _, checkMember := range result {
+        if checkMember.Name() == member.Name() {
+          errCtx := checkMember.Context()
+          return nil, errCtx.NewError("Error: redefinition of abstract member " + checkMember.Name() + "(see " + parent.Name() + ")")
+        }
+      }
+
+      result = append(result, member)
+    }
+  }
+
+  return result, nil
+}
+
+// during eval types phase
+func (t *Class) checkAbstractness() error {
+  // most basic check
+  if abstractMembers, err := t.collectAbstractMembers(); err != nil {
+    return err
+  } else if len(abstractMembers) != 0 && !t.IsAbstract() {
+    errCtx := t.Context()
+    return errCtx.NewError("Error: non-abstract class contains unimplemented abstract members")
+  } else if len(abstractMembers) == 0 && t.IsAbstract() {
+    errCtx := t.Context()
+    return errCtx.NewError("Error: abstract class doesn't contain any abstract members")
+  }
+
+  return nil
 }
 
 func (t *Class) checkUniversalness() error {
@@ -611,7 +715,10 @@ func (t *Class) evalInternal() error {
     if err := interf.Check(t, interfExpr.Context()); err != nil {
       return err
     }
+  }
 
+  if err := t.checkAbstractness(); err != nil {
+    return err
   }
 
   return nil
@@ -685,7 +792,7 @@ func (t *Class) SetInstanceMember(key string, includePrivate bool, arg values.Va
   }
 
   if t.parentExpr == nil {
-    return ctx.NewError("Error: setable member not found")
+    return ctx.NewError("Error: setable member " + t.Name() + "." + key + " not found")
   } else {
     parent, err := t.GetParent()
     if err != nil {
@@ -726,34 +833,10 @@ func (t *Class) GetClassMember(key string, includePrivate bool, ctx context.Cont
   }
 }
 
-/*func (t *Class) isAbstract(implemented map[string]*ClassMember) bool {
-	for _, member := range t.members {
-		if _, ok := implemented[member.Name()]; !ok {
-			if prototypes.IsAbstract(member) {
-				return true
-			}
-
-			implemented[member.Name()] = member
-		}
-	}
-
-	if t.cachedExtends != nil {
-		if parent, ok := t.cachedExtends.(*Class); ok {
-			return parent.isAbstract(implemented)
-		}
-	}
-
-	return false
-}
-
-func (t *Class) IsAbstract() bool {
-	return t.isAbstract(make(map[string]*ClassMember))
-}*/
-
 func (t *Class) Check(other_ values.Interface, ctx context.Context) error {
   other, ok := other_.(values.Prototype) 
   if !ok {
-    return ctx.NewError("Error: not a class instance")
+    return ctx.NewError("Error: expected class " + t.Name() + ", got " + other_.Name())
   }
 
   // keep getting the parent of the other until they match us

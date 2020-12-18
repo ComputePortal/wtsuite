@@ -24,7 +24,8 @@ func checkOverload(overload []Value, ts []Value, ctx context.Context) error {
 
     return nil
   } else {
-    return ctx.NewError(fmt.Sprintf("Error: expected %d arguments, got %d", len(overload), len(ts)))
+    err := ctx.NewError(fmt.Sprintf("Error: expected %d arguments, got %d", len(overload), len(ts)))
+    return err
   }
 }
 

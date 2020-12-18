@@ -33,6 +33,21 @@ func (p *Tuple) GetParent() (values.Prototype, error) {
   return NewArrayPrototype(content), nil
 }
 
+func (p *Tuple) IsUniversal() bool {
+  if p.content == nil {
+    return false
+  } else {
+    for _, content := range p.content {
+      interf := values.GetInterface(content)
+      if (interf != nil && (!interf.IsUniversal())) || interf == nil {
+        return false
+      } 
+    }
+
+    return true
+  }
+}
+
 func (p *Tuple) getCommonValue(ctx context.Context) values.Value {
   if p.content == nil {
     return values.NewAny(ctx)

@@ -55,8 +55,8 @@ func (p *Array) Name() string {
 func (p *Array) IsUniversal() bool {
   if p.content == nil {
     return false
-  } else if proto := values.GetPrototype(p.content); proto != nil {
-    return proto.IsUniversal()
+  } else if interf := values.GetInterface(p.content); interf != nil {
+    return interf.IsUniversal()
   } else {
     return false
   }
@@ -115,7 +115,7 @@ func (p *Array) GetInstanceMember(key string, includePrivate bool, ctx context.C
         []values.Value{i, i, nil},
         []values.Value{i, i, i, nil},
       }, ctx), nil
-  case "every", "some":
+  case "any", "every", "some":
     return values.NewOverloadedFunction(
       [][]values.Value{
         []values.Value{values.NewFunction([]values.Value{content, b}, ctx), b}, 

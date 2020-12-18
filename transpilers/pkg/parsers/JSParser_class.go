@@ -89,6 +89,22 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 		return nil, errCtx.NewError("Error: bad class definition")
 	}
 
+  isAbstract := false
+  isFinal := false
+  if raw.IsWord(ts[0], "abstract") {
+    isAbstract = true
+    ts = ts[1:]
+  } else if raw.IsWord(ts[0], "final") {
+    isFinal = true
+    ts = ts[1:]
+  }
+
+  if !raw.IsWord(ts[0], "class") {
+    errCtx := ts[0].Context()
+    // should've actually been caught earlier
+    return nil, errCtx.NewError("Error: expected class keyword")
+  }
+
 	// special, because classes dont necessarily have a name
 	var clType *js.TypeExpression
 	var err error = nil
@@ -125,7 +141,7 @@ func (p *JSParser) buildClass(ts []raw.Token) (*js.Class, error) {
 		return nil, err
 	}
 
-  class, err := js.NewUniversalClass(clType, extends, implements, universalName, clCtx)
+  class, err := js.NewClass(clType, extends, implements, isAbstract, isFinal, universalName, clCtx)
 	if err != nil {
 		return nil, err
 	}

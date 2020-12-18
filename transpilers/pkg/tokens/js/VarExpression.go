@@ -164,6 +164,11 @@ func (t *VarExpression) EvalExpression() (values.Value, error) {
 		panic("ref is still nil")
 	}
 
+  if t.GetInterface() != nil && t.GetPrototype() == nil {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't use interface in an expression")
+  }
+
   // note that both Object and Value must be set for builtin classes/interfaces
   res := t.variable.GetValue()
 

@@ -122,6 +122,10 @@ func (v *Class) Check(other_ Value, ctx context.Context) error {
 }
 
 func (v *Class) EvalConstructor(args []Value, ctx context.Context) (Value, error) {
+  return v.evalConstructor(args, ctx, false)
+}
+
+func (v *Class) evalConstructor(args []Value, ctx context.Context, allowAbstract bool) (Value, error) {
   if args != nil {
     if _, err := checkAnyOverload(v.args, args, ctx); err != nil {
 
@@ -134,6 +138,10 @@ func (v *Class) EvalConstructor(args []Value, ctx context.Context) (Value, error
       }
 
       return nil, err
+    }
+
+    if proto, ok := v.interf.(Prototype); ok && proto.IsAbstract() && !allowAbstract {
+      return nil, ctx.NewError("Error: can't construct abstract " + proto.Name())
     }
   }
 

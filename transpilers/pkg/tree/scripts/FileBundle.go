@@ -120,7 +120,6 @@ func (b *FileBundle) reportCircularDependency(start FileScript, deps map[string]
 }
 
 // block recursion
-// TODO: improve the sorting
 func (b *FileBundle) ResolveDependencies() error {
   // first sort the already collected scripts alphabetically by path
   fss := NewFileScriptSorter(b.scripts)
@@ -207,6 +206,12 @@ func (b *FileBundle) ResolveDependencies() error {
 	for _, s := range sortedScripts {
 		b.scripts = append(b.scripts, s)
 	}
+
+  if (VERBOSITY >= 2) {
+    for _, s := range b.scripts {
+      fmt.Printf("dep: %s\n", files.Abbreviate(s.Path()))
+    }
+  }
 
 	return nil
 }

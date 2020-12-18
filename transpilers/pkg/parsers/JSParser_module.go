@@ -428,7 +428,7 @@ func (p *JSParser) buildExportStatement(ts []raw.Token,
 			return p.buildExportFunctionStatement(ts, isDefault)
 		case "async":
 			return p.buildExportFunctionStatement(ts, isDefault)
-		case "class":
+		case "class", "abstract", "final":
 			return p.buildExportClassStatement(ts, isDefault)
 		case "enum":
 			return p.buildExportEnumStatement(ts, isDefault)

@@ -409,6 +409,14 @@ func (t *Enum) IsRPC() bool {
   return false
 }
 
+func (t *Enum) IsAbstract() bool {
+  return false
+}
+
+func (t *Enum) IsFinal() bool {
+  return true
+}
+
 func (t *Enum) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   parent, err := t.GetParent()
   if err != nil {

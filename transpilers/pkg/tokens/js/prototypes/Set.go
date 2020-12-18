@@ -56,6 +56,8 @@ func (p *Set) GetInstanceMember(key string, includePrivate bool, ctx context.Con
     return content, nil
   case "add":
     return values.NewMethodLikeFunction([]values.Value{content, self}, ctx), nil
+  case "clear":
+    return values.NewFunction([]values.Value{nil}, ctx), nil
   case "delete":
     return values.NewMethodLikeFunction([]values.Value{content, b}, ctx), nil
   case "has":

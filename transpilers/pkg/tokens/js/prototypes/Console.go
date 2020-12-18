@@ -32,6 +32,22 @@ func (p *Console) GetInstanceMember(key string, includePrivate bool, ctx context
   switch key {
   case "log":
     return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{nil},
+      []values.Value{a, nil},
+      []values.Value{a, a, nil},
+      []values.Value{a, a, a, nil},
+      []values.Value{a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, nil},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, nil}, // should be enough
+    }, ctx), nil
+  case "error":
+    return values.NewOverloadedFunction([][]values.Value{
+      []values.Value{nil},
       []values.Value{a, nil},
       []values.Value{a, a, nil},
       []values.Value{a, a, a, nil},

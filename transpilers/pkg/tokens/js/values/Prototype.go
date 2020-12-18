@@ -7,6 +7,10 @@ import (
 type Prototype interface {
 	Interface
 
+  IsAbstract() bool
+
+  IsFinal() bool
+
   // returns nil if it doesn't have a parent
   GetParent() (Prototype, error)
 

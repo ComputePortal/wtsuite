@@ -8,7 +8,7 @@ import (
 
 type Parens struct {
 	values []Token
-	alts   []Token // rhs of argDefaults for function and class
+	alts   []Token // rhs of argDefaults for function and class, can contain nil in case of no defaults
 	TokenData
 }
 

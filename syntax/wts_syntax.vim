@@ -20,7 +20,6 @@ syn match   Special "'\\.'"
 
 syn match Constant "-\=\<\d\+L\=\>\|0[xX][0-9a-fA-F]\+\>"
 syn match Constant '\<\zs\d\+\(\.\d\+\([e][-]\?\d\+\)\?\)\?\ze'
-syn match Keyword '^rpc\s'
 
 syn keyword Conditional if else switch break continue
 syn keyword Repeat while for do in of
@@ -41,6 +40,6 @@ syn keyword Constant null
 syn keyword Keyword console document super this window
 syn keyword Label case default
 syn keyword Exception try catch finally throw
-syn keyword Keyword abstract any as async await cast class const constructor enum export extends from function get implements import interface let new private set static universe var void
+syn keyword Keyword abstract any as async await cast class const constructor enum export extends from function get implements import interface let new private rpc set static universe var void
 
 let b:current_syntax = "jspp"

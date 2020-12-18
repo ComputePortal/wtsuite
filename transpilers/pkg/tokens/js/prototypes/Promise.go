@@ -159,8 +159,9 @@ func GetPromiseContent(v values.Value) (values.Value, error) {
 func (p *Promise) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   switch key {
   case "all":
-    return values.NewCustomFunction([]values.Value{
-      NewArray(NewPromise(values.NewAny(ctx), ctx), ctx),
+    return values.NewOverloadedCustomFunction([][]values.Value{
+      []values.Value{NewArray(NewPromise(values.NewAny(ctx), ctx), ctx)},
+      []values.Value{NewArray(NewVoidPromise(ctx), ctx)},
     }, func(args []values.Value, preferMethod bool, ctx_ context.Context) (values.Value, error) {
       prom, err := args[0].GetMember(".getof", false, ctx)
       if err != nil {
@@ -177,7 +178,11 @@ func (p *Promise) GetClassMember(key string, includePrivate bool, ctx context.Co
         return nil, err
       }
 
-      return NewPromise(NewArray(res, ctx_), ctx_), nil
+      if res == nil {
+        return NewVoidPromise(ctx_), nil
+      } else {
+        return NewPromise(NewArray(res, ctx_), ctx_), nil
+      }
     }, ctx), nil
   default:
     return nil, nil

@@ -10,9 +10,11 @@ import (
 	"../context"
 )
 
+const NewRPCClientMemberName = "newRPCClient"
+
 type Interface struct {
 	nameExpr *TypeExpression
-	parents  []*TypeExpression // can't be nil, can be empty
+	parents  []*VarExpression // can't be nil, can be empty
 
 	members  []*FunctionInterface
 
@@ -23,7 +25,7 @@ type Interface struct {
 	TokenData
 }
 
-func NewInterface(nameExpr *TypeExpression, parents []*TypeExpression, isRPC bool,
+func NewInterface(nameExpr *TypeExpression, parents []*VarExpression, isRPC bool,
 	ctx context.Context) (*Interface, error) {
   if parents == nil {
     panic("parents can't be nil")
@@ -57,7 +59,28 @@ func (t *Interface) Name() string {
 }
 
 func (t *Interface) GetInterfaces() ([]values.Interface, error) {
-  return []values.Interface{t}, nil
+  interfs := []values.Interface{t}
+
+  for _, parent := range t.parents {
+    parentInterfs, err := parent.GetInterface().GetInterfaces()
+    if err != nil {
+      return nil, err
+    }
+
+    // complain if already included
+    for _, parentInterf := range parentInterfs {
+      for _, interf := range interfs {
+        if interf == parentInterf {
+          errCtx := parent.Context()
+          return nil, errCtx.NewError("Error: interface " + interf.Name() + " extended twice")
+        }
+      }
+
+      interfs = append(interfs, parentInterf)
+    }
+  }
+
+  return interfs, nil
 }
 
 func (t *Interface) GetPrototypes() ([]values.Prototype, error) {
@@ -79,6 +102,12 @@ func (t *Interface) Dump(indent string) string {
 	b.WriteString("Interface(")
 	b.WriteString(strings.Replace(t.nameExpr.Dump(""), "\n", "", -1))
 	b.WriteString(")\n")
+
+  for _, parent := range t.parents {
+    b.WriteString(indent + "  extends ")
+    b.WriteString(parent.Dump(""))
+    b.WriteString("\n")
+  }
 
 	for _, member := range t.members {
 		if prototypes.IsGetter(member) {
@@ -102,11 +131,18 @@ func (t *Interface) writeRPCNew(indent string) string {
   var b strings.Builder
 
   b.WriteString(indent)
-  b.WriteString("static new(channel,ctx){")
+  b.WriteString("static ")
+  b.WriteString(NewRPCClientMemberName)
+  b.WriteString("(channel,ctx){")
   b.WriteString(NL)
 
   b.WriteString(indent + TAB)
-  b.WriteString("return {")
+  b.WriteString("let obj={")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB + TAB)
+  // ctx===ctx_ should be safe enough to see if channel is running on same comms
+  b.WriteString("__channel__:function(ctx_){return (ctx===ctx_)?channel:undefined},")
   b.WriteString(NL)
 
   for _, member := range t.members {
@@ -114,7 +150,65 @@ func (t *Interface) writeRPCNew(indent string) string {
   }
 
   b.WriteString(indent + TAB)
+  b.WriteString("};")
+  b.WriteString(NL)
+
+  if len(t.parents) != 0 {
+    b.WriteString(indent + TAB)
+    b.WriteString("Object.assign(obj")
+    for _, parent := range t.parents {
+      b.WriteString(",")
+      b.WriteString(parent.Name())
+      b.WriteString(".")
+      b.WriteString(NewRPCClientMemberName)
+      b.WriteString("(channel,ctx)")
+    }
+    b.WriteString(");")
+  }
+
+  b.WriteString(indent + TAB)
+  b.WriteString("return obj;")
+  b.WriteString(NL)
+
+  b.WriteString(indent)
   b.WriteString("}")
+  b.WriteString(NL)
+
+  return b.String()
+}
+
+func (t *Interface) writeRPCCallFunctions(indent string) string {
+  var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString("static rpcFns(obj,msg,ctx){")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB)
+  b.WriteString("let fns={")
+  b.WriteString(NL)
+
+  for _, member := range t.members {
+    b.WriteString(member.writeRPCCallEntry(indent + TAB + TAB))
+  }
+
+  b.WriteString(indent + TAB)
+  b.WriteString("};")
+  b.WriteString(NL)
+
+  if len(t.parents) != 0 {
+    b.WriteString(indent + TAB)
+    b.WriteString("Object.assign(fns")
+    for _, parent := range t.parents {
+      b.WriteString(",")
+      b.WriteString(parent.Name())
+      b.WriteString(".rpcFns(obj,msg,ctx)")
+    }
+    b.WriteString(");")
+  }
+
+  b.WriteString(indent + TAB)
+  b.WriteString("return fns;")
   b.WriteString(NL)
 
   b.WriteString(indent)
@@ -139,28 +233,38 @@ func (t *Interface) writeRPCCall(indent string) string {
   b.WriteString("try{")
   b.WriteString(NL)
 
-  b.WriteString(indent + TAB)
-  b.WriteString("let fn={")
+  b.WriteString(indent + TAB + TAB)
+  b.WriteString("let fns=")
+  b.WriteString(t.Name())
+  b.WriteString(".rpcFns(obj,msg,ctx);")
   b.WriteString(NL)
 
-  for _, member := range t.members {
-    b.WriteString(member.writeRPCCallEntry(indent + TAB + TAB))
-  }
+  b.WriteString(indent + TAB + TAB)
+  b.WriteString("let fn=fns[msg.name];")
+  b.WriteString(NL)
 
-  b.WriteString(indent + TAB)
-  b.WriteString("}[msg.name];")
+  b.WriteString(indent + TAB + TAB)
+  b.WriteString("if(fn==undefined){")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB + TAB + TAB)
+  b.WriteString("throw new Error(msg.name+\" not found\")")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB + TAB)
+  b.WriteString("}else{await fn()};")
   b.WriteString(NL)
 
   b.WriteString(indent + TAB)
-  b.WriteString("if(fn==undefined){throw new Error(msg.name+\" not found\")}")
+  b.WriteString("}catch(e){")
+  b.WriteString(NL)
+
+  b.WriteString(indent + TAB + TAB)
+  b.WriteString("ctx.respond(e);")
   b.WriteString(NL)
 
   b.WriteString(indent + TAB)
-  b.WriteString("await fn();")
-  b.WriteString(NL)
-
-  b.WriteString(indent + TAB)
-  b.WriteString("}catch(e){ctx.respond(e)};")
+  b.WriteString("}")
   b.WriteString(NL)
 
   b.WriteString(indent)
@@ -185,19 +289,14 @@ func (t *Interface) WriteStatement(indent string) string {
 
     if t.IsUniversal() {
       b.WriteString(indent + TAB)
-      b.WriteString("static __implementations__=[")
-      for i, proto := range t.prototypes {
-        b.WriteString(proto.Name())
-        if i < len(t.prototypes) - 1 {
-          b.WriteString(",")
-        }
-      }
-      b.WriteString("];")
+      b.WriteString("static __implementations__=[];")
       b.WriteString(NL)
+      // implementations must register themselves, to avoid using classes before they are declared
     }
 
     if t.IsRPC() {
       b.WriteString(t.writeRPCNew(indent + TAB))
+      b.WriteString(t.writeRPCCallFunctions(indent + TAB))
       b.WriteString(t.writeRPCCall(indent + TAB))
     }
 
@@ -212,64 +311,106 @@ func (t *Interface) HoistNames(scope Scope) error {
 	return nil
 }
 
+// v is in instance
+// also used for abstract implementations (different error messages)
+func checkInterfaceMember(member *FunctionInterface, v values.Value, abstractCheck bool, ctx context.Context) error {
+  vm, err := v.GetMember(member.Name(), false, ctx)
+  if vm == nil && err == nil {
+    if abstractCheck {
+      return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
+      panic("unexpected")
+    } else {
+      return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
+    }
+  } 
+
+  args, err := member.GetArgValues()
+  if err != nil {
+    return err
+  }
+
+  retVal, err := member.GetReturnValue()
+  if err != nil {
+    return err
+  }
+
+  if prototypes.IsGetter(member) {
+    if retVal == nil {
+      panic("getter can't return void, should be checked elsewhere")
+    }
+
+    if vm == nil {
+      if abstractCheck {
+        return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
+        panic("unexpected")
+      } else {
+        return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
+      }
+    }
+
+    if err := retVal.Check(vm, ctx); err != nil {
+      return err
+    }
+  } else if prototypes.IsSetter(member) {
+    if err := v.SetMember(member.Name(), false, args[0], ctx); err != nil {
+      return err
+    }
+  } else {
+    if vm == nil {
+      return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
+    }
+
+    // regular 
+    res, err := vm.EvalFunction(args, retVal == nil, member.Context())
+    if err != nil {
+      return err
+    }
+
+    if retVal == nil {
+      if res != nil {
+        if abstractCheck {
+          return ctx.NewError("Error: abstract member not implemented ("+ member.Name() + " returns non-void, void expected)")
+        } else {
+          return ctx.NewError("Error: interface not respected (member " + member.Name() + " returns non-void, void expected)")
+        }
+      }
+    } else {
+      if res == nil {
+        if abstractCheck {
+          return ctx.NewError("Error: abstract member not respected (" + member.Name() + " return void, non-void expected)")
+        } else {
+          return ctx.NewError("Error: interface not respected (member " + member.Name() + " return void, non-void expected)")
+        }
+      } else {
+        if err := retVal.Check(res, ctx); err != nil {
+          return err
+        }
+      }
+    }
+  } 
+
+  return nil
+}
+
 // uncached check
 func (t *Interface) check(other_ values.Interface, ctx context.Context) error {
   v := values.NewInstance(other_, ctx)
 
   // check each member
   for _, member := range t.members {
-    args, err := member.GetArgValues()
-    if err != nil {
+    if err := checkInterfaceMember(member, v, false, ctx); err != nil {
       return err
     }
+  }
 
-    retVal, err := member.GetReturnValue()
-    if err != nil {
+  // now check parents
+  for _, parent := range t.parents {
+    parentInterf := parent.GetInterface()
+
+    // parent interfaces do its caching in turn
+    if err := parentInterf.Check(other_, ctx); err != nil {
       return err
     }
-
-    vm, err := v.GetMember(member.Name(), false, ctx)
-    if vm == nil && err == nil {
-      return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
-    } 
-
-    if prototypes.IsGetter(member) {
-      if retVal == nil {
-        panic("getter can't return void, should be checked elsewhere")
-      }
-
-      if vm == nil {
-        return ctx.NewError("Error: interface not respected (member " + member.Name() + " not found)")
-      }
-
-      if err := retVal.Check(vm, ctx); err != nil {
-        return err
-      }
-    } else if prototypes.IsSetter(member) {
-      if err := v.SetMember(member.Name(), false, args[0], ctx); err != nil {
-        return err
-      }
-    } else {
-      // regular 
-      res, err := vm.EvalFunction(args, retVal == nil, ctx)
-      if err != nil {
-        return err
-      }
-
-      if retVal == nil {
-        if res != nil {
-          return ctx.NewError("Error: interface not respected (member " + member.Name() + " returns non-void, void expected)")
-        }
-      } else {
-        if res == nil {
-          return ctx.NewError("Error: interface not respected (member " + member.Name() + " return void, non-void expected)")
-        } else {
-          if err := retVal.Check(res, ctx); err != nil {
-            return err
-          }
-        }
-      }
-    } // what about async?
   }
 
 	return nil 
@@ -337,6 +478,12 @@ func (t *Interface) ResolveStatementNames(scope Scope) error {
 			return err
 		}
 
+    for _, parent := range t.parents {
+      if err := parent.ResolveExpressionNames(scope); err != nil {
+        return err
+      }
+    }
+
 		// interface members cant have default arguments
 		for _, member := range t.members {
       subScope := NewSubScope(scope)
@@ -350,6 +497,39 @@ func (t *Interface) ResolveStatementNames(scope Scope) error {
 }
 
 func (t *Interface) EvalStatement() error {
+  for _, parent := range t.parents {
+    parentInterf := parent.GetInterface()
+    if parentInterf == nil {
+      errCtx := parent.Context()
+      return errCtx.NewError("Error: parent is not an interface")
+    }
+
+    parentProto := parent.GetPrototype() 
+    if parentProto != nil {
+      errCtx := parent.Context()
+      return errCtx.NewError("Error: parent can't be a prototype")
+    }
+  }
+
+  // check that members dont exist in parentInterfs
+  // getters and setters must be part of the same interface
+  interfs, err := t.GetInterfaces() 
+  if err != nil {
+    return err
+  }
+  for  _, interf := range interfs {
+    if interf == t {
+      continue
+    }
+
+    for _, member := range t.members {
+      if res, err := interf.GetInstanceMember(member.Name(), false, member.Context()); err != nil || res != nil {
+        errCtx := member.Context()
+        return errCtx.NewError("Error: interface member " + member.Name() + " already exists in extended " + interf.Name())
+      }
+    }
+  }
+
 	for _, member := range t.members {
 		if err := member.Eval(); err != nil {
 			return err
@@ -357,6 +537,15 @@ func (t *Interface) EvalStatement() error {
 	}
 
   if t.isRPC {
+    for _, parent := range t.parents {
+      parentInterf := parent.GetInterface()
+
+      if !parentInterf.IsRPC() {
+        errCtx := parent.Context()
+        return errCtx.NewError("Error: rpc interface can't extend non-rpc interface")
+      }
+    }
+
     // each return value must be a promise
     for _, member := range t.members {
       if err := member.CheckRPC(); err != nil {

@@ -75,9 +75,34 @@ func assertValidTag(nameToken *tokens.String) error {
 	}
 }
 
+// args for contexts
+func assertArgDefaultsLast(argDefaults *tokens.List) error {
+  prevDefault := -1
+  if err := argDefaults.Loop(func(i int, value tokens.Token, last bool) error {
+    if value == nil {
+      if prevDefault >= 0 {
+        prev, err := argDefaults.Get(prevDefault)
+        if err != nil {
+          panic(err)
+        }
+        errCtx := prev.Context()
+        return errCtx.NewError("Error: defaults must come last")
+      } 
+    } else {
+      prevDefault = i
+    }
+
+    return nil
+  }); err != nil {
+    return err
+  }
+
+  return nil
+}
+
 // doesnt change the node
 func AddClass(scope Scope, node Node, tag *tokens.Tag) error {
-	attr, err := tag.Attributes([]string{"name", "args"})
+	attr, err := tag.Attributes([]string{"args"})
 	if err != nil {
 		return err
 	}
@@ -130,6 +155,10 @@ func AddClass(scope Scope, node Node, tag *tokens.Tag) error {
 
 			args = tokens.NewValuesList(argParens.Values(), argParens.Context())
 			argDefaults = tokens.NewValuesList(argParens.Alts(), argParens.Context())
+
+      if err := assertArgDefaultsLast(argDefaults); err != nil {
+        return err
+      }
 		} else {
 			errCtx := args_.Context()
 			return errCtx.NewError("Error: expected list or parens")
@@ -138,6 +167,7 @@ func AddClass(scope Scope, node Node, tag *tokens.Tag) error {
 		args = tokens.NewEmptyList(attr.Context())
 		argDefaults = tokens.NewNilList(args.Len(), attr.Context())
 	}
+
 
 	var blocks *tokens.StringDict = nil
 	if blocks_, ok := attr.Get("blocks"); ok {
@@ -291,16 +321,24 @@ func (c Class) instantiate(node *ClassNode, args *tokens.StringDict,
 
 	// loop incoming attr and check if it is in c.args
 	if err := args.Loop(func(k *tokens.String, v tokens.Token, last bool) error {
-		if ok, _ := c.hasArg(k.Value()); !ok {
+    kVal := k.Value()
+    force := false
+    if strings.HasSuffix(kVal, "!") {
+      force = true
+      kVal = kVal[0:len(kVal)-1]
+    }
+
+		if ok, _ := c.hasArg(kVal); !ok && !force {
 			errCtx := k.Context()
 			err := errCtx.NewError("Error: invalid tag attribute")
 			context.AppendString(err, "Info: available args for "+c.name+
 				"\n"+c.listValidArgNames())
 			return err
-		}
-
-		vVar := functions.Var{v, true, true, false, false, v.Context()}
-		subScope.SetVar(k.Value(), vVar)
+		} else if ok {
+      // dont set if forced but not actually available
+      vVar := functions.Var{v, true, true, false, false, v.Context()}
+      subScope.SetVar(kVal, vVar)
+    }
 		return nil
 	}); err != nil {
 		return err
@@ -318,14 +356,16 @@ func (c Class) instantiate(node *ClassNode, args *tokens.StringDict,
 
 		argName := classArgNames[i]
 
-		if _, ok := args.Get(argName); !ok {
-			v, err := t.Eval(subScope)
-			if err != nil {
-				return err
-			}
+		if _, ok1 := args.Get(argName); !ok1 {
+      if _, ok2 := args.Get(argName + "!"); !ok2 {
+        v, err := t.Eval(subScope)
+        if err != nil {
+          return err
+        }
 
-			vVar := functions.Var{v, true, true, false, false, v.Context()}
-			subScope.SetVar(argName, vVar)
+        vVar := functions.Var{v, true, true, false, false, v.Context()}
+        subScope.SetVar(argName, vVar)
+      }
 		}
 
 		return nil
@@ -370,16 +410,19 @@ func (c Class) instantiate(node *ClassNode, args *tokens.StringDict,
 	subScope.SetVar("__blocks__", blocksVar)
 
 	// pass attr to dattr if they are not already there and have a ! suffix
+  // TODO: get rid of this
 	if err := args.Loop(func(k *tokens.String, v tokens.Token, last bool) error {
-		ok, canBePassedOn := c.hasArg(k.Value())
-		if !ok {
-			panic("should've been caught in previous d.attr.Loop")
-		}
+    if !strings.HasSuffix(k.Value(), "!") {
+      ok, canBePassedOn := c.hasArg(k.Value())
+      if !ok {
+        panic("should've been caught in previous d.attr.Loop")
+      }
 
-		_, hasAlready := classSuperAttr.Get(k.Value())
-		if canBePassedOn && !hasAlready {
-			classSuperAttr.Set(k, v)
-		}
+      _, hasAlready := classSuperAttr.Get(k.Value())
+      if canBePassedOn && !hasAlready {
+        classSuperAttr.Set(k, v)
+      }
+    }
 
 		return nil
 	}); err != nil {
@@ -420,14 +463,13 @@ func (c Class) instantiate(node *ClassNode, args *tokens.StringDict,
 	}
 
 	// add this attr to the new child of node
+  child := node.getLastChild()
+  if child == nil {
+    panic("shouldn't be nil")
+  }
+
+  childAttr := child.Attributes()
 	if !c.thisAttr.IsEmpty() {
-		child := node.getLastChild()
-		if child == nil {
-			panic("shouldn't be nil")
-		}
-
-		childAttr := child.Attributes()
-
 		thisAttr, err := c.thisAttr.EvalStringDict(subScope)
 		if err != nil {
 			return err
@@ -441,6 +483,20 @@ func (c Class) instantiate(node *ClassNode, args *tokens.StringDict,
 			panic(err)
 		}
 	}
+
+  // also insert the forced attributes
+	if err := args.Loop(func(k *tokens.String, v tokens.Token, last bool) error {
+    kVal := k.Value()
+    if strings.HasSuffix(kVal, "!") {
+      kVal = kVal[0:len(kVal)-1]
+
+      childAttr.Set(tokens.NewValueString(kVal, k.Context()), v)
+    }
+
+    return nil
+  }); err != nil {
+    panic(err)
+  }
 
 	return nil
 }

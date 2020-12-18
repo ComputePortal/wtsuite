@@ -23,6 +23,7 @@ func IsNodeJSPackage(name string) bool {
 }
 
 type NodeJSImport struct {
+  name   string
 	expr   *VarExpression
 	TokenData
 }
@@ -30,6 +31,7 @@ type NodeJSImport struct {
 // TODO: alt name capability
 func NewNodeJSImport(expr *VarExpression, ctx context.Context) *NodeJSImport {
 	return &NodeJSImport{
+    expr.Name(),
 		expr,
 		newTokenData(ctx),
 	}
@@ -44,7 +46,7 @@ func (m *NodeJSImport) AddStatement(st Statement) {
 }
 
 func (m *NodeJSImport) WriteStatement(indent string) string {
-	return "const " + m.expr.Name() + "=require('" + m.expr.Name() + "');"
+	return "const " + m.expr.Name() + "=require('" + m.name + "')"
 }
 
 func (m *NodeJSImport) HoistNames(scope Scope) error {

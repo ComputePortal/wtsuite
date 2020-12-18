@@ -362,6 +362,11 @@ func (p *UIParser) buildTagAttributes(ts_ []raw.Token, ctx context.Context) (*ht
 		panic(err)
 	}
 
+  if group.IsSemiColon() {
+    errCtx := group.Context()
+    return nil, errCtx.NewError("Error: expected commas as separators")
+  }
+
 	tss := group.Fields
 
 	attr := html.NewEmptyRawDict(ctx)
@@ -397,6 +402,28 @@ func (p *UIParser) buildTagAttributes(ts_ []raw.Token, ctx context.Context) (*ht
 			}
 
 			attr.Set(posKey, posVal)
+    case len(ts) == 1 && raw.IsOperator(ts[0], "bin!="):
+			hadOpts = true
+
+			op, err := raw.AssertAnyBinaryOperator(ts[0])
+			if err != nil {
+				return nil, err
+			}
+
+			w, err := raw.AssertWord(op.Args()[0])
+			if err != nil {
+				panic(err)
+			}
+
+			posKey := html.NewValueString(w.Value() + "!", w.Context())
+
+			posVal, err := p.buildToken(op.Args()[1:], true)
+			if err != nil {
+				return nil, err
+			}
+
+      // must then be treated specially later
+			attr.Set(posKey, posVal)
 		case len(ts) == 1:
 			if hadOpts {
 				errCtx := ts[0].Context()
@@ -424,7 +451,21 @@ func (p *UIParser) buildTagAttributes(ts_ []raw.Token, ctx context.Context) (*ht
 }
 
 func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
+  p.eatWhitespace() 
+	rName, isString := p.eatNonWhitespace()
+  if rName[0] == rName[1] {
+    errCtx := ctx
+    return nil, errCtx.NewError("Error: couldn't find the class name")
+  } else if isString {
+    errCtx := p.NewContext(rName[0], rName[1])
+    return nil, errCtx.NewError("Error: expected name of class, got literal string instead")
+  }
+  nameCtx := p.NewContext(rName[0], rName[1])
+	nameKey := html.NewValueString("name", nameCtx)
+	nameVal := html.NewValueString(p.Write(rName[0], rName[1]), nameCtx)
+
 	start := p.pos
+
 	// look for the closing super, and get the attributes from that range
 	rSuper, _, superOk := p.nextMatch(patterns.UI_CLASS_SUPER_REGEXP, true)
 	if !superOk {
@@ -451,7 +492,7 @@ func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
 				panic(err)
 			}
 
-			if iKey.Value() == 1 {
+			if iKey.Value() == 0 {
 				res := make([]raw.Token, 0)
 
 				for i := 0; i < len(ts); i++ {
@@ -486,6 +527,9 @@ func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
 	if err != nil {
 		return nil, err
 	}
+
+  // name was eaten before
+  attr.Set(nameKey, nameVal);
 
 	// parse the super
 	// positional must come before optional args

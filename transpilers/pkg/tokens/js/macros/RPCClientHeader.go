@@ -1,5 +1,9 @@
 package macros
 
+import (
+  "../../js"
+)
+
 type RPCClientHeader struct {
   HeaderData
 }
@@ -66,7 +70,7 @@ func (h *RPCClientHeader) Write() string {
   b.ttcn("}")
   b.tcn("}());")
 
-  b.tcn("return interf.new(0,ctx);")
+  b.tcccn("return interf.", js.NewRPCClientMemberName, "(0,ctx);")
   b.c("});")
   b.n()
 

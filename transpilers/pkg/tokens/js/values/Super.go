@@ -42,7 +42,7 @@ func (v *Super) EvalConstructor(args []Value, ctx context.Context) (Value, error
 
 // always acts as method
 func (v *Super) EvalFunction(args []Value, preferMethod bool, ctx context.Context) (Value, error) {
-  if  _, err := v.cl.EvalConstructor(args, ctx); err != nil {
+  if  _, err := v.cl.evalConstructor(args, ctx, true); err != nil {
     return nil, err
   }
 

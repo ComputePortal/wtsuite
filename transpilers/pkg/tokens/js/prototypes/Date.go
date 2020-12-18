@@ -53,11 +53,14 @@ func (p *Date) GetInstanceMember(key string, includePrivate bool, ctx context.Co
 }
 
 func (p *Date) GetClassMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
-  self := NewDate(ctx)
+  i := NewInt(ctx)
+  s := NewString(ctx)
 
   switch key {
   case "now":
-    return values.NewFunction([]values.Value{self}, ctx), nil
+    return values.NewFunction([]values.Value{i}, ctx), nil
+  case "parse":
+    return values.NewFunction([]values.Value{s, i}, ctx), nil
   default:
     return nil, nil
   }
