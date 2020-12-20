@@ -15,19 +15,24 @@ type Tag struct {
 	children []*Tag
 	text     string
 	textCtx  context.Context
+  isDirective bool
 	TokenData
 }
 
 func NewTag(name string, attr *RawDict, children []*Tag, ctx context.Context) *Tag {
-	return &Tag{name, attr, children, "", ctx, TokenData{ctx}}
+	return &Tag{name, attr, children, "", ctx, false, TokenData{ctx}}
 }
 
 func NewTextTag(text string, ctx context.Context) *Tag {
-	return &Tag{"", nil, nil, text, ctx, TokenData{ctx}}
+	return &Tag{"", nil, nil, text, ctx, false, TokenData{ctx}}
 }
 
 func NewScriptTag(name string, attr *RawDict, text string, textCtx, ctx context.Context) *Tag {
-	return &Tag{name, attr, nil, text, textCtx, TokenData{ctx}}
+	return &Tag{name, attr, nil, text, textCtx, false, TokenData{ctx}}
+}
+
+func NewDirectiveTag(name string, attr *RawDict, children []*Tag, ctx context.Context) *Tag {
+	return &Tag{name, attr, children, "", ctx, true, TokenData{ctx}}
 }
 
 func (t *Tag) Dump(indent string) string {
@@ -88,12 +93,19 @@ func (t *Tag) Name() string {
 func (t *Tag) Attributes(posNames []string) (*StringDict, error) {
 	result := NewEmptyStringDict(t.attr.Context())
 
+  hasKWArgs := false
+
 	// duplicates dont give an error anymore: so beware
 	for _, keyVal := range t.attr.items {
 		key := keyVal.key
 		val := keyVal.value
 
 		if IsInt(key) {
+      if hasKWArgs {
+        errCtx := val.Context()
+        return nil, errCtx.NewError("Error: positional attributes must come first")
+      }
+
 			iKey, err := AssertInt(key)
 			if err != nil {
 				panic(err)
@@ -109,6 +121,7 @@ func (t *Tag) Attributes(posNames []string) (*StringDict, error) {
 			strKey := NewValueString(posName, key.Context())
 			result.Set(strKey, val)
 		} else {
+      hasKWArgs = true
 			result.Set(key, val)
 		}
 	}
@@ -163,4 +176,8 @@ func (t *Tag) AssertNoAttributes() error {
 	} else {
 		return nil
 	}
+}
+
+func (t *Tag) IsDirective() bool {
+  return t.isDirective
 }

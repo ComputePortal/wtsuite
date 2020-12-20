@@ -11,11 +11,11 @@ type ScopeData struct {
 	parent Scope // nil is used to detect toplevel
 
 	vars    map[string]functions.Var
-	classes map[string]Class
+	templates map[string]Template
 }
 
 func newScopeData(parent Scope) ScopeData {
-	return ScopeData{parent, make(map[string]functions.Var), make(map[string]Class)}
+	return ScopeData{parent, make(map[string]functions.Var), make(map[string]Template)}
 }
 
 // including builtin functions
@@ -61,21 +61,19 @@ func (scope *ScopeData) Sync(dst Scope, keepAutoVars, keepImports, asImports boo
 		dst.SetVar(prefix+k, v)
 	}
 
-	for k, c := range scope.classes {
+	for k, c := range scope.templates {
 		if c.imported && !keepImports {
 			continue
 		}
 
 		if asImports {
-			c = Class{
+			c = Template{
 				c.name,
 				c.extends,
 				c.scope,
 				c.args,
 				c.argDefaults,
 				c.superAttr,
-				c.thisAttr,
-				c.blocks,
 				c.children,
 				true,
 				c.exported,
@@ -83,7 +81,7 @@ func (scope *ScopeData) Sync(dst Scope, keepAutoVars, keepImports, asImports boo
 			}
 		}
 
-		dst.SetClass(prefix+k, c)
+		dst.SetTemplate(prefix+k, c)
 	}
 
 	return nil
@@ -108,21 +106,19 @@ func (scope *ScopeData) SyncPackage(dst Scope, keepAutoVars, keepImports, asImpo
 		}
 	}
 
-	for k, c := range scope.classes {
+	for k, c := range scope.templates {
 		if c.imported && !keepImports {
 			continue
 		}
 
 		if asImports {
-			c = Class{
+			c = Template{
 				c.name,
 				c.extends,
 				c.scope,
 				c.args,
 				c.argDefaults,
 				c.superAttr,
-				c.thisAttr,
-				c.blocks,
 				c.children,
 				true,
 				c.exported,
@@ -131,7 +127,7 @@ func (scope *ScopeData) SyncPackage(dst Scope, keepAutoVars, keepImports, asImpo
 		}
 
 		if c.exported {
-			dst.SetClass(prefix+k, c)
+			dst.SetTemplate(prefix+k, c)
 		}
 	}
 
@@ -197,21 +193,19 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 		}
 	}
 
-	for k, c := range scope.classes {
+	for k, c := range scope.templates {
 		if c.imported && !keepImports {
 			continue
 		}
 
 		if asImports {
-			c = Class{
+			c = Template{
 				c.name,
 				c.extends,
 				c.scope,
 				c.args,
 				c.argDefaults,
 				c.superAttr,
-				c.thisAttr,
-				c.blocks,
 				c.children,
 				true,
 				c.exported,
@@ -230,7 +224,7 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 				return errCtx.NewError("Error: var not exported")
 			}
 
-			dst.SetClass(prefix+k, c)
+			dst.SetTemplate(prefix+k, c)
 		}
 	}
 
@@ -255,8 +249,8 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 		cpy.SetVar(k, v)
 	}
 
-	for k, d := range scope.classes {
-		cpy.SetClass(k, d)
+	for k, d := range scope.templates {
+		cpy.SetTemplate(k, d)
 	}
 
 	return cpy
@@ -269,9 +263,9 @@ func (scope *ScopeData) SetVar(key string, v functions.Var) {
 	}
 }
 
-func (scope *ScopeData) SetClass(key string, d Class) {
+func (scope *ScopeData) SetTemplate(key string, d Template) {
 	// always set at this level
-	scope.classes[key] = d
+	scope.templates[key] = d
 }
 
 func (scope *ScopeData) HasVar(key string) bool {
@@ -284,11 +278,11 @@ func (scope *ScopeData) HasVar(key string) bool {
 	}
 }
 
-func (scope *ScopeData) HasClass(key string) bool {
-	if _, ok := scope.classes[key]; ok {
+func (scope *ScopeData) HasTemplate(key string) bool {
+	if _, ok := scope.templates[key]; ok {
 		return true
 	} else if scope.parent != nil {
-		return scope.parent.HasClass(key)
+		return scope.parent.HasTemplate(key)
 	} else {
 		return false
 	}
@@ -304,11 +298,11 @@ func (scope *ScopeData) GetVar(key string) functions.Var {
 	}
 }
 
-func (scope *ScopeData) GetClass(key string) Class {
-	if d, ok := scope.classes[key]; ok {
+func (scope *ScopeData) GetTemplate(key string) Template {
+	if d, ok := scope.templates[key]; ok {
 		return d
 	} else if scope.parent != nil {
-		return scope.parent.GetClass(key)
+		return scope.parent.GetTemplate(key)
 	} else {
 		panic("not found")
 	}

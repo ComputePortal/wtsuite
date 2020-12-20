@@ -241,46 +241,6 @@ func (t *VisibleTagData) InnerHTML() string {
 	}
 }
 
-func collectStates(attr *tokens.StringDict) map[string][]string {
-	states := make(map[string][]string)
-
-	if err := attr.Loop(func(key *tokens.String, value tokens.Token, last bool) error {
-		if tokens.IsAttrEnumList(value) {
-			lst, err := tokens.AssertList(value)
-			if err != nil {
-				panic(err)
-			}
-
-			strLst := make([]string, 0)
-
-			for _, v_ := range lst.GetTokens() {
-				if !tokens.IsNull(v_) {
-					v, err := tokens.AssertPrimitive(v_)
-					if err != nil {
-						panic(err)
-					}
-
-					strLst = append(strLst, v.Write())
-				}
-			}
-
-			states[key.Value()] = strLst
-		}
-
-		return nil
-	}); err != nil {
-		panic(err)
-	}
-
-	return states
-}
-
-func (t *VisibleTagData) CollectStates() map[string][]string {
-	attr := t.Attributes()
-
-	return collectStates(attr)
-}
-
 func (t *VisibleTagData) WriteWrappedAutoHref(indent string, nl, tab string) string {
 	var b strings.Builder
 

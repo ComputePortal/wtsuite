@@ -46,7 +46,7 @@ func parseFile(path, caller string) ([]*tokens.Tag, context.Context, error) {
 	}
 }
 
-// also used be NewRoot
+// also used by NewRoot
 // abs path, so we can use this to cache the import results
 func BuildFile(path string, caller string, isRoot bool) (*TagScope, *RootNode, error) {
 	var fileScope *TagScope = nil

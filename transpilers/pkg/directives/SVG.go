@@ -14,7 +14,7 @@ import (
 )
 
 func BuildSVG(scope Scope, node Node, tag *tokens.Tag) error {
-	return buildTree(scope, node, SVG, tag, false)
+	return buildTree(scope, node, SVG, tag, "")
 }
 
 func buildSVGPathInternal(node Node, attr *tokens.StringDict, ctx context.Context) error {
@@ -45,7 +45,7 @@ func buildSVGPath(scope Scope, node Node, tag *tokens.Tag) error {
 
 	subScope := NewSubScope(scope, node)
 
-	attr, err := buildAttributes(subScope, nil, tag, []string{"d"})
+	attr, err := buildAttributes(subScope, tag, []string{"d"})
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 
 	subScope := NewSubScope(scope, node)
 
-	attr, err := buildAttributes(subScope, nil, tag, []string{"d", "type"})
+	attr, err := buildAttributes(subScope, tag, []string{"d", "type"})
 	if err != nil {
 		return err
 	}
@@ -309,14 +309,14 @@ func evalSVGURI(scope Scope, args []tokens.Token, ctx context.Context) (tokens.T
 		return nil, err
 	}
 
-	classToken, err := tokens.AssertString(args[0])
+	templateToken, err := tokens.AssertString(args[0])
 	if err != nil {
 		return nil, err
 	}
 
-	if !scope.HasClass(classToken.Value()) {
-		errCtx := classToken.Context()
-		return nil, errCtx.NewError("Error: class '" + classToken.Value() + "' not found")
+	if !scope.HasTemplate(templateToken.Value()) {
+		errCtx := templateToken.Context()
+		return nil, errCtx.NewError("Error: template '" + templateToken.Value() + "' not found")
 	}
 
 	// get the def
@@ -325,10 +325,10 @@ func evalSVGURI(scope Scope, args []tokens.Token, ctx context.Context) (tokens.T
 		return nil, err
 	}
 
-	imageTag := tokens.NewTag(classToken.Value(), attrToken.ToRaw(), []*tokens.Tag{}, ctx)
+	imageTag := tokens.NewTag(templateToken.Value(), attrToken.ToRaw(), []*tokens.Tag{}, ctx)
 
 	uriNode := NewURINode(scope.GetNode())
-	if err := BuildClass(scope, uriNode, imageTag); err != nil {
+	if err := BuildTemplate(scope, uriNode, imageTag); err != nil {
 		return nil, err
 	}
 

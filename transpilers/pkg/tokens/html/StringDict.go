@@ -174,3 +174,27 @@ func (t *StringDict) Loop(fn func(key *String, value Token, last bool) error) er
 
 	return nil
 }
+
+func (t *StringDict) AssertOnlyValidKeys(validKeys []string) error {
+	for _, item := range t.items {
+		key, err := AssertString(item.key)
+		if err != nil {
+			panic(err)
+		}
+
+    found := false
+    for _, test := range validKeys {
+      if test == key.Value() {
+        found = true
+        break
+      }
+    }
+
+    if !found {
+      errCtx := key.Context()
+      return errCtx.NewError("Error: invalid attribute")
+    }
+	}
+
+  return nil
+}

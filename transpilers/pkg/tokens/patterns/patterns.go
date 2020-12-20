@@ -135,11 +135,9 @@ var (
 
 	JS_UNIVERSAL_CLASS_NAME_REGEXP = regexp.MustCompile(`^[A-Z][a-zA-Z]*$`)
 
-	UI_CLASS_SUPER_REGEXP             = regexp.MustCompile(`\bsuper[\s]*[(]`)
-	UI_CLASS_NAME_REGEXP              = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
-	UI_CLASS_EXTENDS_TO_BLOCKS_REGEXP = regexp.MustCompile(`\b(extends[\s]*[=].*)((blocks)|(super))`)
-	UI_CLASS_EXTENDS_TO_SUPER_REGEXP  = regexp.MustCompile(`\b(extends[\s]*[=].*)super`)
-	UI_CLASS_BLOCKS_REGEXP            = regexp.MustCompile(`\b(blocks[\s]*[=].*)super`)
+	UI_TEMPLATE_SUPER_REGEXP             = regexp.MustCompile(`\bsuper[\s]*[(]`)
+	UI_TEMPLATE_NAME_REGEXP              = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
+	UI_TEMPLATE_EXTENDS_TO_SUPER_REGEXP  = regexp.MustCompile(`\b(extends[\s]*[=].*)super`)
 
 	CSS_PLAIN_CLASS_REGEXP = regexp.MustCompile(`^[\.][a-zA-Z_\-0-9]*$`)
 )

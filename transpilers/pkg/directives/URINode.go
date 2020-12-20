@@ -1,7 +1,6 @@
 package directives
 
 import (
-	tokens "../tokens/html"
 	"../tree"
 )
 
@@ -13,12 +12,8 @@ func NewURINode(parent Node) *URINode {
 	return &URINode{newNodeData(nil, parent)}
 }
 
-func (n *URINode) MapBlocks(blocks *tokens.StringDict) error {
-	return nil
-}
-
-func (n *URINode) PopOp(id string) (Operation, bool, error) {
-	return nil, false, nil
+func (n *URINode) PopOp(id string) (Operation, error) {
+	return nil, nil
 }
 
 func (n *URINode) incrementElementCountFolded() {

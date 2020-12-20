@@ -363,10 +363,6 @@ func (t *HTML) Write(indent string, nl, tab string) string {
 	return result
 }
 
-func (t *HTML) CollectStates() map[string][]string {
-	return collectStates(t.Attributes())
-}
-
 func (t *HTML) InnerHTML() string {
 	return ""
 }

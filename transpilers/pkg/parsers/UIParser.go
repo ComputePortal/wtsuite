@@ -167,7 +167,7 @@ func (p *UIParser) BuildTags() ([]*html.Tag, error) {
 
 		if t.Name() == "if" && (len(stack) == 0 || stack[len(stack)-1].Name() != "ifelse") {
 			ifElseCtx := t.Context()
-			ifElseTag := html.NewTag("ifelse", html.NewEmptyRawDict(ifElseCtx),
+			ifElseTag := html.NewDirectiveTag("ifelse", html.NewEmptyRawDict(ifElseCtx),
 				[]*html.Tag{}, ifElseCtx)
 
 			if err := appendTagInner(ifElseTag); err != nil {
@@ -234,26 +234,26 @@ func (p *UIParser) buildTextTag(str string, inline bool, ctx context.Context) (*
 	return html.NewTextTag(str, ctx), nil
 }
 
-func (p *UIParser) buildGenericStatement(name string, ctx context.Context) (*html.Tag, error) {
+func (p *UIParser) buildGenericDirective(name string, ctx context.Context) (*html.Tag, error) {
 	fnPre := func(_ html.Token, ts []raw.Token) []raw.Token {
 		return p.convertWords(ts)
 	}
 
-	attr, err := p.buildStatementAttributes(-1, -1, ctx, fnPre)
+	attr, err := p.buildDirectiveAttributes(-1, -1, ctx, fnPre)
 	if err != nil {
 		return nil, err
 	}
 
 	// children are appended later
-	return html.NewTag(name, attr, []*html.Tag{}, ctx), nil
+	return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
 }
 
-func (p *UIParser) buildImportExportStatement(name string, dynamic bool, ctx context.Context) (*html.Tag, error) {
+func (p *UIParser) buildImportExportDirective(name string, dynamic bool, ctx context.Context) (*html.Tag, error) {
 	fnPre := func(_ html.Token, ts []raw.Token) []raw.Token {
 		return p.convertWords(ts)
 	}
 
-	attr, err := p.buildStatementAttributes(-1, -1, ctx, fnPre)
+	attr, err := p.buildDirectiveAttributes(-1, -1, ctx, fnPre)
 	if err != nil {
 		return nil, err
 	}
@@ -261,10 +261,10 @@ func (p *UIParser) buildImportExportStatement(name string, dynamic bool, ctx con
 	attr.Set(html.NewValueString(".dynamic", ctx), html.NewValueBool(dynamic, ctx))
 
 	// children are appended later
-	return html.NewTag(name, attr, []*html.Tag{}, ctx), nil
+	return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
 }
 
-func (p *UIParser) matchFunctionStatement(ctx context.Context) ([2]int, error) {
+func (p *UIParser) matchFunctionDirective(ctx context.Context) ([2]int, error) {
 	containerCount := 0
 
 	firstBrace := -1
@@ -305,8 +305,8 @@ func (p *UIParser) matchFunctionStatement(ctx context.Context) ([2]int, error) {
 
 // everything following the function keyword
 // eat until first closing brace (containerCount == 0
-func (p *UIParser) buildFunctionStatement(ctx context.Context) (*html.Tag, error) {
-	r, err := p.matchFunctionStatement(ctx)
+func (p *UIParser) buildFunctionDirective(ctx context.Context) (*html.Tag, error) {
+	r, err := p.matchFunctionDirective(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -343,11 +343,11 @@ func (p *UIParser) buildFunctionStatement(ctx context.Context) (*html.Tag, error
 	nameHtmlToken := html.NewValueString(nameToken.Value(), nameToken.Context())
 	varAttr.Set(nameHtmlToken, fnValue)
 
-	return html.NewTag("var", varAttr, []*html.Tag{}, ctx), nil
+	return html.NewDirectiveTag("var", varAttr, []*html.Tag{}, ctx), nil
 }
 
-func (p *UIParser) buildVarStatement(ctx context.Context) (*html.Tag, error) {
-	return p.buildGenericStatement("var", ctx)
+func (p *UIParser) buildVarDirective(ctx context.Context) (*html.Tag, error) {
+	return p.buildGenericDirective("var", ctx)
 }
 
 func (p *UIParser) buildTagAttributes(ts_ []raw.Token, ctx context.Context) (*html.RawDict, error) {
@@ -450,15 +450,15 @@ func (p *UIParser) buildTagAttributes(ts_ []raw.Token, ctx context.Context) (*ht
 	return attr, nil
 }
 
-func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
+func (p *UIParser) buildTemplateDirective(ctx context.Context) (*html.Tag, error) {
   p.eatWhitespace() 
 	rName, isString := p.eatNonWhitespace()
   if rName[0] == rName[1] {
     errCtx := ctx
-    return nil, errCtx.NewError("Error: couldn't find the class name")
+    return nil, errCtx.NewError("Error: couldn't find the template name")
   } else if isString {
     errCtx := p.NewContext(rName[0], rName[1])
-    return nil, errCtx.NewError("Error: expected name of class, got literal string instead")
+    return nil, errCtx.NewError("Error: expected name of template, got literal string instead")
   }
   nameCtx := p.NewContext(rName[0], rName[1])
 	nameKey := html.NewValueString("name", nameCtx)
@@ -467,7 +467,7 @@ func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
 	start := p.pos
 
 	// look for the closing super, and get the attributes from that range
-	rSuper, _, superOk := p.nextMatch(patterns.UI_CLASS_SUPER_REGEXP, true)
+	rSuper, _, superOk := p.nextMatch(patterns.UI_TEMPLATE_SUPER_REGEXP, true)
 	if !superOk {
 		return nil, ctx.NewError("Error: no super keyword found")
 	}
@@ -496,24 +496,12 @@ func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
 				res := make([]raw.Token, 0)
 
 				for i := 0; i < len(ts); i++ {
-					if i < len(ts)-1 && raw.IsSymbol(ts[i+1], "!") && raw.IsAnyWord(ts[i]) {
-						w, err := raw.AssertWord(ts[i])
-						if err != nil {
-							panic(err)
-						}
-
-						entryCtx := context.MergeContexts(w.Context(), ts[i+1].Context())
-						entry := raw.NewWordLiteralString(w.Value()+"!", entryCtx)
-						res = append(res, entry)
-						i++
-					} else {
-						var tNext raw.Token = nil
-						if i < len(ts)-1 {
-							tNext = ts[i+1]
-						}
-						t := p.convertWord(ts[i], tNext)
-						res = append(res, t)
-					}
+          var tNext raw.Token = nil
+          if i < len(ts)-1 {
+            tNext = ts[i+1]
+          }
+          t := p.convertWord(ts[i], tNext)
+          res = append(res, t)
 				}
 
 				return res
@@ -523,7 +511,7 @@ func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
 		return p.convertWords(ts)
 	}
 
-	attr, err := p.buildStatementAttributes(start, rSuper[0], ctx, fnPre)
+	attr, err := p.buildDirectiveAttributes(start, rSuper[0], ctx, fnPre)
 	if err != nil {
 		return nil, err
 	}
@@ -590,10 +578,10 @@ func (p *UIParser) buildClassStatement(ctx context.Context) (*html.Tag, error) {
 		p.pos = rSuperParens[1]
 	}
 
-	return html.NewTag("class", attr, []*html.Tag{}, ctx), nil
+	return html.NewDirectiveTag("template", attr, []*html.Tag{}, ctx), nil
 }
 
-func (p *UIParser) buildExportedStatement(ctx context.Context) (*html.Tag, error) {
+func (p *UIParser) buildExportedDirective(ctx context.Context) (*html.Tag, error) {
 	addExportAttr := func(attr *html.RawDict, exportCtx context.Context) {
 		exportToken := html.NewValueString("export", exportCtx)
 		flagToken := html.NewValueString("", exportCtx)
@@ -605,7 +593,7 @@ func (p *UIParser) buildExportedStatement(ctx context.Context) (*html.Tag, error
 	if isString || rName[0] == rName[1] {
 		// is regular export
 		p.pos = prevPos
-		return p.buildGenericStatement("export", ctx)
+		return p.buildGenericDirective("export", ctx)
 	} else {
 		exportCtx := ctx
 		tagCtx := p.NewContext(rName[0], rName[1])
@@ -613,7 +601,7 @@ func (p *UIParser) buildExportedStatement(ctx context.Context) (*html.Tag, error
 		name := p.Write(rName[0], rName[1])
 		switch name {
 		case "var":
-			tag, err := p.buildVarStatement(tagCtx)
+			tag, err := p.buildVarDirective(tagCtx)
 			if err != nil {
 				return nil, err
 			}
@@ -621,8 +609,8 @@ func (p *UIParser) buildExportedStatement(ctx context.Context) (*html.Tag, error
 			addExportAttr(tag.RawAttributes(), exportCtx)
 
 			return tag, nil
-		case "class":
-			tag, err := p.buildClassStatement(tagCtx)
+		case "template":
+			tag, err := p.buildTemplateDirective(tagCtx)
 			if err != nil {
 				return nil, err
 			}
@@ -633,7 +621,7 @@ func (p *UIParser) buildExportedStatement(ctx context.Context) (*html.Tag, error
 			//return html.NewTag(name, attr, []*html.Tag{}, tagCtx), nil
 			return tag, nil
 		case "function":
-			tag, err := p.buildFunctionStatement(ctx)
+			tag, err := p.buildFunctionDirective(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -643,7 +631,7 @@ func (p *UIParser) buildExportedStatement(ctx context.Context) (*html.Tag, error
 			return tag, nil
 		default:
 			p.pos = prevPos
-			return p.buildImportExportStatement("export", false, ctx)
+			return p.buildImportExportDirective("export", false, ctx)
 		}
 	}
 }
@@ -754,6 +742,8 @@ func (p *UIParser) buildTag(indent int) (*html.Tag, error) {
 	tagCtx := p.NewContext(r[0], r[1])
 
 	str := p.Write(r[0], r[1]) // name or literal string
+  followedByParens := (r[1] < len(p.raw)) && (p.raw[r[1]] == '(') // non directive versions of template/var must be followed by parens immediately
+
 	switch {
 	case isString:
 		return p.buildTextTag(str, indent == -1, tagCtx)
@@ -761,25 +751,25 @@ func (p *UIParser) buildTag(indent int) (*html.Tag, error) {
 		if indent != 0 {
 			return nil, tagCtx.NewError("Error: export cannot be indented")
 		}
-		return p.buildExportedStatement(tagCtx)
+		return p.buildExportedDirective(tagCtx)
 	case indent != -1 && str == "import":
-		return p.buildImportExportStatement(str, indent != 0, tagCtx)
-	case indent != -1 && str == "class":
-		return p.buildClassStatement(tagCtx)
-	case indent != -1 && str == "var":
-		return p.buildVarStatement(tagCtx)
+		return p.buildImportExportDirective(str, indent != 0, tagCtx)
+	case indent != -1 && !followedByParens && str == "template":
+		return p.buildTemplateDirective(tagCtx)
+	case indent != -1 && !followedByParens && str == "var":
+		return p.buildVarDirective(tagCtx)
 	case indent != -1 && str == "function":
-		return p.buildFunctionStatement(tagCtx)
-	case indent != -1 && (str == "for" || str == "if" || str == "else" || str == "elseif" || str == "switch" || str == "case" || str == "default" || str == "print" || str == "replace" || str == "append" || str == "prepend"):
+		return p.buildFunctionDirective(tagCtx)
+	case indent != -1 && (str == "for" || str == "if" || str == "else" || str == "elseif" || str == "switch" || str == "case" || str == "default" || str == "print" || str == "replace" || str == "append" || str == "prepend" || str == "block"):
 		// dummy is like a regular tag!
-		return p.buildGenericStatement(str, tagCtx)
+		return p.buildGenericDirective(str, tagCtx)
 	default:
 		return p.buildGenericTag(str, indent == -1, tagCtx)
 	}
 }
 
 // eat each next token (consequetive non-whitespace)
-func (p *UIParser) buildStatementAttributes(start, end int, tagCtx context.Context,
+func (p *UIParser) buildDirectiveAttributes(start, end int, tagCtx context.Context,
 	fnPre func(html.Token, []raw.Token) []raw.Token) (*html.RawDict, error) {
 
 	keys := make([]html.Token, 0)
@@ -794,7 +784,7 @@ func (p *UIParser) buildStatementAttributes(start, end int, tagCtx context.Conte
 	}
 
 	for true {
-		rVal, rNextKey, err := p.matchNextStatementAttribute(end)
+		rVal, rNextKey, err := p.matchNextDirectiveAttribute(end)
 		if err != nil {
 			return nil, err
 		}
@@ -822,7 +812,7 @@ func (p *UIParser) buildStatementAttributes(start, end int, tagCtx context.Conte
 				return fnPre(key, ts)
 			}
 
-			val, err := p.buildStatementAttributeValue(rVal, fnPre_)
+			val, err := p.buildDirectiveAttributeValue(rVal, fnPre_)
 			if err != nil {
 				return nil, err
 			}
@@ -1054,7 +1044,7 @@ func (p *UIParser) parseRawValue(s string, ctx context.Context) ([]raw.Token, er
 	return fp.nestOperators(ts)
 }
 
-func (p *UIParser) buildStatementAttributeValue(r [2]int,
+func (p *UIParser) buildDirectiveAttributeValue(r [2]int,
 	fnPre func(ts []raw.Token) []raw.Token) (html.Token, error) {
 	//s := p.writeWithoutLineContinuation(r[0], r[1])
 	//fmt.Printf("value from %d to %d: \"%s\"\n", r[0], r[1], s)
@@ -1072,7 +1062,7 @@ func (p *UIParser) buildStatementAttributeValue(r [2]int,
 // eat up to next equals sign (preceded by whitespace or word char)
 // return prev value range, and range for next attr key
 // either can be zero, if both are zero then there are no more attributes
-func (p *UIParser) matchNextStatementAttribute(end int) ([2]int, [2]int, error) {
+func (p *UIParser) matchNextDirectiveAttribute(end int) ([2]int, [2]int, error) {
 	// all symbols expect more
 	// containers need to be matched
 	// preunary symbols are a difficulty and require an extra check

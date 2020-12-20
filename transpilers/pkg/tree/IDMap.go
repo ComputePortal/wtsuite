@@ -13,7 +13,6 @@ type IDMapTag interface {
 	Name() string
 	ToJSType() string
 	InnerHTML() string // empty if no direct descendant is text
-	CollectStates() map[string][]string
 	Context() context.Context
 }
 

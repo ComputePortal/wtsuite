@@ -17,9 +17,9 @@ type Scope interface {
 	GetVar(key string) functions.Var
 	SetVar(key string, v functions.Var)
 
-	HasClass(key string) bool
-	GetClass(key string) Class
-	SetClass(key string, d Class)
+	HasTemplate(key string) bool
+	GetTemplate(key string) Template
+	SetTemplate(key string, d Template)
 
 	listValidVarNames() string
 
@@ -31,32 +31,17 @@ func IsTopLevel(scope Scope) bool {
 	return scope.Parent() == nil
 }
 
-func buildAttributes(scope Scope, enumNode *ClassNode, tag *tokens.Tag,
+func buildAttributes(scope Scope, tag *tokens.Tag,
 	pos2opt []string) (*tokens.StringDict, error) {
 	attr, err := tag.Attributes(pos2opt)
 	if err != nil {
 		return nil, err
 	}
 
-	if enumNode == nil {
-		attr, err = attr.EvalStringDict(scope)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		scanFn := func(key *tokens.String, lst_ tokens.Token) error {
-			if tokens.IsAttrEnumList(lst_) {
-				lst := lst_.(*tokens.List)
-				enumNode.addAttrEnum(key.Value(), lst)
-			}
-			return nil
-		}
-
-		attr, err = attr.EvalStringDictScan(scope, scanFn)
-		if err != nil {
-			return nil, err
-		}
-	}
+  attr, err = attr.EvalStringDict(scope)
+  if err != nil {
+    return nil, err
+  }
 
 	if style_, ok := attr.Get("style"); ok && tokens.IsString(style_) {
 		styleStr, err := tokens.AssertString(style_)
@@ -76,13 +61,13 @@ func buildAttributes(scope Scope, enumNode *ClassNode, tag *tokens.Tag,
 }
 
 // NodeType can change from parentNode to this node
+// collectDefaultOps==true in case Template extends this tag
 func buildTree(parent Scope, parentNode Node, nt NodeType,
-	tagToken *tokens.Tag, collectDefaultOps bool) error {
+	tagToken *tokens.Tag, opName string) error {
 
-	enumNode, _ := NewClassNode(parentNode, []Operation{})
-	scope := NewSubScope(parent, enumNode) // the enumNode absorbs intermediate enum declarations
+	scope := NewSubScope(parent, parentNode) // the enumNode absorbs intermediate enum declarations
 
-	attr, err := buildAttributes(scope, enumNode, tagToken, []string{})
+	attr, err := buildAttributes(scope, tagToken, []string{})
 	if err != nil {
 		return err
 	}
@@ -110,17 +95,6 @@ func buildTree(parent Scope, parentNode Node, nt NodeType,
 		return err
 	}
 
-	id := tag.GetID()
-	hasId := id != "" || collectDefaultOps
-	var op Operation
-	hasOp := false
-	if hasId {
-		op, hasOp, err = parentNode.PopOp(id)
-		if err != nil {
-			return err
-		}
-	}
-
 	var newNode Node
 	switch nt {
 	case SVG:
@@ -131,15 +105,23 @@ func buildTree(parent Scope, parentNode Node, nt NodeType,
 		panic("unrecognized node type")
 	}
 
-	if hasOp {
-		if err := op.Apply(scope, parentNode, newNode, tag, tagToken.Children()); err != nil {
+	var op Operation
+	if opName != "" {
+		op, err = parentNode.PopOp("default")
+		if err != nil {
+			return err
+		}
+	}
+
+  if err := parentNode.AppendChild(tag); err != nil {
+    return err
+  }
+
+	if op != nil {
+		if err := op.Apply(scope, newNode, tagToken.Children()); err != nil {
 			return err
 		}
 	} else {
-		if err := parentNode.AppendChild(tag); err != nil {
-			return err
-		}
-
 		for _, child := range tagToken.Children() {
 			if err := BuildTag(scope, newNode, child); err != nil {
 				return err
@@ -147,15 +129,17 @@ func buildTree(parent Scope, parentNode Node, nt NodeType,
 		}
 	}
 
-	if collectDefaultOps && tag.GetID() != "" {
+  // XXX: when are default ops suddenly available after the children are built?
+	if opName != "" {
+    panic("remove this if this is reached")
 		// can only be append op
-		op, hasOp, err := parentNode.PopOp("")
+		op, err := parentNode.PopOp(opName)
 		if err != nil {
 			return err
 		}
 
-		if hasOp {
-			if err := op.Apply(scope, parentNode, newNode, nil, []*tokens.Tag{}); err != nil {
+		if op != nil {
+			if err := op.Apply(scope, newNode, []*tokens.Tag{}); err != nil {
 				return err
 			}
 		}
@@ -168,15 +152,35 @@ func buildText(node Node, tag *tokens.Tag) error {
 	return node.AppendChild(tree.NewText(tag.Text(), tag.Context()))
 }
 
+func buildDeferred(scope Scope, node *TemplateNode, tag *tokens.Tag) error {
+  key := tag.Name()
+  switch {
+  case tag.IsText() || scope.HasTemplate(key) || key == "block" || key == "print":
+    return node.AppendToDefault(scope, tag)
+  case key == "append":
+    // append directive is not directly registered
+    return AppendToBlock(scope, node, tag)
+  case key == "replace":
+    // replace directive is not directly registered
+    return ReplaceBlockChildren(scope, node, tag)
+  case IsDirective(key) && tag.IsDirective():
+		return BuildDirective(scope, node, tag)
+  default:
+    return node.AppendToDefault(scope, tag)
+  }
+}
+
 func BuildTag(scope Scope, node Node, tag *tokens.Tag) error {
 	key := tag.Name()
 
 	switch {
+  case IsDeferringTemplateNode(node):
+    return buildDeferred(scope, node.(*TemplateNode), tag)
 	case tag.IsText():
 		return buildText(node, tag)
-	case scope.HasClass(key):
-		return BuildClass(scope, node, tag)
-	case IsDirective(key):
+	case scope.HasTemplate(key):
+		return BuildTemplate(scope, node, tag)
+	case IsDirective(key) && tag.IsDirective():
 		return BuildDirective(scope, node, tag)
 	case node.Type() == SVG && key == "path":
 		return buildSVGPath(scope, node, tag)
@@ -185,14 +189,14 @@ func BuildTag(scope Scope, node Node, tag *tokens.Tag) error {
 	case key == "path" || key == "arrow":
 		panic("node type is bad")
 	default:
-		if err := buildTree(scope, node, node.Type(), tag, false); err != nil {
+		if err := buildTree(scope, node, node.Type(), tag, ""); err != nil {
 			// some error hints
 			if key == "else" || key == "elseif" {
 				context.AppendString(err, "Hint: did you forget to wrap in ifelse tag?")
 			} else if key == "case" || key == "default" {
 				context.AppendString(err, "Hint: did you forget to wrap in switch tag?")
 			} else if key == "replace" || key == "append" || key == "preprend" {
-				context.AppendString(err, "Hint: are you trying to instantiate a class'ed tag?")
+				context.AppendString(err, "Hint: are you trying to instantiate a templated tag?")
 			} else if node.Type() != SVG && svg.IsTag(key) {
 				context.AppendString(err, "Hint: are you trying to use an svg tag?")
 			}
@@ -226,20 +230,8 @@ func eval(scope Scope, key string, args []tokens.Token, ctx context.Context) (to
 		return evalMathURI(scope, args, ctx)
 	case key == "new":
 		return evalNew(scope, args, ctx)
-	case key == "block-id":
-		return evalBlockID(scope, args, ctx)
 	case key == "search-style":
 		return evalSearchStyle(scope, args, ctx)
-	/*case key == "attr": // 20200509: impossible to check with this()
-		return evalAttrEnum(scope, args, ctx)
-	case key == "attrs":
-		return evalAttrEnumS(scope, args, ctx)
-	case key == "attre":
-		return evalAttrEnumS(scope, args, ctx)
-	case key == "attrc":
-		return evalAttrEnumC(scope, args, ctx)
-	case key == "attra":
-		return evalAttrEnumA(scope, args, ctx)*/
 	case key == "idx":
 		return evalElementCount(scope, args, ctx)
 	case key == "var":

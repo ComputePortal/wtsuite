@@ -89,25 +89,8 @@ func validateAttributes(id string, name string, attr *tokens.StringDict) error {
 	// check attribute values
 	return attr.Loop(func(key *tokens.String, value tokens.Token, last bool) error {
 		if tokens.IsList(value) {
-			if !tokens.IsAttrEnumList(value) {
-				errCtx := value.Context()
-				return errCtx.NewError("Error: not an attr enum list")
-			}
-
-			lst, err := tokens.AssertList(value)
-			if err != nil {
-				panic(err)
-			}
-
-			if lst.Len() == 0 {
-				errCtx := value.Context()
-				return errCtx.NewError("Error: attr list with no entries is pointless")
-			}
-
-			if key.Value() == "class" || key.Value() == "href" || key.Value() == "style" || key.Value() == "__style__" {
-				errCtx := value.Context()
-				return errCtx.NewError("Error: attr " + key.Value() + " cannot have an attr enum list value")
-			}
+      errCtx := value.Context()
+      return errCtx.NewError("Error: a list is not a valid final attribute")
 		} else if tokens.IsStringDict(value) {
 			if key.Value() != "style" && key.Value() != "__style__" {
 				errCtx := value.Context()
@@ -119,9 +102,9 @@ func validateAttributes(id string, name string, attr *tokens.StringDict) error {
 		} else if (!tokens.IsNull(value) && !tokens.IsPrimitive(value)) && (key.Value() == "class" || key.Value() == "href") {
 			errCtx := value.Context()
 			return errCtx.NewError("Error: expected primitive")
-		} else if !tokens.IsBool(value) && !tokens.IsNull(value) && !tokens.IsPrimitive(value) && !tokens.IsAttrEnumList(value) {
+		} else if !tokens.IsBool(value) && !tokens.IsNull(value) && !tokens.IsPrimitive(value) {
 			errCtx := value.Context()
-			return errCtx.NewError("Error: expected primitive or enum list")
+			return errCtx.NewError("Error: expected primitive")
 		}
 
 		return nil
@@ -249,37 +232,12 @@ func (t *tagData) writeAttributes() string {
 		case tokens.IsTrueBool(val):
 			b.WriteString(" ")
 			b.WriteString(k)
-		case tokens.IsAttrEnumList(val):
-			// a state 'enum'
-			lst, err := tokens.AssertList(val)
-			if err != nil {
-				panic(err)
-			}
-
-			value := lst.GetTokens()[0]
-			if !tokens.IsNull(value) {
-				b.WriteString(" ")
-				b.WriteString(k)
-
-				str, err := tokens.AssertString(value)
-				if err != nil {
-					panic(err)
-				}
-				v := str.Write()
-				if v != "" {
-					b.WriteString("=\"")
-					b.WriteString(v)
-					b.WriteString("\"")
-				}
-			}
 		default:
 			value, err := tokens.AssertPrimitive(val)
 			if err != nil {
 				if tokens.IsList(val) {
-					if !tokens.IsAttrEnumList(val) {
-						errCtx := val.Context()
-						return errCtx.NewError("Error: not an attr enum list")
-					}
+          errCtx := val.Context()
+          return errCtx.NewError("Error: a list can't be used as a final attribute")
 				}
 				return err
 			}

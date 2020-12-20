@@ -269,25 +269,6 @@ func AssertList(t Token) (*List, error) {
 	return l, nil
 }
 
-func IsAttrEnumList(t Token) bool {
-	l, ok := t.(*List)
-	if !ok {
-		return false
-	}
-
-	for i, v := range l.values {
-		if IsNull(v) {
-			if i != 0 {
-				return false
-			}
-		} else if !IsString(v) {
-			return false
-		}
-	}
-
-	return true
-}
-
 // ignore first null to accomodate enum attrs
 func (t *List) GetStrings() ([]string, error) {
 	res := make([]string, 0)

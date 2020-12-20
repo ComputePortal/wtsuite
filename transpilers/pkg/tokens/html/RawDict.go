@@ -174,23 +174,7 @@ func (t *RawDict) toKeyDict(scope Scope, dtype DictType, scanFn func(Token, Toke
 }
 
 func (t *RawDict) EvalRawDict(scope Scope) (*RawDict, error) {
-	result := make([]struct{ key, value Token }, 0)
-
-	for _, item := range t.items {
-		key, err := item.key.Eval(scope)
-		if err != nil {
-			return nil, err
-		}
-
-		val, err := item.value.Eval(scope)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, struct{ key, value Token }{key, val})
-	}
-
-	return &RawDict{result, TokenData{t.Context()}}, nil
+  return t.EvalRawDictScan(scope, nil)
 }
 
 func (t *RawDict) EvalRawDictScan(scope Scope,
@@ -210,9 +194,11 @@ func (t *RawDict) EvalRawDictScan(scope Scope,
 			return nil, err
 		}
 
-		if err := scanFn(key, val); err != nil {
-			return nil, err
-		}
+    if scanFn != nil {
+      if err := scanFn(key, val); err != nil {
+        return nil, err
+      }
+    }
 
 		result = append(result, struct{ key, value Token }{key, val})
 	}

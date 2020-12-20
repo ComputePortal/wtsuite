@@ -38,3 +38,18 @@ func (scope *TagScope) Eval(key string, args []tokens.Token,
 	ctx context.Context) (tokens.Token, error) {
 	return eval(scope, key, args, ctx)
 }
+
+// blocks must be inside template scope
+func InsideTemplateScope(scope Scope) bool {
+  if node := scope.GetNode(); node != nil {
+    if _, ok := node.(*TemplateNode); ok {
+      return true
+    }
+  } 
+
+  if parent := scope.Parent(); parent != nil {
+    return InsideTemplateScope(parent)
+  }
+
+  return false
+}

@@ -26,13 +26,10 @@ type Node interface {
 
 	AppendChild(tree.Tag) error
 
-	MapBlocks(blocks *tokens.StringDict) error
 	GetOperations() []Operation               // for merging
-	PopOp(id string) (Operation, bool, error) // for application
+	PopOp(id string) (Operation, error) // for application
 
 	SearchStyle(key *tokens.String, ctx context.Context) (tokens.Token, error)
-	// if id == nil search this node only
-	SearchAttrEnum(id *tokens.String, key *tokens.String, ctx context.Context) (*tokens.List, error)
 }
 
 type NodeData struct {
@@ -40,7 +37,6 @@ type NodeData struct {
 	parent Node
 
 	ecf int
-	// TODO: list of operations
 }
 
 func newNodeData(tag tree.Tag, parent Node) NodeData {
@@ -109,15 +105,11 @@ func (n *NodeData) AppendChild(child tree.Tag) error {
 	return nil
 }
 
-func (n *NodeData) MapBlocks(blocks *tokens.StringDict) error {
-	return n.parent.MapBlocks(blocks)
-}
-
 func (n *NodeData) GetOperations() []Operation {
 	return n.parent.GetOperations()
 }
 
-func (n *NodeData) PopOp(id string) (Operation, bool, error) {
+func (n *NodeData) PopOp(id string) (Operation, error) {
 	return n.parent.PopOp(id)
 }
 
@@ -135,27 +127,4 @@ func (n *NodeData) SearchStyle(key *tokens.String, ctx context.Context) (tokens.
 	}
 
 	return n.parent.SearchStyle(key, ctx)
-}
-
-func (n *NodeData) SearchAttrEnum(id *tokens.String, key *tokens.String, ctx context.Context) (*tokens.List, error) {
-	if id != nil && (id.Value() != n.tag.GetID() && !(id.Value() == "html" && n.tag.Name() == "html") && !(id.Value() == "body" && n.tag.Name() == "body")) {
-		return n.parent.SearchAttrEnum(id, key, ctx)
-	}
-
-	attr := n.tag.Attributes()
-
-	if v_, ok := attr.Get(key.Value()); !ok {
-		return nil, ctx.NewError("Error: attr " + key.Value() + " not found")
-	} else {
-		if !tokens.IsAttrEnumList(v_) {
-			return nil, ctx.NewError("Error: attr " + key.Value() + " value is not an enum list")
-		}
-
-		lst, err := tokens.AssertList(v_)
-		if err != nil {
-			panic(err)
-		}
-
-		return lst, nil
-	}
 }
