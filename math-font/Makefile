@@ -1,4 +1,4 @@
-dst = ../transpilers/pkg/tokens/math/serif
+dst = ../pkg/tokens/math/serif
 
 build ?= $(abspath ../build)
 

@@ -23,6 +23,7 @@ syn match DecreaseIndent '\s*\zs[\<]\ze\s*'
 " syn match Indentifier '\s*\zs[#!a-zA-Z_][a-zA-Z0-9_\.\-]*\ze\s*' containedin=IdentifierLine
 
 " statement keywords that are only sensible on the beginning of a line
+syn match Statement '^\zspermissive\ze\s*'
 syn match Statement '^\zsexport\ze\s\+'
 
 " statements can span multiple lines, so these keywords can be anywhere
@@ -32,9 +33,9 @@ syn match Statement '^\zsexport\ze\s\+'
 "syn match Statement contained '^\s\*\zs\(import\|print\|for\|switch\|case\|default\|if\|else\|elseif\|var\|function\)\ze\s\+'
 " syn keyword StatementKeywords from in 
 
-syn keyword ClassKeywords contained class extends blocks super
-syn region Class start='class' end='super' contains=ClassKeywords,Block,VarAction,Constant,String, Comment keepend
-syn keyword ClassKeywords this
+syn keyword TemplateKeywords contained template extends blocks super
+syn region Template start='template' end='super' contains=TemplateKeywords,Block,VarAction,Constant,String, Comment keepend
+syn keyword TemplateKeywords this
 
 syn keyword VarKeywords contained var 
 syn region Var start='var' end='=[^{]*' oneline contains=VarKeywords,Block,Action,Constant,String, Comment
@@ -74,6 +75,9 @@ syn region Elseif start='elseif' end='$' oneline contains=ElseifKeywords,Block,A
 
 syn keyword ElseKeywords contained else
 syn region Else start='else' end='$' oneline contains=ElseKeywords,Block,Action,Constant,String, Comment
+
+syn keyword DeclBlockKeywords contained block
+syn region DeclBlock start='block' end='$' oneline contains=DeclBlockKeywords,Comment
 
 syn keyword ReplaceKeywords contained replace
 syn region Replace start='replace' end='$' oneline contains=ReplaceKeywords,Block,Action,Constant,String, Comment
@@ -130,7 +134,7 @@ syn region	Comment	start="/\*" end="\*/" extend contains=Todo
 hi def link Action PreProc
 hi def link VarAction PreProc
 
-hi def link ClassKeywords Statement
+hi def link TemplateKeywords Statement
 hi def link VarKeywords Statement
 hi def link ForKeywords Statement
 hi def link ImportKeywords Statement
@@ -143,6 +147,7 @@ hi def link IfKeywords Statement
 hi def link ElseifKeywords Statement
 hi def link ElseKeywords Statement
 hi def link ReplaceKeywords Statement
+hi def link DeclBlockKeywords Statement
 hi def link AppendKeywords Statement
 hi def link PrependKeywords Statement
 hi def link FunctionKeywords Statement
