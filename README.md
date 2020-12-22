@@ -7,6 +7,7 @@
 * wt-search-index
 * wt-site
 * wt-svg-minify
+* wt-template
 * wt-template-syntax-tree
 
 Documentation can be found [here](https://computeportal.github.io/wtsuite-doc)
