@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"../tokens/context"
-	"../tokens/html"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func tokenizeHTMLWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {

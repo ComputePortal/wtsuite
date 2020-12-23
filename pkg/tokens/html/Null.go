@@ -1,7 +1,7 @@
 package html
 
 import (
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Null struct {

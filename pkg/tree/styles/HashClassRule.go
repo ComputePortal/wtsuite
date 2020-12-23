@@ -1,8 +1,8 @@
 package styles
 
 import (
-	tokens "../../tokens/html"
-	"../../tokens/raw"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 type HashClassRule struct {

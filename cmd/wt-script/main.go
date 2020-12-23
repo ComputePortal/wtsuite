@@ -9,14 +9,14 @@ import (
 	"regexp"
 	"strings"
 
-	"../../pkg/cache"
-	"../../pkg/directives"
-	"../../pkg/files"
-	"../../pkg/parsers"
-	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/macros"
-	"../../pkg/tokens/js/values"
-	"../../pkg/tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/cache"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 const (
@@ -210,7 +210,7 @@ func setUpEnv(cmdArgs CmdArgs) {
 	}
 
 	js.TARGET = cmdArgs.target
-	directives.ForceNewViewFileScriptRegistration()
+	directives.ForceNewViewFileScriptRegistration(directives.NewFileCache())
 
 	VERBOSITY = cmdArgs.verbosity
 	cache.VERBOSITY = cmdArgs.verbosity

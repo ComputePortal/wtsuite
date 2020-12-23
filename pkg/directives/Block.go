@@ -1,8 +1,7 @@
 package directives
  
 import (
-
-  tokens "../tokens/html"
+  tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func EvalBlock(scope Scope, node Node, tag *tokens.Tag) error {

@@ -1,7 +1,7 @@
 package js
 
 import (
-	"./values"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 )
 
 type Expression interface {

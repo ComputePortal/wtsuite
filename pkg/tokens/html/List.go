@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type List struct {
@@ -322,4 +322,19 @@ func ToStringList(t_ Token) (*List, error) {
 	}
 
 	return t, nil
+}
+
+func GolangSliceToList(x []interface{}, ctx context.Context) (*List, error) {
+  res := NewNilList(len(x), ctx)
+
+  for i := 0; i < len(x); i++ {
+    item, err := GolangToToken(x[i], ctx)
+    if err != nil {
+      return nil, err
+    }
+
+    res.values[i] = item
+  }
+
+  return res, nil
 }

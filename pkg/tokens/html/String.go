@@ -5,7 +5,7 @@ import (
 	"os"
 	"reflect"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type String struct {

@@ -4,9 +4,8 @@ package js
 import (
 	"strings"
 
-	"../context"
-
-	"../../files"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type ImportedVariable struct {

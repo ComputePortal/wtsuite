@@ -10,10 +10,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"../tokens/context"
-	"../tokens/js"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func tokenizeJSWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {

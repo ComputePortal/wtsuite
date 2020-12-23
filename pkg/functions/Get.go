@@ -3,8 +3,8 @@ package functions
 import (
 	"reflect"
 
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func Get(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {

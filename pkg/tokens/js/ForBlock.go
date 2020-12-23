@@ -3,7 +3,7 @@ package js
 import (
 	"strings"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 // common for For, ForIn, ForOf

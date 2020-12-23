@@ -1,8 +1,8 @@
 package tree
 
 import (
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 type Img struct {

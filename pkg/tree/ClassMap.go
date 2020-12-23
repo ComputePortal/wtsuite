@@ -1,7 +1,7 @@
 package tree
 
 import (
-	tokens "../tokens/html"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 type ClassMap interface {

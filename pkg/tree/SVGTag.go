@@ -3,8 +3,8 @@ package tree
 import (
 	"reflect"
 
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 type SVGTag interface {

@@ -1,8 +1,8 @@
 package functions
 
 import (
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func Xor(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {

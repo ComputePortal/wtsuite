@@ -1,8 +1,8 @@
 package styles
 
 import (
-	"../../tokens/context"
-	tokens "../../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func ImportFontFace(sel Selector, args []string, v tokens.Token, ctx context.Context) ([]Rule, error) {

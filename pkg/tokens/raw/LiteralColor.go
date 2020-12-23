@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type LiteralColor struct {

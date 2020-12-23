@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"../files"
+	"github.com/computeportal/wtsuite/pkg/files"
 )
 
 type JSCacheEntry struct {

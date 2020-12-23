@@ -1,7 +1,7 @@
 package js
 
 import (
-	"./prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
 )
 
 type FunctionScope struct {

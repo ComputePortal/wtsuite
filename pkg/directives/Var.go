@@ -1,10 +1,10 @@
 package directives
 
 import (
-	"../functions"
-	//"../tokens/context"
-	tokens "../tokens/html"
-	"../tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	//"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 func AssertValidVar(nameToken *tokens.String) error {

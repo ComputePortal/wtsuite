@@ -3,8 +3,8 @@ package raw
 import (
 	"strings"
 
-	"../context"
-	"../patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 // this is a temporary token, and shouldnt be available outside the parser package

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"../files"
-	"../tokens/patterns"
-	"../tree/styles"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type HTMLCacheEntry struct {
@@ -374,13 +374,7 @@ func (c *HTMLCache) RequiresUpdate(fname string) bool {
 	return c.requiresUpdate(fname, targetAge, m)
 }
 
-// rules need to be kept together
-func AddCssEntry(rules []string, htmlFile string) {
-	c, ok := _cache.(*HTMLCache)
-	if !ok {
-		panic("unexpected")
-	}
-
+func (c *HTMLCache) AddCssEntry(rules []string, htmlFile string) {
 	var keyBuilder strings.Builder
 	for _, r := range rules {
 		keyBuilder.WriteString(r)
@@ -405,6 +399,16 @@ func AddCssEntry(rules []string, htmlFile string) {
 	} else {
 		c.CssRules[key] = CSSCacheEntry{[]string{htmlFile}, rules, true}
 	}
+}
+
+// rules need to be kept together
+func AddCssEntry(rules []string, htmlFile string) {
+	c, ok := _cache.(*HTMLCache)
+	if !ok {
+		panic("unexpected")
+	}
+
+  c.AddCssEntry(rules, htmlFile)
 }
 
 func (c *HTMLCache) touchUpwards(fname string) {
@@ -488,13 +492,8 @@ func SaveHTMLCache(targetFile string) {
 	SaveCache(targetFile + " html")
 }
 
-func WriteCSSBundle(mathFontUrl string) string {
+func (c *HTMLCache) WriteCSSBundle(mathFontUrl string) string {
 	var b strings.Builder
-
-	c, ok := _cache.(*HTMLCache)
-	if !ok {
-		panic("unexpected")
-	}
 
 	if mathFontUrl != "" {
 		b.WriteString("@font-face{font-family:")
@@ -520,6 +519,15 @@ func WriteCSSBundle(mathFontUrl string) string {
 	compressed := compressCSS(b.String())
 
   return compressed
+}
+
+func WriteCSSBundle(mathFontUrl string) string {
+	c, ok := _cache.(*HTMLCache)
+	if !ok {
+		panic("unexpected")
+	}
+
+  return c.WriteCSSBundle(mathFontUrl)
 }
 
 func SaveCSSBundle(dst string, mathFontUrl string, mathFontDst string) {

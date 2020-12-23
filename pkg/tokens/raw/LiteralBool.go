@@ -1,8 +1,8 @@
 package raw
 
 import (
-	"../context"
-	"../patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type LiteralBool struct {

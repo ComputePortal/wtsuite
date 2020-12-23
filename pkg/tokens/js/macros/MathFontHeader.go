@@ -4,7 +4,7 @@ import (
   "fmt"
   "strconv"
 
-  "../../math/serif"
+  "github.com/computeportal/wtsuite/pkg/tokens/math/serif"
 )
 
 type MathFontHeader struct {

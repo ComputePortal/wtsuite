@@ -4,10 +4,9 @@ import (
   "fmt"
   "strings"
 
-  "../values"
-
-  "../../context"
-  "../../js"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
+  "github.com/computeportal/wtsuite/pkg/tokens/js"
+  "github.com/computeportal/wtsuite/pkg/tokens/js/values"
 )
 
 type CastCall struct {

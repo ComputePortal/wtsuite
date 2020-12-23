@@ -1,9 +1,9 @@
 package directives
 
 import (
-	"../functions"
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func getUndefinedOrNull(scope Scope, keyToken_ tokens.Token, ctx context.Context) (tokens.Token, error) {

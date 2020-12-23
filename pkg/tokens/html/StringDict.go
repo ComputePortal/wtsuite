@@ -2,8 +2,9 @@ package html
 
 import (
 	"reflect"
+  "sort"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type StringDict struct {
@@ -197,4 +198,31 @@ func (t *StringDict) AssertOnlyValidKeys(validKeys []string) error {
 	}
 
   return nil
+}
+
+func GolangStringMapToStringDict(m map[string]interface{}, ctx context.Context) (*StringDict, error) {
+  // sort the keys alphabetically!
+  keys := make([]string, 0)
+  for k, _ := range m {
+    keys = append(keys, k)
+  }
+
+  sort.Strings(keys)
+
+  res := NewEmptyStringDict(ctx)
+
+  for _, k_ := range keys {
+    item_ := m[k_]
+
+    item, err := GolangToToken(item_, ctx)
+    if err != nil {
+      return nil, err
+    }
+
+    k := NewValueString(k_, ctx)
+
+    res.Set(k, item)
+  }
+
+  return res, nil
 }

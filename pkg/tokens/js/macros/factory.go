@@ -1,9 +1,9 @@
 package macros
 
 import (
-	"../"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 
-	"../../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var _classMacros = map[string]MacroGroup{

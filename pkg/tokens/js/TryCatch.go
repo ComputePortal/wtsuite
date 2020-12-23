@@ -3,9 +3,9 @@ package js
 import (
 	"strings"
 
-	"./prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type TryCatch struct {

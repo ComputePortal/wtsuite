@@ -1,15 +1,21 @@
 package directives
 
 import (
-	"../tree"
-	"../tree/scripts"
+  "github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
-func NewRoot(path string, url string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
-	_, node, err := BuildFile(path, "", true)
+func NewRoot(source files.Source, cache *FileCache, path string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
+	_, node, err := BuildFile(source, cache, path, "", true)
 	if err != nil {
 		return nil, nil, err
 	}
+
+  return FinalizeRoot(node, control, cssUrl, jsUrl)
+}
+
+func FinalizeRoot(node *RootNode, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
 
 	root_ := node.tag
 	root, ok := root_.(*tree.Root)
@@ -17,16 +23,7 @@ func NewRoot(path string, url string, control string, cssUrl string, jsUrl strin
 		panic("expected root")
 	}
 
-	// postprocessing
-	/*if err := root.VerifyElementCount(0, ELEMENT_COUNT); err != nil {
-		return nil, nil, nil, err
-	}*/
-
 	root.FoldDummy()
-
-	/*if err := root.VerifyElementCount(0, ELEMENT_COUNT_FOLDED); err != nil {
-		return nil, nil, nil, err
-	}*/
 
 	tree.RegisterParents(root)
 

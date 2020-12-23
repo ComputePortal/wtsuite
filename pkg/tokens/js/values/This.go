@@ -1,7 +1,7 @@
 package values
 
 import (
-  "../../context"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 // so we can assert each property is touched during construction

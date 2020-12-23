@@ -317,7 +317,7 @@ int main(int argc, char* argv[]) {
   }
 
   printf("package %s\n\n", package_name);
-  printf("import ( \"../boundingbox\")\n\n");
+  printf("import ( \"github.com/computeportal/wtsuite/pkg/tokens/math/boundingbox\" )\n\n");
   printf("var UnitsPerEm = %d\n\n", face->units_per_EM);
 
   if (FT_Set_Char_Size(face, 1000 << 6, 1000 << 6, 72, 72)) {

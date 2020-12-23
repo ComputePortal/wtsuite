@@ -1,7 +1,7 @@
 package raw
 
 import (
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type LiteralNull struct {

@@ -6,17 +6,16 @@ import (
 	"path/filepath"
 	"strings"
 
-	"../../pkg/files"
-	"../../pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
 )
 
 type CmdArgs struct {
 	inputFile string
-	xml       bool
 }
 
 func printUsageAndExit() {
-	fmt.Fprintf(os.Stderr, "Usage: %s [-?|-h|--help] [--xml] inputFile\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "Usage: %s [-?|-h|--help] inputFile\n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "  Note: this tool can only be used to analyze the attribute syntax-tree\n")
 	os.Exit(1)
 }
@@ -35,7 +34,6 @@ func parseArgs() CmdArgs {
 	// default args
 	cmdArgs := CmdArgs{
 		"",
-		false,
 	}
 
 	positional := make([]string, 0)
@@ -49,8 +47,6 @@ func parseArgs() CmdArgs {
 			switch arg {
 			case "-?", "-h", "--help":
 				printUsageAndExit()
-			case "--xml":
-				cmdArgs.xml = true
 			default:
 				messageAndExit("Error: unrecognized flag " + arg)
 			}
@@ -82,21 +78,19 @@ func parseArgs() CmdArgs {
 }
 
 func buildSyntaxTree(cmdArgs CmdArgs) {
-	if cmdArgs.xml {
-		p, err := parsers.NewHTMLParser(cmdArgs.inputFile)
-		if err != nil {
-			printSyntaxErrorAndExit(err)
-		}
+  path := cmdArgs.inputFile
+  if !filepath.IsAbs(path) {
+    panic("path should be absolute")
+  }
 
-		p.DumpTokens()
-	} else {
-		p, err := parsers.NewUIParser(cmdArgs.inputFile)
-		if err != nil {
-			printSyntaxErrorAndExit(err)
-		}
+  source := files.NewDefaultUIFileSource()
 
-		p.DumpTokens()
-	}
+  p, err := parsers.NewUIParser(source, path)
+  if err != nil {
+    printSyntaxErrorAndExit(err)
+  }
+
+  p.DumpTokens()
 }
 
 func main() {

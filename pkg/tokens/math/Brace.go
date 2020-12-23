@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"./boundingbox"
-
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/math/boundingbox"
 )
 
 const (

@@ -3,7 +3,7 @@ package main
 import (
   "strings"
 
-	"../../pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 )
 
 type PropertyEdge struct {

@@ -3,9 +3,9 @@ package prototypes
 import (
   "strings"
 
-  "../values"
+  "github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-  "../../context"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Tuple struct {

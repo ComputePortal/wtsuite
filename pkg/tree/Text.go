@@ -3,7 +3,7 @@ package tree
 import (
 	"strings"
 
-	"../tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Text struct {

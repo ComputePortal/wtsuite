@@ -6,15 +6,15 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+  "strings"
 
-	"../tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var htmlppPath = os.Getenv("HTMLPPPATH")
 var includeDirs = filepath.SplitList(htmlppPath)
 
 var (
-	XML_SYNTAX = false
 	JS_MODE    = false
 	VERBOSITY  = 0
 )
@@ -37,6 +37,10 @@ func PrependIncludeDirs(dirs []string) {
 
 func AppendIncludeDirs(dirs []string) {
 	includeDirs = append(includeDirs, dirs...)
+}
+
+func NewDefaultUIFileSource() Source {
+  return NewFileSource(includeDirs, UIPACKAGE_SUFFIX)
 }
 
 func IsFile(fname string) bool {
@@ -87,62 +91,22 @@ func AssertDir(dname string) error {
 	}
 }
 
-func search(currentFname string, refFname string, pkgSuffix string) (absFname string, isPackage bool, found error) {
-	if filepath.IsAbs(refFname) {
-		if err := AssertFile(refFname); err != nil {
-			return "", false, err
-		} else {
-			return refFname, false, nil
-		}
-	}
-
-	if !filepath.IsAbs(currentFname) {
-    if currentFname == "" {
-      panic("currentFname empty even though refFname isnt Abs: " + refFname)
-    } else {
-      panic("currentFname should be absolute, got: " + currentFname)
-    }
-	}
-
-	currentDir := filepath.Dir(currentFname)
-
-	searchDirs := append([]string{currentDir}, includeDirs...)
-
-	foundPackage := false
-
-	for _, dir := range searchDirs {
-		if dir == "" {
-			continue
-		}
-
-		fname := filepath.Join(dir, refFname)
-
-		if pkgSuffix != "" && IsDir(fname) {
-			fname = filepath.Join(fname, pkgSuffix)
-			foundPackage = true
-		}
-
-		if err := AssertFile(fname); err == nil {
-			if absFname, err := filepath.Abs(fname); err != nil {
-				return "", false, err
-			} else {
-				return absFname, foundPackage, nil
-			}
-		}
-	}
-
-	err := errors.New("not found")
-	return "", false, err
-}
-
 // currentFname is the caller, refFname is the file we are trying to find
 func Search(currentFname string, refFname string) (string, error) {
-	absPath, _, err := search(currentFname, refFname, "")
-	return absPath, err
+  fileSource := NewFileSource(includeDirs, "")
+
+	return fileSource.Search(currentFname, refFname)
 }
 
 func SearchPackage(currentFname string, refFname string, pkgSuffix string) (string, bool, error) {
-	return search(currentFname, refFname, pkgSuffix)
+  fileSource := NewFileSource(includeDirs, pkgSuffix)
+
+  absPath, err := fileSource.Search(currentFname, refFname)
+  if err != nil {
+    return "", false, err
+  }
+
+  return absPath, strings.HasSuffix(absPath, pkgSuffix), nil
 }
 
 func Abbreviate(path string) string {

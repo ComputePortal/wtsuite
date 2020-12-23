@@ -3,11 +3,10 @@ package js
 import (
 	"strings"
 
-	"./prototypes"
-	"./values"
-
-	"../context"
-	"../patterns"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type LiteralString struct {

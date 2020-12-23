@@ -3,10 +3,10 @@ package js
 import (
 	"fmt"
 
-	"./prototypes"
-	"./values"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type LiteralFloat struct {

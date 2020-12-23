@@ -1,10 +1,10 @@
 package parsers
 
 import (
-	"../tokens/js"
-	"../tokens/js/prototypes"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func (p *JSParser) buildInterfaceExtendsExpression(ts []raw.Token) ([]*js.VarExpression, []raw.Token, error) {

@@ -8,10 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"../../pkg/directives"
-	"../../pkg/parsers"
-	"../../pkg/tree"
-	"../../pkg/tree/styles"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type CmdArgs struct {
@@ -185,7 +186,8 @@ func buildSVGFile(path string) (string, error) {
 
 	root := tree.NewSVGRoot(p.NewContext(0, 1))
 	node := directives.NewRootNode(root, directives.SVG)
-	fileScope := directives.NewRootScope(false)
+  // the source isn't really used, because the svg file doesnt contain import statements
+	fileScope := directives.NewFileScope(false, files.NewDefaultUIFileSource(), directives.NewFileCache())
 
 	for _, tag := range rawTags {
 		if err := directives.BuildTag(fileScope, node, tag); err != nil {

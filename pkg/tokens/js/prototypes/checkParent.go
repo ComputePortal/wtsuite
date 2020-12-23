@@ -1,9 +1,9 @@
 package prototypes
 
 import (
-  "../values"
+  "github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-  "../../context"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 func checkParent(p values.Prototype, other_ values.Interface, ctx context.Context) error {

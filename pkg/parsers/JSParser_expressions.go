@@ -3,10 +3,10 @@ package parsers
 import (
 	"strings"
 
-	"../tokens/js"
-	"../tokens/js/macros"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func (p *JSParser) buildLiteralStringExpression(t raw.Token) (js.Expression, error) {

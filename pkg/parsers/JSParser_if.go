@@ -1,9 +1,9 @@
 package parsers
 
 import (
-	"../tokens/js"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func (p *JSParser) buildIfStatement(ts []raw.Token) (*js.If, []raw.Token, error) {

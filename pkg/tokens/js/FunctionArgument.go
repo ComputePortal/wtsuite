@@ -3,10 +3,9 @@ package js
 import (
 	"strings"
 
-	"./values"
-
-	"../context"
-	"../patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type FunctionArgument struct {

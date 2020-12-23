@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"../tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 // wrt the viewBox

@@ -11,20 +11,20 @@ import (
   "sort"
 	"strings"
 
-	"../../pkg/cache"
-	"../../pkg/directives"
-	"../../pkg/files"
-	"../../pkg/parsers"
-	"../../pkg/tokens/context"
-	tokens "../../pkg/tokens/html"
-	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/macros"
-	"../../pkg/tokens/js/values"
-	"../../pkg/tree"
-	"../../pkg/tree/scripts"
-	"../../pkg/tree/styles"
+	"github.com/computeportal/wtsuite/pkg/cache"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
 
-	"./config"
+	"github.com/computeportal/wtsuite/cmd/wt-site/config"
 )
 
 var GitCommit string
@@ -38,7 +38,6 @@ type CmdArgs struct {
 	noAliasing    bool
 	autoLink      bool
 	profFile      string
-	xml           bool
 
 	verbosity int // defaults to zero, every -v[v[v]] adds a level
 }
@@ -93,7 +92,6 @@ func parseArgs() CmdArgs {
 		noAliasing:    false,
 		autoLink:      false,
 		profFile:      "",
-		xml:           false,
 		verbosity:     0,
 	}
 
@@ -173,12 +171,6 @@ func parseArgs() CmdArgs {
 					printMessageAndExit("Error: "+arg+" already specified", true)
 				} else {
 					cmdArgs.autoLink = true
-				}
-			case "--xml":
-				if cmdArgs.xml {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.xml = true
 				}
 			case "--js-url":
 				if i == n-1 {
@@ -342,10 +334,6 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 		directives.NO_ALIASING = true
 	}
 
-	if cmdArgs.xml {
-		files.XML_SYNTAX = true
-	}
-
 	if cmdArgs.autoLink {
 		tree.AUTO_LINK = true
 	}
@@ -371,13 +359,13 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 	scripts.VERBOSITY = cmdArgs.verbosity
 }
 
-func buildHTMLFile(src, url, dst string, control string, cssUrl string, jsUrl string) error {
+func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src, url, dst string, control string, cssUrl string, jsUrl string) error {
 	cache.StartRootUpdate(src)
 
 	directives.SetActiveURL(url)
 
 	// must come before AddViewControl
-	r, cssBundleRules, err := directives.NewRoot(src, url, control, cssUrl, jsUrl)
+	r, cssBundleRules, err := directives.NewRoot(fileSource, c, src, control, cssUrl, jsUrl)
 
 	directives.UnsetActiveURL()
 
@@ -480,6 +468,9 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 
   sort.Strings(updatedViews)
 
+  fileSource := files.NewDefaultUIFileSource()
+  c := directives.NewFileCache()
+
 	for _, src := range updatedViews {
 		dst := cfg.GetViews()[src]
 
@@ -490,7 +481,7 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 
 		url := dst[len(cmdArgs.OutputDir):]
 
-		err := buildHTMLFile(src, url, dst, control, cfg.CssUrl, cfg.JsUrl)
+		err := buildHTMLFile(fileSource, c, src, url, dst, control, cfg.CssUrl, cfg.JsUrl)
 		if err != nil {
 			context.AppendString(err, "Info: error encountered in \""+src+"\"")
 

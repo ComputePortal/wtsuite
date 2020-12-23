@@ -4,7 +4,7 @@ import (
   "fmt"
   "strings"
 
-	"../../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Class struct {

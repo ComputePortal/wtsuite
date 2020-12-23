@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"../tokens/context"
-	"../tokens/math"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/math"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func tokenizeMathWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {

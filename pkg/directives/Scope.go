@@ -1,12 +1,13 @@
 package directives
 
 import (
-	"../functions"
-	"../parsers"
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tree"
-	"../tree/svg"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/svg"
 )
 
 type Scope interface {
@@ -27,6 +28,9 @@ type Scope interface {
 
 	// implements tokens.Scope
 	Eval(key string, args []tokens.Token, ctx context.Context) (tokens.Token, error)
+
+  GetCache() *FileCache
+  GetSource() files.Source
 }
 
 func NewSubScope(parent Scope) Scope {
@@ -38,17 +42,6 @@ func NewSubScope(parent Scope) Scope {
   scope := &scope_
 
 	return scope
-}
-
-func NewRootScope(permissive bool) *ScopeData {
-  scope_ := newScopeData(nil)
-  scope := &scope_
-
-  if permissive {
-    scope.permissive = true
-  }
-
-  return scope
 }
 
 func IsTopLevel(scope Scope) bool {

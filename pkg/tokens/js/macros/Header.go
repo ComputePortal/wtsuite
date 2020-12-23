@@ -3,8 +3,8 @@ package macros
 import (
 	"strings"
 
-	"../../context"
-	"../../js"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 type Header interface {

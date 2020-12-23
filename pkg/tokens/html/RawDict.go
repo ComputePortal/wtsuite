@@ -3,9 +3,10 @@ package html
 import (
 	"fmt"
 	"reflect"
+  "sort"
 	"strings"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type DictType int
@@ -426,4 +427,31 @@ func AssertRawDict(t_ Token) (*RawDict, error) {
 		errCtx := t_.Context()
 		return nil, errCtx.NewError("Internal Error: expected a raw dict")
 	}
+}
+
+func GolangStringMapToRawDict(m map[string]interface{}, ctx context.Context) (*RawDict, error) {
+  // sort the keys alphabetically!
+  keys := make([]string, 0)
+  for k, _ := range m {
+    keys = append(keys, k)
+  }
+
+  sort.Strings(keys)
+
+  res := NewEmptyRawDict(ctx)
+
+  for _, k_ := range keys {
+    item_ := m[k_]
+
+    item, err := GolangToToken(item_, ctx)
+    if err != nil {
+      return nil, err
+    }
+
+    k := NewValueString(k_, ctx)
+
+    res.Set(k, item)
+  }
+
+  return res, nil
 }

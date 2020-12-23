@@ -3,10 +3,10 @@ package js
 import (
   "strings"
 
-  pr "./prototypes" // used a lot, so slightly shorter name
-  "./values"
+  pr "github.com/computeportal/wtsuite/pkg/tokens/js/prototypes" // used a lot, so slightly shorter name
+  "github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-  "../context"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var TARGET = "nodejs"

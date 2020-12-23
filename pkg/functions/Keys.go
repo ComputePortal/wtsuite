@@ -1,8 +1,8 @@
 package functions
 
 import (
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func stringDictKeys(arg tokens.Token, ctx context.Context) (tokens.Token, error) {

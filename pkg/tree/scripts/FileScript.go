@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strings"
 
-	"../../files"
-	"../../parsers"
-	"../../tokens/js"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 type FileScript interface {

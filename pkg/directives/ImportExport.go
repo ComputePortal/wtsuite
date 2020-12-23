@@ -3,64 +3,50 @@ package directives
 import (
 	"path/filepath"
 
-	"../files"
-	"../parsers"
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tokens/patterns"
-	"../tree"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 type CachedScope struct {
-	scope *ScopeData
+	scope *FileScope
 	node  *RootNode
 }
 
+// TODO: importCache should be part of FileScope
 var _importCache = make(map[string]CachedScope)
 
-func parseFile(path, caller string) ([]*tokens.Tag, context.Context, error) {
-	if files.XML_SYNTAX {
-		p, err := parsers.NewHTMLParser(path)
-		if err != nil {
-			return nil, context.Context{}, err
-		}
+func parseFile(source files.Source, path, caller string) ([]*tokens.Tag, context.Context, error) {
+  p, err := parsers.NewUIParser(source, path)
+  if err != nil {
+    return nil, context.Context{}, err
+  }
 
-		if caller != "" {
-			p = p.ChangeCaller(caller)
-		}
+  if caller != "" {
+    p = p.ChangeCaller(caller)
+  }
 
-		tags, err := p.BuildTags()
-		return tags, p.NewContext(0, 1), err
-	} else {
-		p, err := parsers.NewUIParser(path)
-		if err != nil {
-			return nil, context.Context{}, err
-		}
-
-		if caller != "" {
-			p = p.ChangeCaller(caller)
-		}
-
-		tags, err := p.BuildTags()
-		return tags, p.NewContext(0, 1), err
-	}
+  tags, err := p.BuildTags()
+  return tags, p.NewContext(0, 1), err
 }
 
 // also used by NewRoot
 // abs path, so we can use this to cache the import results
-func BuildFile(path string, caller string, isRoot bool) (*ScopeData, *RootNode, error) {
-	var fileScope *ScopeData = nil
+func BuildFile(source files.Source, cache *FileCache, path string, caller string, isRoot bool) (*FileScope, *RootNode, error) {
+	var fileScope *FileScope = nil
 	var node *RootNode = nil
 
-	if cachedScope, ok := _importCache[path]; ok && !isRoot {
-		fileScope = cachedScope.scope
-		node = cachedScope.node
+	if cache.IsCached(path) && !isRoot {
+		fileScope, node = cache.Get(path)
 	} else {
 		if caller != "" {
 			files.StartCacheUpdate(path)
 		}
 
-		tags, fileCtx, err := parseFile(path, caller)
+		tags, fileCtx, err := parseFile(source, path, caller)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -73,7 +59,7 @@ func BuildFile(path string, caller string, isRoot bool) (*ScopeData, *RootNode, 
 
 		root := tree.NewRoot(fileCtx)
 		node = NewRootNode(root, HTML)
-		fileScope = NewRootScope(permissive)
+		fileScope = NewFileScope(permissive, source, cache)
 
 		autoCtx := fileCtx.NewContext(0, 1)
 
@@ -91,7 +77,7 @@ func BuildFile(path string, caller string, isRoot bool) (*ScopeData, *RootNode, 
 		}
 
 		//UnsetURL(fileScope)
-		_importCache[path] = CachedScope{fileScope, node}
+    cache.Set(path, fileScope, node)
 	}
 
 	return fileScope, node, nil
@@ -154,10 +140,16 @@ func importExport(scope Scope, node Node, export bool, tag *tokens.Tag) error {
 		}
 
 		ctx := tag.Context()
-		path, _, err := files.SearchPackage(ctx.Path(), srcToken.Value(), files.UIPACKAGE_SUFFIX)
+    source := scope.GetSource()
+		path, err := source.Search(ctx.Path(), srcToken.Value())
 		if err != nil {
 			errCtx := srcToken.Context()
 			return errCtx.NewError("Error: file " + err.Error())
+		}
+
+		subScope, _, err := BuildFile(source, scope.GetCache(), path, ctx.Caller(), false)
+		if err != nil {
+			return err
 		}
 
 		namespace := filepath.Base(filepath.Dir(path)) + patterns.NAMESPACE_SEPARATOR
@@ -168,11 +160,6 @@ func importExport(scope Scope, node Node, export bool, tag *tokens.Tag) error {
 			}
 
 			namespace = namespaceToken.Value() + patterns.NAMESPACE_SEPARATOR
-		}
-
-		subScope, _, err := BuildFile(path, ctx.Caller(), false)
-		if err != nil {
-			return err
 		}
 
 		subScope.SyncPackage(scope, false, false, !export, namespace)
@@ -200,13 +187,14 @@ func importExport(scope Scope, node Node, export bool, tag *tokens.Tag) error {
 		}
 
 		ctx := tag.Context()
-		path, _, err := files.SearchPackage(ctx.Path(), srcToken.Value(), files.UIPACKAGE_SUFFIX)
+    source := scope.GetSource()
+		path, err := source.Search(ctx.Path(), srcToken.Value())
 		if err != nil {
 			errCtx := srcToken.Context()
 			return errCtx.NewError("Error: file " + err.Error())
 		}
 
-		subScope, _, err := BuildFile(path, ctx.Caller(), false)
+		subScope, _, err := BuildFile(source, scope.GetCache(), path, ctx.Caller(), false)
 		if err != nil {
 			return err
 		}

@@ -5,7 +5,7 @@ import (
 	"math"
 	"reflect"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var PX_PER_REM = 0

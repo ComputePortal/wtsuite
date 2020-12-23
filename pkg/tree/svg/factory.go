@@ -1,10 +1,9 @@
 package svg
 
 import (
-	"../../tree"
-
-	"../../tokens/context"
-	tokens "../../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 type TagBuilder interface {

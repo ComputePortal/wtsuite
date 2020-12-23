@@ -1,7 +1,7 @@
 package styles
 
 import (
-	tokens "../../tokens/html"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 type SyncRule interface {

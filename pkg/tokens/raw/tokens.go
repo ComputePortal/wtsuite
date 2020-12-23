@@ -4,7 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Token interface {

@@ -3,7 +3,7 @@ package math
 import (
 	"strings"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type UnaryOp struct {

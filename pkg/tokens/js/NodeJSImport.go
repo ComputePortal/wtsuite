@@ -1,9 +1,9 @@
 package js
 
 import (
-  "./prototypes"
+  "github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var nodeJSPackages map[string]FillPackageFunction = map[string]FillPackageFunction{

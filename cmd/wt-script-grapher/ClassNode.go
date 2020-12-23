@@ -3,7 +3,7 @@ package main
 import (
   "strings"
 
-	"../../pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 type ClassNode struct {

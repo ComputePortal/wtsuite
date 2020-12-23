@@ -3,7 +3,7 @@ package macros
 import (
   "strings"
 
-  "../../js"
+  "github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 type HeaderBuilder struct {

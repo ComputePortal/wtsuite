@@ -8,17 +8,17 @@ import (
   "strconv"
   "strings"
 
-	"../../pkg/cache"
-	"../../pkg/directives"
-	"../../pkg/files"
-	"../../pkg/parsers"
-  tokens "../../pkg/tokens/html"
-	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/macros"
-	"../../pkg/tokens/js/values"
-	"../../pkg/tree"
-	"../../pkg/tree/scripts"
-	"../../pkg/tree/styles"
+	"github.com/computeportal/wtsuite/pkg/cache"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+  tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 const (
@@ -269,15 +269,11 @@ func setUpEnv(cmdArgs CmdArgs) {
 	files.AppendIncludeDirs(cmdArgs.includeDirs)
 }
 
-func buildHTMLFile(src string, dst string, control string, compactOutput bool) error {
-  directives.SetActiveURL("")
-
-  r, cssBundleRules, err := directives.NewRoot(src, "", "", "", "")
+func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src string, dst string, control string, compactOutput bool) error {
+  r, cssBundleRules, err := directives.NewRoot(fileSource, c, src, "", "", "")
   if err != nil {
     return err
   }
-
-  directives.UnsetActiveURL()
 
 	// update the cache with the cssBundleRules
 	for _, rules := range cssBundleRules { // added to file later
@@ -343,7 +339,11 @@ func buildFile(cmdArgs CmdArgs) error {
 		"", "", cmdArgs.pxPerRem, cmdArgs.outputFile, "",
 		cmdArgs.compactOutput, make(map[string]string), true)
 
-	if err := buildHTMLFile(cmdArgs.inputFile, cmdArgs.outputFile, cmdArgs.control, cmdArgs.compactOutput); err != nil {
+
+  fileSource := files.NewDefaultUIFileSource()
+  c := directives.NewFileCache()
+
+	if err := buildHTMLFile(fileSource, c, cmdArgs.inputFile, cmdArgs.outputFile, cmdArgs.control, cmdArgs.compactOutput); err != nil {
     return err
   }
 

@@ -1,9 +1,9 @@
 package parsers
 
 import (
-	"../tokens/context"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func tokenizeFormulaWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {

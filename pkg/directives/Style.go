@@ -3,10 +3,10 @@ package directives
 import (
 	"io/ioutil"
 
-	"../files"
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tree"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 func buildLinkedStyle(node Node, srcPath string, ctx context.Context) error {

@@ -1,9 +1,9 @@
 package directives
 
 import (
-	"../functions"
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 const PARENT_STYLE = "__pstyle__"

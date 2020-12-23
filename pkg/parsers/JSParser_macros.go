@@ -1,9 +1,9 @@
 package parsers
 
 import (
-	"../files"
-	"../tokens/context"
-	"../tokens/js"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 func (p *JSParser) buildImportDefaultMacro(args []js.Expression, ctx context.Context) (js.Expression, error) {

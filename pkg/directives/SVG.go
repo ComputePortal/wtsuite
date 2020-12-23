@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"strings"
 
-	"../functions"
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tree"
-	"../tree/svg"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/svg"
 )
 
 func BuildSVG(scope Scope, node Node, tag *tokens.Tag) error {

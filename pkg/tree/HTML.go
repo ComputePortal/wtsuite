@@ -3,12 +3,11 @@ package tree
 import (
 	"strings"
 
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tokens/js"
-
-	"./scripts"
-	"./styles"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type HTML struct {

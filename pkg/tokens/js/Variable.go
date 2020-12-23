@@ -1,9 +1,9 @@
 package js
 
 import (
-  "./values"
+  "github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 // a Package also implements the Variable interface

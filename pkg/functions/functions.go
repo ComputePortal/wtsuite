@@ -3,8 +3,8 @@ package functions
 import (
 	"strings"
 
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 // args are evaluated outside PreEval functions, but scope is needed to check Permissive()

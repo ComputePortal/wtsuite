@@ -3,7 +3,7 @@ package math
 import (
 	"fmt"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Float struct {

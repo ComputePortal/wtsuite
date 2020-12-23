@@ -3,7 +3,7 @@ package tree
 import (
 	"fmt"
 
-	"../tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type SVGRoot struct {

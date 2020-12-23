@@ -1,10 +1,9 @@
 package tree
 
 import (
-	"../tokens/context"
-	tokens "../tokens/html"
-
-	"./scripts"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 // reuse tagData's write functions

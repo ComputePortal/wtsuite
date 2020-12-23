@@ -5,17 +5,14 @@ import (
 	"strconv"
 	"strings"
 
-	"../files"
-
-	tokens "../tokens/html"
-
-	"../tokens/js"
-	"../tokens/js/prototypes"
-	"../tokens/js/values"
-
-	"../tokens/context"
-	"../tree"
-	"../tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 type ViewVariable interface {
@@ -25,7 +22,7 @@ type ViewVariable interface {
 
 // use this to import ui variables into script files
 type ViewModule struct {
-	scope    *ScopeData
+	scope    *FileScope
 	imported map[string]ViewVariable
 	path     string
 	ctx      context.Context
@@ -84,9 +81,9 @@ type ViewObject struct {
 	ViewVariableData
 }
 
-func NewViewFileScript(absPath string, caller string) (scripts.FileScript, error) {
+func NewViewFileScript(source files.Source, cache *FileCache, absPath string, caller string) (scripts.FileScript, error) {
 	if js.TARGET == "browser" || js.TARGET == "all" {
-		fileScope, rootNode, err := BuildFile(absPath, caller, false)
+		fileScope, rootNode, err := BuildFile(source, cache, absPath, caller, false)
 		if err != nil {
 			return nil, err
 		}
@@ -451,9 +448,12 @@ func (v *ViewObject) Write() string {
 	return b.String()
 }
 
-var _newViewFileScriptOk = scripts.SetNewViewFileScript(NewViewFileScript)
-
 // in jspp the directives module isn't automatically included, so we need to force (which includes the above lines actually, so this happens twice)
-func ForceNewViewFileScriptRegistration() {
-	scripts.SetNewViewFileScript(NewViewFileScript)
+func ForceNewViewFileScriptRegistration(cache *FileCache) {
+  source := files.NewDefaultUIFileSource()
+
+	scripts.SetNewViewFileScript(func(absPath string, caller string) (scripts.FileScript, error) {
+    return NewViewFileScript(source, cache, absPath, caller)
+
+  })
 }

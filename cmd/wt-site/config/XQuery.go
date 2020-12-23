@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"../../../pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 type XQuery interface {

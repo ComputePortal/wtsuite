@@ -3,9 +3,8 @@ package tree
 import (
 	"fmt"
 
-	"../tokens/context"
-
-	"./scripts"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 // doesn't need to implement Tag interface

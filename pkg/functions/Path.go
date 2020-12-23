@@ -1,9 +1,9 @@
 package functions
 
 import (
-	"../files"
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func Path(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {

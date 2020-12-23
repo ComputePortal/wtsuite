@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"../context"
-	"../patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type LiteralFloat struct {

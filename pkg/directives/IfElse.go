@@ -1,8 +1,8 @@
 package directives
 
 import (
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func buildConditional(scope Scope, node Node, tag *tokens.Tag) (bool, error) {

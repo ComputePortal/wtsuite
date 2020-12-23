@@ -6,11 +6,11 @@ import (
   "sort"
 	"strings"
 
-	"../../files"
-	"../../tokens/context"
-	"../../tokens/js"
-	"../../tokens/js/macros"
-	"../../tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
 )
 
 type FileBundle struct {

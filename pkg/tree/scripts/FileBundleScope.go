@@ -1,9 +1,9 @@
 package scripts
 
 import (
-	"../../files"
-	"../../tokens/js"
-	"../../tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 )
 
 type FileBundleScope struct {

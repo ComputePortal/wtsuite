@@ -4,12 +4,12 @@ import (
   "fmt"
 	"strings"
 
-	"../"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 
-	"../prototypes"
-	"../values"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-	"../../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type BigIntCall struct {

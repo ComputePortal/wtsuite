@@ -2,15 +2,14 @@ package parsers
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 
-	"../tokens/context"
-	"../tokens/html"
-	"../tokens/patterns"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func tokenizeUIFormulas(s string, ctx context.Context) ([]raw.Token, error) {
@@ -86,12 +85,8 @@ type UIParser struct {
 	Parser
 }
 
-func NewUIParser(path string) (*UIParser, error) {
-	if !filepath.IsAbs(path) {
-		panic("path should be absolute")
-	}
-
-	rawBytes, err := ioutil.ReadFile(path)
+func NewUIParser(source files.Source, path string) (*UIParser, error) {
+	rawBytes, err := source.Read(path)
 	if err != nil {
 		return nil, err
 	}

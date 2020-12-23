@@ -6,12 +6,10 @@ import (
 	"reflect"
 	"strings"
 
-	"../"
-
-	"../prototypes"
-	"../values"
-
-	"../../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 )
 
 type SyntaxTreeInfo struct {

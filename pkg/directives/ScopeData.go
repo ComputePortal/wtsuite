@@ -3,9 +3,10 @@ package directives
 import (
 	"strings"
 
-	"../functions"
-  "../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/functions"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 type ScopeData struct {
@@ -322,3 +323,11 @@ func (scope *ScopeData) Eval(key string, args []tokens.Token,
 	return eval(scope, key, args, ctx)
 }
 
+
+func (scope *ScopeData) GetCache() *FileCache {
+  return scope.parent.GetCache()
+}
+
+func (scope *ScopeData) GetSource() files.Source {
+  return scope.parent.GetSource()
+}

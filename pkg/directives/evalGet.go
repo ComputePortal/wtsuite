@@ -1,9 +1,9 @@
 package directives
 
 import (
-	"../functions"
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func evalGet(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {

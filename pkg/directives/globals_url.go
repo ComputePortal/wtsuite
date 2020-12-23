@@ -3,10 +3,10 @@ package directives
 import (
 	"path/filepath"
 
-	"../files"
-	//"../functions"
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/files"
+	//"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 const URL = "__url__"

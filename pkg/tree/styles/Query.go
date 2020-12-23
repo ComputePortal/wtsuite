@@ -3,7 +3,7 @@ package styles
 import (
 	"strings"
 
-	tokens "../../tokens/html"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 // eg. @supports or @media

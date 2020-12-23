@@ -1,7 +1,7 @@
 package math
 
 import (
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Scope interface {

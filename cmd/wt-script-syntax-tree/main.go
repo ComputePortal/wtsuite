@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"../../pkg/files"
-	"../../pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
 )
 
 type CmdArgs struct {
@@ -76,6 +77,8 @@ func parseArgs() CmdArgs {
 
 func setUpEnv(cmdArgs CmdArgs) {
 	files.JS_MODE = true
+
+  directives.ForceNewViewFileScriptRegistration(directives.NewFileCache())
 }
 
 func buildSyntaxTree(cmdArgs CmdArgs) {

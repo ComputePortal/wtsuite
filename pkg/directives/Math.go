@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"../functions"
-	"../parsers"
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tree"
-	"../tree/styles"
-	"../tree/svg"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
+	"github.com/computeportal/wtsuite/pkg/tree/svg"
 )
 
 func Math(scope Scope, node Node, tag *tokens.Tag) error {

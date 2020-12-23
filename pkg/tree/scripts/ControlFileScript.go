@@ -3,7 +3,7 @@ package scripts
 import (
 	"strings"
 
-	"../../tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 type ControlFileScript struct {

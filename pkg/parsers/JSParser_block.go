@@ -1,8 +1,8 @@
 package parsers
 
 import (
-	"../tokens/js"
-	"../tokens/raw"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
 func (p *JSParser) buildBlockStatements(bracesGroup *raw.Group) ([]js.Statement, error) {

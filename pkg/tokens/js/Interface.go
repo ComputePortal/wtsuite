@@ -4,10 +4,10 @@ import (
   "fmt"
 	"strings"
 
-	"./prototypes"
-	"./values"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 const NewRPCClientMemberName = "newRPCClient"

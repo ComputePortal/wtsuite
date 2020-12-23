@@ -1,8 +1,8 @@
 package directives
 
 import (
-	tokens "../tokens/html"
-	"../tree"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 func Print(scope Scope, node Node, tag *tokens.Tag) error {

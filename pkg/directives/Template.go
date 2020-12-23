@@ -3,11 +3,11 @@ package directives
 import (
 	"strings"
 
-	"../functions"
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tokens/patterns"
-	"../tree"
+	"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 type Template struct {

@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"../../tokens/context"
-	tokens "../../tokens/html"
-	"../../tokens/math/serif"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/math/serif"
 )
 
 var MATH_FONT = "FreeSerif"

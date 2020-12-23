@@ -3,7 +3,7 @@ package svg
 import (
 	"reflect"
 
-	"../../tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type PathSegment interface {

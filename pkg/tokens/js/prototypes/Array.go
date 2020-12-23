@@ -3,9 +3,9 @@ package prototypes
 import (
   "strings"
 
-  "../values"
+  "github.com/computeportal/wtsuite/pkg/tokens/js/values"
 
-  "../../context"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 // instance of Array are values.Prototype, not values.Value!

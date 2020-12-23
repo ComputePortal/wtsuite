@@ -1,9 +1,9 @@
 package math
 
 import (
-	"./boundingbox"
+	"github.com/computeportal/wtsuite/pkg/tokens/math/boundingbox"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Token interface {

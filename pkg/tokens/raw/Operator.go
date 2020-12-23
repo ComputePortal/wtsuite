@@ -3,7 +3,7 @@ package raw
 import (
 	"strings"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type Operator struct {

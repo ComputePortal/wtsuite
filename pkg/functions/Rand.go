@@ -3,8 +3,8 @@ package functions
 import (
 	"math/rand"
 
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func randInt(r *rand.Rand, a *tokens.Int, b *tokens.Int, ctx context.Context) (tokens.Token, error) {

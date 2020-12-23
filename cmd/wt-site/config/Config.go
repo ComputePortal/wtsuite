@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"sort"
 
-	"../../../pkg/directives"
-	"../../../pkg/files"
-	"../../../pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 // all the cmdargs that are needed for Config file reading

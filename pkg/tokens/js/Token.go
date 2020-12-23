@@ -1,7 +1,7 @@
 package js
 
 import (
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var (

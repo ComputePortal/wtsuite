@@ -3,7 +3,7 @@ package tree
 import (
 	"fmt"
 
-	"../tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var IsAutoUID func(id string) bool = nil

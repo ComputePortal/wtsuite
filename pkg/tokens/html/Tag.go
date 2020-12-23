@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 // for text tag 'attr' and 'children' are nil, and 'text' is set

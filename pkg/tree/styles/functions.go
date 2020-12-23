@@ -3,8 +3,8 @@ package styles
 import (
 	"strings"
 
-	"../../tokens/context"
-	tokens "../../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 type AtFunction func(sel Selector, args []string, v tokens.Token, ctx context.Context) ([]Rule, error)

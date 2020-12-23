@@ -1,7 +1,7 @@
 package directives
 
 import (
-	"../tree"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 type SVGNode struct {

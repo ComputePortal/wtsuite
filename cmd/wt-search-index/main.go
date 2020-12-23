@@ -11,17 +11,17 @@ import (
 	"sort"
 	"strings"
 
-	"../../pkg/cache"
-	"../../pkg/directives"
-	"../../pkg/files"
-	"../../pkg/parsers"
-	tokens "../../pkg/tokens/html"
-	"../../pkg/tokens/js"
-	"../../pkg/tree"
-	"../../pkg/tree/scripts"
-	"../../pkg/tree/styles"
+	"github.com/computeportal/wtsuite/pkg/cache"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
 
-	"../wt-site/config"
+	"github.com/computeportal/wtsuite/cmd/wt-site/config"
 )
 
 var VERBOSITY = 0
@@ -365,6 +365,9 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 
 	searchIndex := NewSearchIndex()
 
+  fileSource := files.NewDefaultUIFileSource()
+  c := directives.NewFileCache()
+
 	for src, dst := range cfg.GetViews() {
 		// TODO: do something with strategy
 		if indexConfig, ok := viewSearchIndicesConfig[src]; ok && indexConfig != nil {
@@ -375,7 +378,7 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 
 			directives.SetActiveURL(url)
 
-			r, _, err := directives.NewRoot(src, url, "", cfg.CssUrl, cfg.JsUrl)
+			r, _, err := directives.NewRoot(fileSource, c, src, "", cfg.CssUrl, cfg.JsUrl)
 			if err != nil {
 				return nil, err
 			}

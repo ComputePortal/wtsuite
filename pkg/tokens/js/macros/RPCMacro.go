@@ -1,8 +1,8 @@
 package macros
 
 import (
-  "../../context"
-  "../../js"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
+  "github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 type RPCMacro struct {

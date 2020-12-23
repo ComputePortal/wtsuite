@@ -12,15 +12,15 @@ import (
   "regexp"
   "strings"
 
-	"../../pkg/cache"
-	"../../pkg/directives"
-	"../../pkg/files"
-	"../../pkg/parsers"
-	"../../pkg/tokens/context"
-	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/values"
-	"../../pkg/tokens/html"
-	"../../pkg/tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/cache"
+	"github.com/computeportal/wtsuite/pkg/directives"
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 type CmdArgs struct {
@@ -149,7 +149,7 @@ func setUpEnv(cmdArgs CmdArgs) {
 	files.JS_MODE = true
 
 	js.TARGET = "all"
-	directives.ForceNewViewFileScriptRegistration()
+	directives.ForceNewViewFileScriptRegistration(directives.NewFileCache())
   directives.IGNORE_UNSET_URLS = true
 
   html.PX_PER_REM = 16

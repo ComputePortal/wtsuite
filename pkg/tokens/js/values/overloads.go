@@ -3,7 +3,7 @@ package values
 import (
   "fmt"
 
-  "../../context"
+  "github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 func checkOverload(overload []Value, ts []Value, ctx context.Context) error {

@@ -3,9 +3,9 @@ package math
 import (
 	"strings"
 
-	"./boundingbox"
+	"github.com/computeportal/wtsuite/pkg/tokens/math/boundingbox"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 const (

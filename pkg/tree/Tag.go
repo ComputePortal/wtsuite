@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"../tokens/context"
-	tokens "../tokens/html"
-	"../tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 
-	"./scripts"
-	"./styles"
+	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type Tag interface {

@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"../files"
+	"github.com/computeportal/wtsuite/pkg/files"
 )
 
 type FileCacheEntry struct {

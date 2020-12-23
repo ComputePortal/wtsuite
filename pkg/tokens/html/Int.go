@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"../context"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 // distinct from Float because it is used for indexing in lists

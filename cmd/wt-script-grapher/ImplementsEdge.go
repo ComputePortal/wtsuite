@@ -3,8 +3,8 @@ package main
 import (
   "strings"
 
-	"../../pkg/tokens/js"
-	"../../pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 )
 
 type ImplementsEdge struct {

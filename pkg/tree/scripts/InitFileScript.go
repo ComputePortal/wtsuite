@@ -1,7 +1,7 @@
 package scripts
 
 import (
-	"../../tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/js"
 )
 
 type InitFileScript struct {

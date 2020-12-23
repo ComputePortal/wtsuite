@@ -3,8 +3,8 @@ package functions
 import (
 	"strings"
 
-	"../tokens/context"
-	tokens "../tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 func doSlice(obj *tokens.List, start, incr, stop *tokens.Int, ctx context.Context) (*tokens.List, error) {
