@@ -52,7 +52,7 @@ func (p *JSParser) buildWhileStatement(ts []raw.Token) (*js.While, []raw.Token, 
 		whileStatement.AddStatement(st)
 	}
 
-	ts = p.stripSeparators(3, ts, patterns.SEMICOLON)
+	ts = stripSeparators(3, ts, patterns.SEMICOLON)
 
 	return whileStatement, ts, nil
 }

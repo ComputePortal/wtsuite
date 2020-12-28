@@ -108,7 +108,7 @@ func (p *JSParser) buildRegularImportStatement(ts []raw.Token) error {
 			}
 		}
 	case n >= 3 && raw.IsWord(ts[n-2], "from"):
-		fields := p.splitBySeparator(ts[1:n-2], patterns.COMMA)
+		fields := splitBySeparator(ts[1:n-2], patterns.COMMA)
 
 		if len(fields) < 1 || len(fields) > 3 {
 			errCtx := raw.MergeContexts(ts...)
@@ -206,7 +206,7 @@ func (p *JSParser) buildNodeJSImportStatement(ts []raw.Token) error {
 }
 
 func (p *JSParser) buildImportStatement(ts []raw.Token) ([]raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 
 	n := len(ts)
 	if n < 2 {
@@ -444,7 +444,7 @@ func (p *JSParser) buildExportStatement(ts []raw.Token,
 		}
 	// aggregate exports
 	case raw.IsWord(ts[2], "from"):
-		ts, remaining := p.splitByNextSeparator(ts, patterns.SEMICOLON)
+		ts, remaining := splitByNextSeparator(ts, patterns.SEMICOLON)
 
 		pathLiteral, _, err := p.assertValidPath(ts[3])
 		if err != nil {
@@ -514,7 +514,7 @@ func (p *JSParser) buildModuleStatement(ts []raw.Token) ([]raw.Token, error) {
 	return remaining, nil
 }
 
-func (p *JSParser) BuildModule() (*js.ControlModule, error) {
+func (p *JSParser) BuildModule() (*js.ModuleData, error) {
 	ts, err := p.tokenize()
 	if err != nil {
 		return nil, err
@@ -525,7 +525,7 @@ func (p *JSParser) BuildModule() (*js.ControlModule, error) {
 			files.Abbreviate(p.ctx.Path()) + "'\n")
 	}
 
-	p.module = js.NewControlModule(ts[0].Context())
+	p.module = js.NewModule(ts[0].Context())
 
 	for len(ts) > 0 {
 		ts, err = p.buildModuleStatement(ts)

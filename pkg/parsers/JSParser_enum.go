@@ -167,7 +167,7 @@ func (p *JSParser) buildEnumStatement(ts []raw.Token) (*js.Enum, []raw.Token, er
 				return nil, nil, err
 			}
 
-			remaining := p.stripSeparators(i+1, ts, patterns.SEMICOLON)
+			remaining := stripSeparators(i+1, ts, patterns.SEMICOLON)
 
 			return statement, remaining, nil
 		}

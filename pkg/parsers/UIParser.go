@@ -66,7 +66,7 @@ var uiParserSettings = ParserSettings{
 		pattern:   patterns.HTML_WORD_OR_LITERAL_REGEXP,
 		tokenizer: tokenizeHTMLWordsAndLiterals,
 	},
-	// XXX: not used?
+	// handled by FormulaParser
 	symbols: symbolsSettings{
 		maskType: SYMBOL,
 		pattern:  nil,

@@ -24,7 +24,7 @@ type FileScript interface {
 
 type FileScriptData struct {
 	path   string
-	module *js.ControlModule
+	module *js.ModuleData
 }
 
 var NewViewFileScript func(absPath string, caller string) (FileScript, error) = nil
@@ -135,7 +135,6 @@ func (s *FileScriptData) Walk(fn func(scriptPath string, obj interface{}) error)
   })
 }
 
-// TODO: return interface instead
 func (s *FileScriptData) Module() js.Module {
 	return s.module
 }

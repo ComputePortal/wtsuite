@@ -1,6 +1,8 @@
 package tree
 
 import (
+  "strings"
+
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
@@ -58,4 +60,19 @@ func (t *Script) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.
 	}
 
 	return nil
+}
+
+func (t *Script) Write(indent string, nl, tab string) string {
+	var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString("<script>")
+  b.WriteString(nl)
+  b.WriteString(t.content)
+  b.WriteString(nl)
+  b.WriteString(indent)
+  b.WriteString("</script>")
+  b.WriteString(nl)
+
+  return b.String()
 }

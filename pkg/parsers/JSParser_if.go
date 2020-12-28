@@ -84,7 +84,7 @@ func (p *JSParser) buildIfStatement(ts []raw.Token) (*js.If, []raw.Token, error)
 		}
 	}
 
-	ts = p.stripSeparators(0, ts, patterns.SEMICOLON)
+	ts = stripSeparators(0, ts, patterns.SEMICOLON)
 
 	return ifStatement, ts, nil
 }

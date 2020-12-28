@@ -113,7 +113,7 @@ func (p *JSParser) buildLiteralObjectExpression(t raw.Token) (js.Expression, err
 	values := make([]js.Expression, 0)
 
 	for _, field := range group.Fields {
-		components := p.splitBySeparator(field, patterns.COLON)
+		components := splitBySeparator(field, patterns.COLON)
 		if len(components) != 2 {
 			errCtx := raw.MergeContexts(field...)
 			return nil, errCtx.NewError("Error: bad dict key-value entry")
@@ -402,7 +402,7 @@ func (p *JSParser) buildTypeExpression(ts []raw.Token) (*js.TypeExpression, erro
 						someKeyed = true
 					}
 
-					components := p.splitBySeparator(field, patterns.COLON)
+					components := splitBySeparator(field, patterns.COLON)
 
 					if len(components) != 2 || len(components[0]) != 1 {
 						errCtx := raw.MergeContexts(field...)
@@ -513,7 +513,6 @@ func (p *JSParser) buildExpression(ts []raw.Token) (js.Expression, error) {
 			} else {
 				errCtx := ts[0].Context()
 				err := errCtx.NewError("Error: expression not yet supported")
-				panic(err)
 				return nil, err
 			}
 		}

@@ -310,6 +310,7 @@ func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src string,
 			return err
 		}
 
+    fmt.Println("including content: ", content)
     if err := r.IncludeControl(content); err != nil {
       return err
     }

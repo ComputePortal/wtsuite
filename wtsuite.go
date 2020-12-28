@@ -35,6 +35,7 @@ type FileSource struct {
 }
 
 func NewTranspiler(source Source, compact bool, mathFontURL string) *Transpiler {
+  // XXX: should this be done via SetEnv-like function(s) instead?
   styles.MATH_FONT_URL = mathFontURL
 
   return &Transpiler{

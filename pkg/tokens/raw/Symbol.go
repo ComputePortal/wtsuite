@@ -127,6 +127,16 @@ func ContainsSymbol(ts []Token, s string) bool {
 	return false
 }
 
+func ContainsSymbolThatEndsWith(ts []Token, s string) bool {
+	for _, t := range ts {
+		if IsSymbolThatEndsWith(t, s) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // first part includes the symbol
 func SplitByFirstSymbol(ts []Token, s string) ([]Token, []Token, error) {
 	for i, t := range ts {

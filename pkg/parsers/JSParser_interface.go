@@ -126,7 +126,7 @@ func (p *JSParser) buildInterfaceStatement(ts []raw.Token) (*js.Interface, []raw
 				return nil, nil, err
 			}
 
-			remaining := p.stripSeparators(i+1, ts, patterns.SEMICOLON)
+			remaining := stripSeparators(i+1, ts, patterns.SEMICOLON)
 
 			return statement, remaining, nil
 		}

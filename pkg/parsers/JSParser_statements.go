@@ -16,8 +16,8 @@ func (p *JSParser) buildVarStatement(ts []raw.Token,
 		return nil, nil, errCtx.NewError("Error: expected at least a name")
 	}
 
-	ts, remainingTokens := p.splitByNextSeparator(ts, patterns.SEMICOLON)
-	fields := p.splitBySeparator(ts[1:], patterns.COMMA)
+	ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
+	fields := splitBySeparator(ts[1:], patterns.COMMA)
 
 	expressions := make([]js.Expression, 0)
   typeExprs := make([]*js.TypeExpression, 0)
@@ -125,7 +125,7 @@ func (p *JSParser) buildVarStatement(ts []raw.Token,
 }
 
 func (p *JSParser) buildReturnStatement(ts []raw.Token) (*js.Return, []raw.Token, error) {
-	exprTokens, remainingTokens := p.splitByNextSeparator(ts[1:], patterns.SEMICOLON)
+	exprTokens, remainingTokens := splitByNextSeparator(ts[1:], patterns.SEMICOLON)
 	var expr js.Expression = nil
 	if len(exprTokens) > 0 {
 		var err error
@@ -144,7 +144,7 @@ func (p *JSParser) buildReturnStatement(ts []raw.Token) (*js.Return, []raw.Token
 }
 
 func (p *JSParser) buildThrowStatement(ts []raw.Token) (*js.Throw, []raw.Token, error) {
-	exprTokens, remainingTokens := p.splitByNextSeparator(ts[1:], patterns.SEMICOLON)
+	exprTokens, remainingTokens := splitByNextSeparator(ts[1:], patterns.SEMICOLON)
 	if len(exprTokens) > 0 {
 		expr, err := p.buildExpression(exprTokens)
 		if err != nil {
@@ -164,7 +164,7 @@ func (p *JSParser) buildThrowStatement(ts []raw.Token) (*js.Throw, []raw.Token, 
 }
 
 func (p *JSParser) buildBreakStatement(ts []raw.Token) (*js.Break, []raw.Token, error) {
-	exprTokens, remainingTokens := p.splitByNextSeparator(ts, patterns.SEMICOLON)
+	exprTokens, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 	if len(exprTokens) != 1 {
 		errCtx := raw.MergeContexts(ts...)
 		return nil, nil, errCtx.NewError("Error: bad break statement")
@@ -179,7 +179,7 @@ func (p *JSParser) buildBreakStatement(ts []raw.Token) (*js.Break, []raw.Token, 
 }
 
 func (p *JSParser) buildContinueStatement(ts []raw.Token) (*js.Continue, []raw.Token, error) {
-	exprTokens, remainingTokens := p.splitByNextSeparator(ts, patterns.SEMICOLON)
+	exprTokens, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 	if len(exprTokens) != 1 {
 		errCtx := raw.MergeContexts(ts...)
 		return nil, nil, errCtx.NewError("Error: bad continue statement")
@@ -219,7 +219,7 @@ func (p *JSParser) buildAssignStatementLHS(ts []raw.Token) (js.Expression, []raw
 }
 
 func (p *JSParser) buildAssignStatement(ts_ []raw.Token) (*js.Assign, []raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts_, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts_, patterns.SEMICOLON)
 
 	if len(ts) < 3 {
 		errCtx := ts[1].Context()
@@ -256,7 +256,7 @@ func (p *JSParser) buildAssignStatement(ts_ []raw.Token) (*js.Assign, []raw.Toke
 
 func (p *JSParser) buildImplicitLetStatement(ts_ []raw.Token) (*js.VarStatement,
 	[]raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts_, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts_, patterns.SEMICOLON)
 
 	if len(ts) < 3 {
 		errCtx := ts[1].Context()
@@ -282,7 +282,7 @@ func (p *JSParser) buildImplicitLetStatement(ts_ []raw.Token) (*js.VarStatement,
 
 func (p *JSParser) buildPostIncrOpStatement(ts_ []raw.Token) (*js.PostIncrOp,
 	[]raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts_, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts_, patterns.SEMICOLON)
 
 	if len(ts) < 2 {
 		panic("should've been caught before")
@@ -301,7 +301,7 @@ func (p *JSParser) buildPostIncrOpStatement(ts_ []raw.Token) (*js.PostIncrOp,
 
 func (p *JSParser) buildPostDecrOpStatement(ts_ []raw.Token) (*js.PostDecrOp,
 	[]raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts_, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts_, patterns.SEMICOLON)
 
 	if len(ts) < 2 {
 		panic("should've been caught before")
@@ -320,7 +320,7 @@ func (p *JSParser) buildPostDecrOpStatement(ts_ []raw.Token) (*js.PostDecrOp,
 
 func (p *JSParser) buildVoidStatement(ts []raw.Token) (*js.Void,
 	[]raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 
 	expr, err := p.buildExpression(ts[1:])
 	if err != nil {
@@ -332,7 +332,7 @@ func (p *JSParser) buildVoidStatement(ts []raw.Token) (*js.Void,
 
 func (p *JSParser) buildDeleteStatement(ts []raw.Token) (*js.DeleteOp,
 	[]raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 
 	expr, err := p.buildExpression(ts[1:])
 	if err != nil {
@@ -407,7 +407,7 @@ func (p *JSParser) buildStatement(ts []raw.Token) (js.Statement, []raw.Token, er
 				return nil, nil, errCtx.NewError("Error: bad statement")
 			}
 
-			ilast := p.nextSeparatorPosition(ts, patterns.SEMICOLON)
+			ilast := nextSeparatorPosition(ts, patterns.SEMICOLON)
 
 			switch {
       case raw.IsWord(ts[0], "rpc") && raw.IsWord(ts[1], "interface"):
@@ -429,7 +429,7 @@ func (p *JSParser) buildStatement(ts []raw.Token) (js.Statement, []raw.Token, er
         // why not use the buildassignstatement function directly?
         return p.buildAssignStatement(ts)
 
-				/*statementTokens, remaining := p.splitByNextSeparator(ts, patterns.SEMICOLON)
+				/*statementTokens, remaining := splitByNextSeparator(ts, patterns.SEMICOLON)
 				// try to find an equals
 				assignStatement_, err := p.buildExpression(statementTokens)
 				if err != nil {
@@ -445,7 +445,7 @@ func (p *JSParser) buildStatement(ts []raw.Token) (js.Statement, []raw.Token, er
 			}
 		}
 	} else {
-		ilast := p.nextSeparatorPosition(ts, patterns.SEMICOLON)
+		ilast := nextSeparatorPosition(ts, patterns.SEMICOLON)
 
 		switch {
 		case ilast == 0:

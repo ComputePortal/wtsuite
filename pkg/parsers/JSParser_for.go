@@ -99,7 +99,7 @@ func (p *JSParser) buildForRegularStatement(parensGroup *raw.Group,
 			initField = initField[1:]
 		}
 
-		components := p.splitBySeparator(initField, patterns.COMMA)
+		components := splitBySeparator(initField, patterns.COMMA)
 		for _, c := range components {
 			if len(c) < 2 {
 				return nil, forCtx.NewError("Error: unexpectedly short init expression")
@@ -151,7 +151,7 @@ func (p *JSParser) buildForRegularStatement(parensGroup *raw.Group,
 			return nil, errCtx.NewError("Error: bad for loop final statement, expected at least two tokens (eg. a++)")
 		}
 
-		components := p.splitBySeparator(incrField, patterns.COMMA)
+		components := splitBySeparator(incrField, patterns.COMMA)
 		for _, c := range components {
 			incrExpr, err := p.buildExpression(c)
 			if err != nil {
@@ -233,7 +233,7 @@ func (p *JSParser) buildForStatement(ts []raw.Token) (js.Statement, []raw.Token,
 		forStatement.AddStatement(st)
 	}
 
-	remaining := p.stripSeparators(3, ts, patterns.SEMICOLON)
+	remaining := stripSeparators(3, ts, patterns.SEMICOLON)
 
 	return forStatement, remaining, nil
 }

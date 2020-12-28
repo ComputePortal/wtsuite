@@ -3,10 +3,9 @@ package js
 import (
 	"strings"
 
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
   "github.com/computeportal/wtsuite/pkg/tokens/js/values"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
-
-	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type If struct {

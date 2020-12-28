@@ -363,7 +363,7 @@ func (p *JSParser) buildFunctionStatement(ts []raw.Token) (*js.Function,
 	//return nil, nil, errCtx.NewError("Error: bad function statement")
 	//}
 
-	//remaining := p.stripSeparators(4, ts, patterns.SEMICOLON)
+	//remaining := stripSeparators(4, ts, patterns.SEMICOLON)
 
 	fn, remaining, err := p.buildFunction(ts, true, false)
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 )
 
 func (p *JSParser) buildAwait(ts []raw.Token) (*js.Await, []raw.Token, error) {
-	exprTokens, remainingTokens := p.splitByNextSeparator(ts[1:], patterns.SEMICOLON)
+	exprTokens, remainingTokens := splitByNextSeparator(ts[1:], patterns.SEMICOLON)
 
 	if len(exprTokens) > 0 {
 		expr, err := p.buildExpression(exprTokens)

@@ -1,7 +1,7 @@
 package js
 
 type ModuleScope struct {
-	module  *ControlModule
+	module  *ModuleData
 	globals GlobalScope // both as parent and as globals
 	ScopeData
 }

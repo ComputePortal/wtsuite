@@ -362,7 +362,7 @@ func (t *HTML) IncludeControl(code string) error {
   }
 
 	ctx := head.Context()
-	script, _ := NewScript(tokens.NewEmptyStringDict(ctx), code, ctx)
+	script, _ := NewLoaderScript(code, ctx)
 	head.AppendChild(script)
 
   return nil

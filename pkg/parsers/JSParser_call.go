@@ -103,7 +103,7 @@ func (p *JSParser) buildCallExpression(ts []raw.Token) (js.Expression, error) {
 
 // method call
 func (p *JSParser) buildCallStatement(ts_ []raw.Token) (js.Statement, []raw.Token, error) {
-	ts, remainingTokens := p.splitByNextSeparator(ts_, patterns.SEMICOLON)
+	ts, remainingTokens := splitByNextSeparator(ts_, patterns.SEMICOLON)
 
 	if raw.IsWord(ts[0], "void") {
 		call, err := p.buildExpression(ts[1:])
