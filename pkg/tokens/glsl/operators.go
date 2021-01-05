@@ -4,6 +4,7 @@ import (
   "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type UnaryOp struct {
@@ -270,4 +271,269 @@ func (t *PostUnaryOp) WriteStatement(usage Usage, indent string, nl string, tab 
   b.WriteString(t.op)
 
   return b.String()
+}
+
+func (t *BinaryOp) ResolveExpressionNames(scope Scope) error {
+	if err := t.a.ResolveExpressionNames(scope); err != nil {
+		return err
+	}
+
+	if err := t.b.ResolveExpressionNames(scope); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *UnaryOp) ResolveExpressionNames(scope Scope) error {
+	if err := t.a.ResolveExpressionNames(scope); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *PostUnaryOp) ResolveStatementNames(scope Scope) error {
+  return t.ResolveExpressionNames(scope)
+}
+
+func (t *BinaryOp) evalArgs() (values.Value, values.Value, error) {
+  a, err := t.a.EvalExpression()
+  if err != nil {
+    return nil, nil, err
+  }
+
+  b, err := t.b.EvalExpression()
+  if err != nil {
+    return nil, nil, err
+  }
+
+  return a, b, nil
+}
+
+func (t *AddOp) EvalExpression() (values.Value, error) {
+  a, b, err := t.evalArgs()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsInt(a):
+    if _, err := values.AssertInt(b); err != nil {
+      return nil, err
+    }
+    return values.NewContextValue(a, t.Context()), nil
+  case values.IsFloat(a):
+    if _, err := values.AssertFloat(b); err != nil {
+      return nil, err
+    }
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't add " + a.TypeName() + " and " + b.TypeName())
+  }
+}
+
+func (t *SubOp) EvalExpression() (values.Value, error) {
+  a, b, err := t.evalArgs()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsInt(a):
+    if _, err := values.AssertInt(b); err != nil {
+      return nil, err
+    }
+    return values.NewContextValue(a, t.Context()), nil
+  case values.IsFloat(a):
+    if _, err := values.AssertFloat(b); err != nil {
+      return nil, err
+    }
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't subtract " + a.TypeName() + " and " + b.TypeName())
+  }
+}
+
+func (t *DivOp) EvalExpression() (values.Value, error) {
+  a, b, err := t.evalArgs()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsFloat(a):
+    if _, err := values.AssertFloat(b); err != nil {
+      return nil, err
+    }
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't divide " + a.TypeName() + " and " + b.TypeName())
+  }
+}
+
+func (t *MulOp) EvalExpression() (values.Value, error) {
+  a, b, err := t.evalArgs()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsInt(a):
+    if _, err := values.AssertInt(b); err != nil {
+      return nil, err
+    }
+    return values.NewContextValue(a, t.Context()), nil
+  case values.IsFloat(a):
+    if _, err := values.AssertFloat(b); err != nil {
+      return nil, err
+    }
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't multiply " + a.TypeName() + " and " + b.TypeName())
+  }
+}
+
+func (t *NegOp) EvalExpression() (values.Value, error) {
+  a, err := t.a.EvalExpression()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsInt(a):
+    return values.NewContextValue(a, t.Context()), nil
+  case values.IsFloat(a):
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't negate " + a.TypeName())
+  }
+}
+
+func (t *PosOp) EvalExpression() (values.Value, error) {
+  a, err := t.a.EvalExpression()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsInt(a):
+    return values.NewContextValue(a, t.Context()), nil
+  case values.IsFloat(a):
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't + " + a.TypeName())
+  }
+}
+
+func (t *NotOp) EvalExpression() (values.Value, error) {
+  a, err := t.a.EvalExpression()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsBool(a):
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: can't + " + a.TypeName())
+  }
+}
+
+func (t *LogicalBinaryOp) EvalExpression() (values.Value, error) {
+  a, b, err := t.evalArgs()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsBool(a) && values.IsBool(b):
+    return values.NewContextValue(a, t.Context()), nil
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: " + a.TypeName() + t.op + b.TypeName() + " is illegal")
+  }
+}
+
+func (t *OrderCompareOp) EvalExpression() (values.Value, error) {
+  a, b, err := t.evalArgs()
+  if err != nil {
+    return nil, err
+  }
+
+  switch {
+  case values.IsInt(a) && values.IsInt(b):
+  case values.IsFloat(a) && values.IsFloat(b):
+  default:
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: " + a.TypeName() + t.op + b.TypeName() + " is illegal")
+  }
+
+  return values.NewScalar("bool", t.Context()), nil
+}
+
+func (t *EqCompareOp) EvalExpression() (values.Value, error) {
+  a, b, err := t.evalArgs()
+  if err != nil {
+    return nil, err
+  }
+
+  if err := a.Check(b, t.Context()); err != nil {
+    return nil, err
+  }
+
+  return values.NewScalar("bool", t.Context()), nil
+}
+
+func (t *PostIncrOp) EvalStatement() error {
+  a, err := t.a.EvalExpression()
+  if err != nil {
+    return err
+  }
+
+  if _, err := values.AssertInt(a); err != nil {
+    return err
+  }
+
+  return nil
+}
+
+func (t *PostDecrOp) EvalStatement() error {
+  a, err := t.a.EvalExpression()
+  if err != nil {
+    return err
+  }
+
+  if _, err := values.AssertInt(a); err != nil {
+    return err
+  }
+
+  return nil
+}
+
+func (t *UnaryOp) ResolveExpressionActivity(usage Usage) error {
+  return t.a.ResolveExpressionActivity(usage)
+}
+
+func (t *BinaryOp) ResolveExpressionActivity(usage Usage) error {
+  if err := t.a.ResolveExpressionActivity(usage); err != nil {
+    return err
+  }
+
+  return t.b.ResolveExpressionActivity(usage)
+}
+
+func (t *PostUnaryOp) ResolveStatementActivity(usage Usage) error {
+  return t.ResolveExpressionActivity(usage)
+}
+
+func (t *PostUnaryOp) UniqueStatementNames(ns Namespace) error {
+  return nil
 }

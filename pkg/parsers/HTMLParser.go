@@ -164,10 +164,6 @@ func (p *HTMLParser) Refine(start, stop int) *HTMLParser {
 	return &HTMLParser{p.refine(start, stop)}
 }
 
-func (p *HTMLParser) ChangeCaller(caller string) *HTMLParser {
-	return &HTMLParser{p.changeCaller(caller)}
-}
-
 func (p *HTMLParser) tokenize() ([]raw.Token, error) {
 	ts, err := p.Parser.tokenize()
 	if err != nil {

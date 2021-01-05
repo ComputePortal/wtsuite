@@ -2,6 +2,8 @@ package scripts
 
 import (
 	"strings"
+
+	"github.com/computeportal/wtsuite/pkg/files"
 )
 
 type InlineBundle struct {
@@ -36,24 +38,26 @@ func (b *InlineBundle) Write() (string, error) {
 	return sb.String(), nil
 }
 
-func (b *InlineBundle) Dependencies() []string {
+func (b *InlineBundle) Dependencies() []files.PathLang {
 	// src's
-	uniqueDeps := make(map[string]string) // to make them unique
+	uniqueDeps := make(map[string]files.PathLang) // to make them unique
 
 	for _, s := range b.scripts {
 		deps := s.Dependencies()
 
-		for _, dep := range deps {
+		for _, pl := range deps {
+      dep := pl.Path
+
 			if _, ok := uniqueDeps[dep]; !ok {
-				uniqueDeps[dep] = dep
+				uniqueDeps[dep] = pl
 			}
 		}
 	}
 
-	result := make([]string, 0)
+	result := make([]files.PathLang, 0)
 
-	for k, _ := range uniqueDeps {
-		result = append(result, k)
+	for _, pl := range uniqueDeps {
+		result = append(result, pl)
 	}
 
 	return result

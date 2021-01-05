@@ -16,6 +16,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tree"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 	"github.com/computeportal/wtsuite/pkg/tree/styles"
@@ -34,7 +35,6 @@ var (
 type CmdArgs struct {
   inputFile string
   outputFile string
-  includeDirs []string
 
   control string // optional control to be built along with view
   mathFontURL string
@@ -53,7 +53,6 @@ func printUsageAndExit() {
 Options:
   -?, -h, --help         Show this message, other options are ignored
 	-c, --compact          Compact output with minimal whitespace and short names
-	-I, --include <dir>    Append a search directory to HTMLPPPATH
 	-o, --output <file>    Defaults to "a.js" if not set
   --control <file>       Optional control file
   --math-font-url <url>  Defaults to "FreeSerifMath.woff2"
@@ -84,7 +83,6 @@ func parseArgs() CmdArgs {
 	cmdArgs := CmdArgs{
 		inputFile:     "",
 		outputFile:    DEFAULT_OUTPUTFILE,
-		includeDirs:   make([]string, 0),
 		control:        "",
     mathFontURL: DEFAULT_MATHFONTURL,
     pxPerRem: DEFAULT_PX_PER_REM,
@@ -115,13 +113,6 @@ func parseArgs() CmdArgs {
 					printMessageAndExit("Error: "+arg+" already specified", true)
 				} else {
 					cmdArgs.compactOutput = true
-				}
-			case "-I", "--include":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					cmdArgs.includeDirs = append(cmdArgs.includeDirs, os.Args[i+1])
-					i++
 				}
 			case "-o", "--output":
 				if i == n-1 {
@@ -205,12 +196,6 @@ func parseArgs() CmdArgs {
 		cmdArgs.outputFile = outputFile
 	}
 
-	for _, includeDir := range cmdArgs.includeDirs {
-		if err := files.AssertDir(includeDir); err != nil {
-			printMessageAndExit("Error: include dir '"+includeDir+"' "+err.Error(), false)
-		}
-	}
-
   if cmdArgs.control != "" {
     if err := files.AssertFile(cmdArgs.control); err != nil {
       printMessageAndExit("Error: control file '"+cmdArgs.control+"' "+err.Error(), false)
@@ -227,19 +212,13 @@ func parseArgs() CmdArgs {
   return cmdArgs
 }
 
-func setUpEnv(cmdArgs CmdArgs) {
+func setUpEnv(cmdArgs CmdArgs) error {
   if cmdArgs.compactOutput {
-		tree.NL = ""
-		tree.TAB = ""
 		tree.COMPRESS_NUMBERS = true
-
-		styles.NL = ""
-		styles.TAB = ""
-		styles.LAST_SEMICOLON = ""
-
-    js.NL = ""
-    js.TAB = ""
-    js.COMPACT_NAMING = true
+		patterns.NL = ""
+		patterns.TAB = ""
+		patterns.LAST_SEMICOLON = ""
+    patterns.COMPACT_NAMING = true
     macros.COMPACT = true
   }
 
@@ -250,7 +229,6 @@ func setUpEnv(cmdArgs CmdArgs) {
 	if cmdArgs.pxPerRem > 0 {
 		tokens.PX_PER_REM = cmdArgs.pxPerRem
 	}
-
 
   styles.MATH_FONT = "FreeSerifMath"
   styles.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
@@ -266,11 +244,11 @@ func setUpEnv(cmdArgs CmdArgs) {
 	values.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
-	files.AppendIncludeDirs(cmdArgs.includeDirs)
+  return files.ResolvePackages(cmdArgs.inputFile)
 }
 
-func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src string, dst string, control string, compactOutput bool) error {
-  r, cssBundleRules, err := directives.NewRoot(fileSource, c, src, "", "", "")
+func buildHTMLFile(c *directives.FileCache, src string, dst string, control string, compactOutput bool) error {
+  r, cssBundleRules, err := directives.NewRoot(c, src, "", "", "")
   if err != nil {
     return err
   }
@@ -292,7 +270,7 @@ func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src string,
 
     cache.LoadJSCache("", true)
 
-    entryScript, err := scripts.NewInitFileScript(control, "")
+    entryScript, err := scripts.NewInitFileScript(control)
     if err != nil {
       return err
     }
@@ -316,7 +294,7 @@ func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src string,
     }
   }
 
-	output := r.Write("", tree.NL, tree.TAB)
+	output := r.Write("", patterns.NL, patterns.TAB)
 
 	// src is just for info
 	if err := files.WriteFile(src, dst, []byte(output)); err != nil {
@@ -341,10 +319,9 @@ func buildFile(cmdArgs CmdArgs) error {
 		cmdArgs.compactOutput, make(map[string]string), true)
 
 
-  fileSource := files.NewDefaultUIFileSource()
   c := directives.NewFileCache()
 
-	if err := buildHTMLFile(fileSource, c, cmdArgs.inputFile, cmdArgs.outputFile, cmdArgs.control, cmdArgs.compactOutput); err != nil {
+	if err := buildHTMLFile(c, cmdArgs.inputFile, cmdArgs.outputFile, cmdArgs.control, cmdArgs.compactOutput); err != nil {
     return err
   }
 
@@ -354,7 +331,9 @@ func buildFile(cmdArgs CmdArgs) error {
 func main() {
   cmdArgs := parseArgs()
 
-  setUpEnv(cmdArgs)
+  if err := setUpEnv(cmdArgs); err != nil {
+    printSyntaxErrorAndExit(err)
+  }
 
   if err := buildFile(cmdArgs); err != nil {
     printSyntaxErrorAndExit(err)

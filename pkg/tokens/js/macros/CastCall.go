@@ -33,7 +33,8 @@ func (m *CastCall) Dump(indent string) string {
   var b strings.Builder
   
   b.WriteString(indent)
-  b.WriteString("cast(...)")
+  b.WriteString(js.CAST_MACRO_NAME)
+  b.WriteString("(...)")
   b.WriteString("\n")
   b.WriteString(m.args[0].Dump(indent + "  "))
   b.WriteString(m.typeExpr.WriteExpression())

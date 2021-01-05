@@ -38,7 +38,7 @@ func (t *ForInOf) dump(indent string, op string) string {
 	return b.String()
 }
 
-func (t *ForInOf) writeStatement(indent string, extra string, op string) string {
+func (t *ForInOf) writeStatement(usage Usage, indent string, extra string, op string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(t.writeStatementHeader(indent, extra, true))
@@ -48,7 +48,7 @@ func (t *ForInOf) writeStatement(indent string, extra string, op string) string 
 	b.WriteString(op)
 	b.WriteString(" ")
 	b.WriteString(t.rhs.WriteExpression())
-	b.WriteString(t.writeStatementFooter(indent))
+	b.WriteString(t.writeStatementFooter(usage, indent, nl, tab))
 
 	return b.String()
 }

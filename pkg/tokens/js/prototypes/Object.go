@@ -286,3 +286,21 @@ func (p *Object) GetClassValue() (*values.Class, error) {
     []values.Value{},
   }, NewMapLikeObjectPrototype(values.NewAny(ctx)), ctx), nil
 }
+
+func GetLiteralObjectMembers(v_ values.Value) (map[string]values.Value, error) {
+  v, err := values.AssertInstance(v_)
+  if err == nil {
+    interf := v.GetInterface()
+
+    objectProto, ok := interf.(*Object)
+    if ok {
+      members := objectProto.members
+      if members != nil {
+        return members, nil
+      }
+    }
+  }
+
+  errCtx := v_.Context()
+  return nil, errCtx.NewError("Error: expected literal object, got " + v_.TypeName())
+}

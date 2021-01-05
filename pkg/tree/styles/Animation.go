@@ -6,6 +6,7 @@ import (
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
@@ -90,7 +91,7 @@ func (r *Keyframes) writeStart(indent string) string {
 	b.WriteString("@keyframes ")
 	b.WriteString(r.name)
 	b.WriteString("{")
-	b.WriteString(NL)
+	b.WriteString(patterns.NL)
 
 	return b.String()
 }
@@ -114,21 +115,21 @@ func (r *Keyframes) writeFrames(indent string) string {
 		b.WriteString(stringMapToString(frame.state, "", ""))
 
 		b.WriteString("}")
-		b.WriteString(NL)
+		b.WriteString(patterns.NL)
 	}
 
 	return b.String()
 }
 
 func (r *Keyframes) writeStop(indent string) string {
-	return indent + "}" + NL
+	return indent + "}" + patterns.NL
 }
 
 func (r *Keyframes) Write(indent string) string {
 	var b strings.Builder
 
 	b.WriteString(r.writeStart(indent))
-	b.WriteString(r.writeFrames(indent + TAB))
+	b.WriteString(r.writeFrames(indent + patterns.TAB))
 	b.WriteString(r.writeStop(indent))
 
 	return b.String()

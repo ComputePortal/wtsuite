@@ -43,7 +43,7 @@ func (t *Await) WriteExpression() string {
 	return b.String()
 }
 
-func (t *Await) WriteStatement(indent string) string {
+func (t *Await) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)

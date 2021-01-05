@@ -66,7 +66,7 @@ var _classMacros = map[string]MacroGroup{
 }
 
 var _callMacros = map[string]MacroConstructor{
-  "cast":   NewCastCall,
+  js.CAST_MACRO_NAME:   NewCastCall,
 	"BigInt": NewBigIntCall,
 	//"WebAssemblyEnv": NewWebAssemblyEnvCall,
 }
@@ -74,6 +74,7 @@ var _callMacros = map[string]MacroConstructor{
 var _constructorMacros = map[string]MacroConstructor{
   "RPCClient": NewRPCClient,
   "RPCServer": NewRPCServer,
+  "WebGLProgram": NewWebGLProgram,
 }
 
 func IsClassMacroGroup(gname string) bool {

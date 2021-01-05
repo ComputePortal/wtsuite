@@ -145,7 +145,7 @@ func (fi *FunctionInterface) Write() string {
 	return b.String()
 }
 
-func (fi *FunctionInterface) writeRPCNewEntry(indent string) string {
+func (fi *FunctionInterface) writeRPCNewEntry(indent string, nl string, tab string) string {
   var b strings.Builder
 
   b.WriteString(indent)
@@ -160,10 +160,10 @@ func (fi *FunctionInterface) writeRPCNewEntry(indent string) string {
     }
   }
   b.WriteString("){")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   // create the msg
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("let packet={channel:channel,name:\"")
   b.WriteString(fi.Name())
   b.WriteString("\"")
@@ -201,7 +201,7 @@ func (fi *FunctionInterface) writeRPCNewEntry(indent string) string {
     }
   }
   b.WriteString("};")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   // prepare a return value
   promise, err := fi.GetReturnValue()
@@ -215,7 +215,7 @@ func (fi *FunctionInterface) writeRPCNewEntry(indent string) string {
   }
 
   // perform the actual request
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   if ret != nil {
     b.WriteString("let result=")
   }
@@ -231,11 +231,11 @@ func (fi *FunctionInterface) writeRPCNewEntry(indent string) string {
     }
   }
   b.WriteString("]);")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   // type check?
   if ret != nil {
-    b.WriteString(indent + TAB)
+    b.WriteString(indent + tab)
     b.WriteString("return ")
 
     retInterf := values.GetInterface(ret)
@@ -254,33 +254,33 @@ func (fi *FunctionInterface) writeRPCNewEntry(indent string) string {
       panic("unexpected")
     }
 
-    b.WriteString(NL)
+    b.WriteString(nl)
   }
 
   b.WriteString(indent)
   b.WriteString("},")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   return b.String()
 }
 
-func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
+func (fi *FunctionInterface) writeRPCCallEntry(indent string, nl string, tab string) string {
   var b strings.Builder
 
   b.WriteString(indent)
   b.WriteString(fi.Name())
   b.WriteString(":async function(){")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   // each argument is extracted from the msg, and type checked
   for i, arg := range fi.args {
     argName := "arg" + strconv.Itoa(i)
 
-    b.WriteString(indent + TAB)
+    b.WriteString(indent + tab)
     b.WriteString("let ") 
     b.WriteString(argName)
     b.WriteString(";")
-    b.WriteString(NL)
+    b.WriteString(nl)
 
     te := arg.typeExpr
 
@@ -288,32 +288,32 @@ func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
     if interf == nil {
       panic("unexpected")
     } else if interf.IsRPC() {
-      b.WriteString(indent + TAB)
+      b.WriteString(indent + tab)
       b.WriteString("if(msg.")
       b.WriteString(argName)
       b.WriteString("!==undefined&&msg.")
       b.WriteString(argName)
       b.WriteString(".channel!==undefined){")
-      b.WriteString(NL)
+      b.WriteString(nl)
 
-      b.WriteString(indent + TAB + TAB)
+      b.WriteString(indent + tab + tab)
       b.WriteString("let pair=ctx.channels[parseInt(__checkType__(msg.")
       b.WriteString(argName)
       b.WriteString(".channel,Number))];")
-      b.WriteString(NL)
-      b.WriteString(indent + TAB + TAB)
+      b.WriteString(nl)
+      b.WriteString(indent + tab + tab)
       b.WriteString("if(pair==undefined){throw new Error('channel not found')}")
-      b.WriteString(NL)
-      b.WriteString(indent + TAB + TAB)
+      b.WriteString(nl)
+      b.WriteString(indent + tab + tab)
       b.WriteString(argName)
       b.WriteString("=pair[1];")
-      b.WriteString(NL)
+      b.WriteString(nl)
 
-      b.WriteString(indent + TAB)
+      b.WriteString(indent + tab)
       b.WriteString("}else{")
-      b.WriteString(NL)
+      b.WriteString(nl)
 
-      b.WriteString(indent + TAB + TAB)
+      b.WriteString(indent + tab + tab)
       b.WriteString(argName)
       b.WriteString("=")
       b.WriteString(interf.Name())
@@ -322,12 +322,12 @@ func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
       b.WriteString("(parseInt(__checkType__(msg.")
       b.WriteString(argName)
       b.WriteString(",Number)),ctx)")
-      b.WriteString(NL)
+      b.WriteString(nl)
 
-      b.WriteString(indent + TAB)
+      b.WriteString(indent + tab)
       b.WriteString("}")
     } else {
-      b.WriteString(indent + TAB);
+      b.WriteString(indent + tab);
       b.WriteString(argName)
       b.WriteString("=__checkType__(msg.")
       b.WriteString(argName)
@@ -336,7 +336,7 @@ func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
       b.WriteString(");")
     }
 
-    b.WriteString(NL)
+    b.WriteString(nl)
   }
 
   // prepare a return value
@@ -351,7 +351,7 @@ func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
   }
 
   // now call the actual function
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   if ret != nil {
     b.WriteString("let r=")
   }
@@ -366,9 +366,9 @@ func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
     }
   }
   b.WriteString(");")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("ctx.respond({id:msg.id,")
   if ret != nil {
     retInterf := values.GetInterface(ret)
@@ -385,11 +385,11 @@ func (fi *FunctionInterface) writeRPCCallEntry(indent string) string {
     }
   }
   b.WriteString("});")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   b.WriteString(indent)
   b.WriteString("},")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   return b.String()
 }

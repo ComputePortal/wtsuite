@@ -18,7 +18,6 @@ import (
 type CmdArgs struct {
 	ConfigFile  string
 	OutputDir   string
-	IncludeDirs []string
 	GlobalVars  map[string]string
 
 	JsUrl           string
@@ -65,7 +64,6 @@ func NewDefaultCmdArgs() CmdArgs {
 	return CmdArgs{
 		ConfigFile:  "",
 		OutputDir:   "",
-		IncludeDirs: make([]string, 0),
 		GlobalVars:  make(map[string]string),
 
 		JsUrl:           "",
@@ -314,9 +312,6 @@ func ReadConfigFile(cmdArgs *CmdArgs) (*Config, error) {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return cfg, errors.New("Error: bad config file syntax (" + err.Error() + ")")
 	}
-
-	// need include dirs now because rel paths are converted to abs paths
-	files.AppendIncludeDirs(cmdArgs.IncludeDirs)
 
 	cfg.controls, err = relAndGlobToAbsControlsFileMap(cmdArgs, cfg.Controls, cfg.Views)
 	if err != nil {

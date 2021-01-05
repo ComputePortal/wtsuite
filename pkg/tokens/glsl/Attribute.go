@@ -7,13 +7,11 @@ import (
 )
 
 type Attribute struct {
-  typeExpr *TypeExpression
-  nameExpr *VarExpression
-  TokenData
+  Pointer
 }
 
 func NewAttribute(typeExpr *TypeExpression, name string, ctx context.Context) *Attribute {
-  return &Attribute{typeExpr, NewVarExpression(name, ctx), newTokenData(ctx)}
+  return &Attribute{newPointer(typeExpr, NewVarExpression(name, ctx), -1, ctx)}
 }
 
 func (t *Attribute) Dump(indent string) string {

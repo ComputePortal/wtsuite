@@ -2,6 +2,7 @@ package glsl
 
 import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type LiteralBool struct {
@@ -28,6 +29,10 @@ func (t *LiteralBool) WriteExpression() string {
 	}
 
 	return s
+}
+
+func (t *LiteralBool) EvalExpression() (values.Value, error) {
+  return values.NewScalar("bool", t.Context()), nil
 }
 
 func IsLiteralBool(t Expression) bool {

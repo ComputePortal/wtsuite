@@ -3,10 +3,10 @@ package js
 import (
 	"strings"
 
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
-
-	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 // only support single inheritance (easier to maintain code, and similar to java)
@@ -297,10 +297,10 @@ func (t *Class) Dump(indent string) string {
 }
 
 func (t *Class) WriteExpression() string {
-	return t.WriteStatement("")
+	return t.WriteStatement(nil, "", patterns.NL, patterns.TAB)
 }
 
-func (t *Class) WriteStatement(indent string) string {
+func (t *Class) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)
@@ -320,44 +320,44 @@ func (t *Class) WriteStatement(indent string) string {
 
   if t.IsUniversal() {
     // runtime propertytype information
-    b.WriteString(indent + TAB)
+    b.WriteString(indent + tab)
     b.WriteString("static __propertyTypes__={")
-    b.WriteString(NL)
+    b.WriteString(nl)
 
     for _, member_ := range t.members{
       if member, ok := member_.(*ClassProperty); ok {
-        b.WriteString(member.writeUniversalPropertyType(indent + TAB))
+        b.WriteString(member.writeUniversalPropertyType(indent + tab, nl, tab))
       }
     }
 
-    b.WriteString(indent + TAB)
+    b.WriteString(indent + tab)
     b.WriteString("};")
-    b.WriteString(NL)
+    b.WriteString(nl)
   }
 
 	hasContent := false
   if t.constructor != nil {
-    b.WriteString(NL)
-    b.WriteString(indent + TAB)
+    b.WriteString(nl)
+    b.WriteString(indent + tab)
     b.WriteString("constructor")
-    b.WriteString(t.constructor.writeBody(indent + TAB, NL, TAB))
+    b.WriteString(t.constructor.writeBody(usage, indent + tab, nl, tab))
     hasContent = true
   }
 
 	for _, member := range t.members {
-		s := member.WriteStatement(indent + TAB)
+		s := member.WriteStatement(usage, indent + tab, nl, tab)
 
 		if s != "" {
-			b.WriteString(NL)
+			b.WriteString(nl)
 			b.WriteString(s)
 			hasContent = true
 		}
 	}
 
-	//b.WriteString(t.writeNonOverriddenGettersAndSetters(indent + TAB))
+	//b.WriteString(t.writeNonOverriddenGettersAndSetters(indent + tab))
 
 	if hasContent {
-		b.WriteString(NL)
+		b.WriteString(nl)
 		b.WriteString(indent)
 	}
 	b.WriteString("}")
@@ -371,7 +371,7 @@ func (t *Class) WriteStatement(indent string) string {
     for _, interf := range interfs {
       if interf.IsUniversal() {
         b.WriteString(";")
-        b.WriteString(NL)
+        b.WriteString(nl)
         b.WriteString(indent)
         b.WriteString(interf.Name())
         b.WriteString(".__implementations__.push(")
@@ -988,7 +988,7 @@ func (t *Class) Walk(fn WalkFunc) error {
 		class := classSetter[0]
 		setter := classSetter[1]
 
-		b.WriteString(NL)
+		b.WriteString(nl)
 		b.WriteString(indent)
 		b.WriteString("set ")
 		b.WriteString(setter)
@@ -1003,7 +1003,7 @@ func (t *Class) Walk(fn WalkFunc) error {
 		class := classGetter[0]
 		getter := classGetter[1]
 
-		b.WriteString(NL)
+		b.WriteString(nl)
 		b.WriteString(indent)
 		b.WriteString("get ")
 		b.WriteString(getter)

@@ -1,5 +1,10 @@
 package scripts
 
+import (
+	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+)
+
 type SrcScript struct {
 	src string
 }
@@ -12,6 +17,6 @@ func (s *SrcScript) Write() (string, error) {
 	return "", nil
 }
 
-func (s *SrcScript) Dependencies() []string {
-	return []string{s.src}
+func (s *SrcScript) Dependencies() []files.PathLang {
+	return []files.PathLang{files.PathLang{s.src, files.SCRIPT, context.NewDummyContext()}}
 }

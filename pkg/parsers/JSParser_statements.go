@@ -358,7 +358,7 @@ func (p *JSParser) buildStatement(ts []raw.Token) (js.Statement, []raw.Token, er
 				panic(err)
 			}
 			return p.buildVarStatement(ts, varType)
-		case "class":
+		case "class", "abstract", "final":
 			return p.buildClassStatement(ts)
 		case "enum":
 			return p.buildEnumStatement(ts)

@@ -28,10 +28,9 @@ type NodeJSImport struct {
 	TokenData
 }
 
-// TODO: alt name capability
-func NewNodeJSImport(expr *VarExpression, ctx context.Context) *NodeJSImport {
+func NewNodeJSImport(name string, expr *VarExpression, ctx context.Context) *NodeJSImport {
 	return &NodeJSImport{
-    expr.Name(),
+    name,
 		expr,
 		newTokenData(ctx),
 	}
@@ -45,7 +44,7 @@ func (m *NodeJSImport) AddStatement(st Statement) {
 	panic("not a block statement")
 }
 
-func (m *NodeJSImport) WriteStatement(indent string) string {
+func (m *NodeJSImport) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	return "const " + m.expr.Name() + "=require('" + m.name + "')"
 }
 
@@ -54,11 +53,9 @@ func (m *NodeJSImport) HoistNames(scope Scope) error {
 }
 
 func (m *NodeJSImport) ResolveStatementNames(scope Scope) error {
-  name := m.expr.Name()
+  pkg := NewBuiltinPackage(m.expr.Name())
 
-  pkg := NewBuiltinPackage(name)
-
-  if pkgFiller, ok := nodeJSPackages[name]; ok {
+  if pkgFiller, ok := nodeJSPackages[m.name]; ok {
     pkgFiller(pkg)
   } else {
     panic("should've been caught before")

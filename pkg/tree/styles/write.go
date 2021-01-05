@@ -8,6 +8,7 @@ import (
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tokens/math/serif"
 )
 
@@ -106,7 +107,7 @@ func stringMapToString(m map[string]string, nl, indent string) string {
 		b.WriteString(":")
 		b.WriteString(v)
 		if i == len(keys)-1 {
-			b.WriteString(LAST_SEMICOLON)
+			b.WriteString(patterns.LAST_SEMICOLON)
 		} else {
 			b.WriteString(";")
 		}

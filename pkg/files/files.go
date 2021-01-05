@@ -6,13 +6,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-  "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 var htmlppPath = os.Getenv("HTMLPPPATH")
-var includeDirs = filepath.SplitList(htmlppPath)
 
 var (
 	JS_MODE    = false
@@ -30,18 +28,6 @@ const (
 var StartCacheUpdate func(fname string) = nil
 var AddCacheDependency func(fname string, dep string) = nil
 var HasUpstreamCacheDependency func(thisPath string, upstreamPath string) bool = nil
-
-func PrependIncludeDirs(dirs []string) {
-	includeDirs = append(dirs, includeDirs...)
-}
-
-func AppendIncludeDirs(dirs []string) {
-	includeDirs = append(includeDirs, dirs...)
-}
-
-func NewDefaultUIFileSource() Source {
-  return NewFileSource(includeDirs, UIPACKAGE_SUFFIX)
-}
 
 func IsFile(fname string) bool {
 	if info, err := os.Stat(fname); os.IsNotExist(err) {
@@ -91,22 +77,38 @@ func AssertDir(dname string) error {
 	}
 }
 
-// currentFname is the caller, refFname is the file we are trying to find
-func Search(currentFname string, refFname string) (string, error) {
-  fileSource := NewFileSource(includeDirs, "")
+// callerPath is the caller, srcPath is the file we are trying to find
+func Search(callerPath string, srcPath string) (string, error) {
+	if filepath.IsAbs(srcPath) {
+		if err := AssertFile(srcPath); err != nil {
+			return "", err
+		} else {
+			return srcPath, nil
+		}
+	}
 
-	return fileSource.Search(currentFname, refFname)
-}
+	if !filepath.IsAbs(callerPath) {
+    if callerPath == "" {
+      panic("currentFname empty even though refFname isnt Abs: " + srcPath)
+    } else {
+      panic("currentFname should be absolute, got: " + callerPath)
+    }
+	}
 
-func SearchPackage(currentFname string, refFname string, pkgSuffix string) (string, bool, error) {
-  fileSource := NewFileSource(includeDirs, pkgSuffix)
+	currentDir := filepath.Dir(callerPath)
 
-  absPath, err := fileSource.Search(currentFname, refFname)
-  if err != nil {
-    return "", false, err
+  fname := filepath.Join(currentDir, srcPath)
+
+  if err := AssertFile(fname); err == nil {
+    if absFname, err := filepath.Abs(fname); err != nil {
+      return "", err
+    } else {
+      return absFname, nil
+    }
+  } else {
+    err := errors.New(srcPath + " not found")
+    return "", err
   }
-
-  return absPath, strings.HasSuffix(absPath, pkgSuffix), nil
 }
 
 func Abbreviate(path string) string {

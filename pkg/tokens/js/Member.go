@@ -228,6 +228,14 @@ func (t *Member) EvalExpression() (values.Value, error) {
 }
 
 func (t *Member) EvalSet(rhsValue values.Value, ctx context.Context) error {
+  pkgMember, err := t.GetPackageMember()
+  if err != nil {
+    return err
+  } else if pkgMember != nil {
+    errCtx := t.Context()
+    return errCtx.NewError("Error: can't set package member")
+  }
+
 	objectValue, err := t.object.EvalExpression()
 	if err != nil {
 		return err

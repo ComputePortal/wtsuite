@@ -312,6 +312,16 @@ func FindGroupStop(ts []Token, istart int, tstart Token) ([2]int, bool) {
 	return [2]int{istart, istart}, false
 }
 
+func FindFirstParensGroup(ts []Token, istart int) int {
+  for i, t := range ts {
+    if IsParensGroup(t) {
+      return i
+    }
+  }
+  
+  return -1
+}
+
 // returns inner, and istop, and success
 func SuggestAngledGroup(ts []Token, istart int, tstart Token) ([]Token, int, bool) {
 	count := 0

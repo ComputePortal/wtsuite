@@ -1,5 +1,9 @@
 package scripts
 
+import (
+	"github.com/computeportal/wtsuite/pkg/files"
+)
+
 type InlineScript struct {
 	content string
 }
@@ -12,6 +16,6 @@ func (s *InlineScript) Write() (string, error) {
 	return s.content, nil
 }
 
-func (s *InlineScript) Dependencies() []string {
-	return []string{}
+func (s *InlineScript) Dependencies() []files.PathLang {
+	return []files.PathLang{}
 }

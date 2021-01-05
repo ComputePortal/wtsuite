@@ -3,7 +3,6 @@ package directives
 import (
 	"strings"
 
-	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/functions"
   "github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
@@ -326,8 +325,4 @@ func (scope *ScopeData) Eval(key string, args []tokens.Token,
 
 func (scope *ScopeData) GetCache() *FileCache {
   return scope.parent.GetCache()
-}
-
-func (scope *ScopeData) GetSource() files.Source {
-  return scope.parent.GetSource()
 }

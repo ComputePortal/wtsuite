@@ -290,7 +290,9 @@ func (t *HTML) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.In
 		ctx := head.Context()
 
 		deps := bundle.Dependencies()
-		for _, dep := range deps {
+		for _, pl := range deps {
+      dep := pl.Path
+
 			srcScript, _ := NewSrcScript(dep, ctx)
 
 			head.AppendChild(srcScript)

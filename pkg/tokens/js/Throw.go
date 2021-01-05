@@ -29,7 +29,7 @@ func (t *Throw) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Throw) WriteStatement(indent string) string {
+func (t *Throw) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)

@@ -4,10 +4,9 @@ import (
   "fmt"
 	"strings"
 
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
-
-	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 const NewRPCClientMemberName = "newRPCClient"
@@ -127,34 +126,34 @@ func (t *Interface) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Interface) writeRPCNew(indent string) string {
+func (t *Interface) writeRPCNew(indent string, nl string, tab string) string {
   var b strings.Builder
 
   b.WriteString(indent)
   b.WriteString("static ")
   b.WriteString(NewRPCClientMemberName)
   b.WriteString("(channel,ctx){")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("let obj={")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB + TAB)
+  b.WriteString(indent + tab + tab)
   // ctx===ctx_ should be safe enough to see if channel is running on same comms
   b.WriteString("__channel__:function(ctx_){return (ctx===ctx_)?channel:undefined},")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   for _, member := range t.members {
-    b.WriteString(member.writeRPCNewEntry(indent + TAB + TAB))
+    b.WriteString(member.writeRPCNewEntry(indent + tab + tab, nl, tab))
   }
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("};")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   if len(t.parents) != 0 {
-    b.WriteString(indent + TAB)
+    b.WriteString(indent + tab)
     b.WriteString("Object.assign(obj")
     for _, parent := range t.parents {
       b.WriteString(",")
@@ -166,38 +165,38 @@ func (t *Interface) writeRPCNew(indent string) string {
     b.WriteString(");")
   }
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("return obj;")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   b.WriteString(indent)
   b.WriteString("}")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   return b.String()
 }
 
-func (t *Interface) writeRPCCallFunctions(indent string) string {
+func (t *Interface) writeRPCCallFunctions(indent string, nl string, tab string) string {
   var b strings.Builder
 
   b.WriteString(indent)
   b.WriteString("static rpcFns(obj,msg,ctx){")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("let fns={")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   for _, member := range t.members {
-    b.WriteString(member.writeRPCCallEntry(indent + TAB + TAB))
+    b.WriteString(member.writeRPCCallEntry(indent + tab + tab, nl, tab))
   }
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("};")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   if len(t.parents) != 0 {
-    b.WriteString(indent + TAB)
+    b.WriteString(indent + tab)
     b.WriteString("Object.assign(fns")
     for _, parent := range t.parents {
       b.WriteString(",")
@@ -207,13 +206,13 @@ func (t *Interface) writeRPCCallFunctions(indent string) string {
     b.WriteString(");")
   }
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("return fns;")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   b.WriteString(indent)
   b.WriteString("}")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   return b.String()
 }
@@ -222,59 +221,59 @@ func (t *Interface) writeRPCCallFunctions(indent string) string {
 // msg: incoming JSON {id: ..., name: ..., arg0: ..., arg1: ...} (arg0 etc. have already been turned into instances)
 // ctx: __rpcContext__
 // return value: {value: ...} (if value is left out then void)
-func (t *Interface) writeRPCCall(indent string) string {
+func (t *Interface) writeRPCCall(indent string, nl string, tab string) string {
   var b strings.Builder
 
   b.WriteString(indent)
   b.WriteString("static async rpc(obj,msg,ctx){")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("try{")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB + TAB)
+  b.WriteString(indent + tab + tab)
   b.WriteString("let fns=")
   b.WriteString(t.Name())
   b.WriteString(".rpcFns(obj,msg,ctx);")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB + TAB)
+  b.WriteString(indent + tab + tab)
   b.WriteString("let fn=fns[msg.name];")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB + TAB)
+  b.WriteString(indent + tab + tab)
   b.WriteString("if(fn==undefined){")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB + TAB + TAB)
+  b.WriteString(indent + tab + tab + tab)
   b.WriteString("throw new Error(msg.name+\" not found\")")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB + TAB)
+  b.WriteString(indent + tab + tab)
   b.WriteString("}else{await fn()};")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("}catch(e){")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB + TAB)
+  b.WriteString(indent + tab + tab)
   b.WriteString("ctx.respond(e);")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
-  b.WriteString(indent + TAB)
+  b.WriteString(indent + tab)
   b.WriteString("}")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   b.WriteString(indent)
   b.WriteString("}")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   return b.String()
 }
 
-func (t *Interface) WriteStatement(indent string) string {
+func (t *Interface) WriteStatement(usage Usage, indent string, nl string, tab string) string {
   if !(t.IsRPC() || t.IsUniversal()) {
     fmt.Println(t.IsRPC(), t.IsUniversal())
     return ""
@@ -285,23 +284,23 @@ func (t *Interface) WriteStatement(indent string) string {
     b.WriteString("class ")
     b.WriteString(t.nameExpr.WriteExpression())
     b.WriteString("{")
-    b.WriteString(NL)
+    b.WriteString(nl)
 
     if t.IsUniversal() {
-      b.WriteString(indent + TAB)
+      b.WriteString(indent + tab)
       b.WriteString("static __implementations__=[];")
-      b.WriteString(NL)
+      b.WriteString(nl)
       // implementations must register themselves, to avoid using classes before they are declared
     }
 
     if t.IsRPC() {
-      b.WriteString(t.writeRPCNew(indent + TAB))
-      b.WriteString(t.writeRPCCallFunctions(indent + TAB))
-      b.WriteString(t.writeRPCCall(indent + TAB))
+      b.WriteString(t.writeRPCNew(indent + tab, nl, tab))
+      b.WriteString(t.writeRPCCallFunctions(indent + tab, nl, tab))
+      b.WriteString(t.writeRPCCall(indent + tab, nl, tab))
     }
 
     b.WriteString("}")
-    b.WriteString(NL)
+    b.WriteString(nl)
 
     return b.String()
   }

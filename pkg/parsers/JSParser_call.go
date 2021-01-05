@@ -71,7 +71,7 @@ func (p *JSParser) buildCallExpression(ts []raw.Token) (js.Expression, error) {
 
   var args []js.Expression = nil
 
-  if ve, ok := lhs.(*js.VarExpression); ok && ve.Name() == "cast" {
+  if ve, ok := lhs.(*js.VarExpression); ok && ve.Name() == js.CAST_MACRO_NAME {
     args, err = p.buildCastArgs(ts[n-1])
     if err != nil {
       return nil, err
@@ -91,8 +91,6 @@ func (p *JSParser) buildCallExpression(ts []raw.Token) (js.Expression, error) {
 
 	if ve, ok := lhs.(*js.VarExpression); ok {
 		switch {
-		case ve.Name() == "import":
-			return p.buildImportDefaultMacro(args, lhs.Context())
 		case macros.IsCallMacro(ve.Name()):
 			return macros.NewCallMacro(ve.Name(), args, lhs.Context())
 		}

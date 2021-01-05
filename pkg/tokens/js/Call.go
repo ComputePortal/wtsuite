@@ -66,7 +66,7 @@ func (t *Call) WriteExpression() string {
 	return b.String()
 }
 
-func (t *Call) WriteStatement(indent string) string {
+func (t *Call) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	return indent + t.WriteExpression()
 }
 

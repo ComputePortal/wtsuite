@@ -4,17 +4,16 @@ import (
   "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type Varying struct {
   precType PrecisionType
-  typeExpr *TypeExpression
-  nameExpr *VarExpression
-  TokenData
+  Pointer
 }
 
 func NewVarying(precType PrecisionType, typeExpr *TypeExpression, name string, ctx context.Context) *Varying {
-  return &Varying{precType, typeExpr, NewVarExpression(name, ctx), newTokenData(ctx)}
+  return &Varying{precType, newPointer(typeExpr, NewVarExpression(name, ctx), -1, ctx)}
 }
 
 func (t *Varying) Dump(indent string) string {
@@ -47,4 +46,27 @@ func (t *Varying) WriteStatement(usage Usage, indent string, nl string, tab stri
   b.WriteString(t.nameExpr.WriteExpression())
 
   return b.String()
+}
+
+func (t *Varying) EvalStatement() error {
+  if err := t.Pointer.EvalStatement(); err != nil {
+    return err
+  }
+
+  variable := t.GetVariable()
+
+  val := variable.GetValue()
+
+  if !values.IsSimple(val) {
+    errCtx := val.Context()
+    return errCtx.NewError("Error: expected simple type, got " +val.TypeName())
+  }
+
+  return nil
+}
+func (t *Varying) Collect(varyings map[string]string) error {
+  // expecting only simple types
+  varyings[t.Name()] = t.typeExpr.WriteExpression()
+
+  return nil
 }

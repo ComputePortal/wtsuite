@@ -17,37 +17,31 @@ type Context struct {
 	ranges []struct{ start, stop int }
 	source *Source
 	path   string // where context is defined
-	caller string // eg. where a def is called
 }
 
-func newContext(start, stop int, source *Source, path string, caller string) Context {
+func newContext(start, stop int, source *Source, path string) Context {
 	return Context{
 		[]struct{ start, stop int }{{start, stop}},
 		source,
 		path,
-		caller,
 	}
 }
 
 // for preset globals
 func NewDummyContext() Context {
-	return newContext(0, 0, &Source{""}, "", "")
+	return newContext(0, 0, &Source{""}, "")
 }
 
 func NewContext(source *Source, path string) Context {
 	if path == "" {
 		panic("use dummycontext instead")
 	}
-	return newContext(0, len(source.source), source, path, "")
+	return newContext(0, len(source.source), source, path)
 }
 
 func (c *Context) NewContext(relStart, relStop int) Context {
 	start := c.ranges[0].start
-	return newContext(start+relStart, start+relStop, c.source, c.path, c.caller)
-}
-
-func (c *Context) ChangeCaller(caller string) Context {
-	return Context{c.ranges, c.source, c.path, caller}
+	return newContext(start+relStart, start+relStop, c.source, c.path)
 }
 
 func (c *Context) getRange(i int) (int, int) {
@@ -73,7 +67,6 @@ func (c *Context) slice(start, stop int) Context {
 		[]struct{ start, stop int }{},
 		c.source,
 		c.path,
-		c.caller,
 	}
 
 	if a, b := c.getRange(-1); stop < a || start > b {
@@ -115,7 +108,6 @@ func (a *Context) Merge(b Context) Context {
 		[]struct{ start, stop int }{},
 		a.source,
 		a.path,
-		a.caller,
 	}
 
 	ia, na := 0, len(a.ranges)
@@ -169,20 +161,61 @@ func (c *Context) Less(other *Context) bool {
 	return c.ranges[0].start < other.ranges[0].start
 }
 
+func (c *Context) IsAtLineStart() bool {
+  i := c.ranges[0].start
+
+  if i <= 0 {
+    return true
+  } else {
+    char := (c.source.source)[i-1]
+    if char == '\n' || char == '\r' {
+      return true
+    } else {
+      return false
+    }
+  }
+}
+
+func (c *Context) IsAtSourceStart() bool {
+  i := c.ranges[0].start
+
+  if i <= 0 {
+    return true
+  }
+
+  return false
+}
+
+func (c *Context) IsSingleLine() bool {
+	start := c.ranges[0].start
+	stop := c.ranges[len(c.ranges)-1].stop
+
+  for i := start; i < stop; i++ {
+    char := (c.source.source)[i]
+
+    if char == '\n' || char == '\r' {
+      return false
+    }
+  }
+
+  return true
+}
+
+// 0 if stop == start
+func (c *Context) Distance(other *Context) int {
+  if c.ranges[0].start < other.ranges[0].start {
+    return other.ranges[0].start - c.ranges[len(other.ranges)-1].stop
+  } else {
+    return c.ranges[0].start - other.ranges[len(other.ranges)-1].stop
+  }
+}
+
 func (c *Context) Len() int {
 	return c.ranges[len(c.ranges)-1].stop - c.ranges[0].start
 }
 
 func (c *Context) Path() string {
 	return c.path
-}
-
-func (c *Context) Caller() string {
-	if c.caller == "" {
-		return c.Path()
-	} else {
-		return c.caller
-	}
 }
 
 func (c *Context) Content() string {
@@ -222,7 +255,7 @@ func MergeFill(a Context, b Context) Context {
   ctx := a.Merge(b)
 
   ctx = newContext(ctx.ranges[0].start, ctx.ranges[len(ctx.ranges)-1].stop, ctx.source, 
-    ctx.path, ctx.caller)
+    ctx.path)
 
   return ctx
 }

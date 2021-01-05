@@ -20,6 +20,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tree"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 	"github.com/computeportal/wtsuite/pkg/tree/styles"
@@ -47,7 +48,6 @@ func printUsageAndExit() {
 	fmt.Fprintf(os.Stderr, `	
 Options:
   -?, -h, --help                Show this message
-  -I, --include <dir>           Append a search directory to the HTMLPPPATH
   -c, --compact                 Compact output with minimal whitespace, newline etc.
   -f, --force                   Force a complete project build
 	--auto-link                   Convert tags to <a> automatically if they have the 'href' attribute
@@ -152,13 +152,6 @@ func parseArgs() CmdArgs {
 					printMessageAndExit("Error: "+arg+" already specified", true)
 				} else {
 					cmdArgs.forceBuild = true
-				}
-			case "-I", "--include":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					cmdArgs.IncludeDirs = append(cmdArgs.IncludeDirs, os.Args[i+1])
-					i++
 				}
 			case "--no-aliasing":
 				if cmdArgs.noAliasing {
@@ -280,12 +273,6 @@ func parseArgs() CmdArgs {
 		printMessageAndExit("Error: '"+positional[0]+"' or '"+positional[1]+"' doesn't exist", true)
 	}
 
-	for _, includeDir := range cmdArgs.IncludeDirs {
-		if err := files.AssertDir(includeDir); err != nil {
-			printMessageAndExit("Error: include dir '"+includeDir+"' "+err.Error(), true)
-		}
-	}
-
 	if err := files.AssertFile(cmdArgs.ConfigFile); err != nil {
 		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error(), true)
 	}
@@ -306,28 +293,19 @@ func parseArgs() CmdArgs {
 		panic(err)
 	}
 
-	/*pwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	if absOutputDir == pwd {
-		printMessageAndExit("Error: output dir is same as current dir (must be different)", true)
-	}*/
-
 	cmdArgs.OutputDir = absOutputDir
 
 	return cmdArgs
 }
 
-func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
+func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
 	if cmdArgs.compactOutput {
-		tree.NL = ""
-		tree.TAB = ""
+		patterns.NL = ""
+		patterns.TAB = ""
+		patterns.LAST_SEMICOLON = ""
+    patterns.COMPACT_NAMING = true
+    macros.COMPACT = true
 		tree.COMPRESS_NUMBERS = true
-
-		styles.NL = ""
-		styles.TAB = ""
-		styles.LAST_SEMICOLON = ""
 	}
 
 	if cmdArgs.noAliasing {
@@ -357,15 +335,17 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 	tree.VERBOSITY = cmdArgs.verbosity
 	styles.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
+
+  return files.ResolvePackages(cmdArgs.ConfigFile)
 }
 
-func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src, url, dst string, control string, cssUrl string, jsUrl string) error {
+func buildHTMLFile(c *directives.FileCache, src, url, dst string, control string, cssUrl string, jsUrl string) error {
 	cache.StartRootUpdate(src)
 
 	directives.SetActiveURL(url)
 
 	// must come before AddViewControl
-	r, cssBundleRules, err := directives.NewRoot(fileSource, c, src, control, cssUrl, jsUrl)
+	r, cssBundleRules, err := directives.NewRoot(c, src, control, cssUrl, jsUrl)
 
 	directives.UnsetActiveURL()
 
@@ -378,7 +358,7 @@ func buildHTMLFile(fileSource files.Source, c *directives.FileCache, src, url, d
 		cache.AddCssEntry(rules, src)
 	}
 
-	output := r.Write("", tree.NL, tree.TAB)
+	output := r.Write("", patterns.NL, patterns.TAB)
 
 	// src is just for info
 	if err := files.WriteFile(src, dst, []byte(output)); err != nil {
@@ -468,7 +448,6 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 
   sort.Strings(updatedViews)
 
-  fileSource := files.NewDefaultUIFileSource()
   c := directives.NewFileCache()
 
 	for _, src := range updatedViews {
@@ -481,7 +460,7 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 
 		url := dst[len(cmdArgs.OutputDir):]
 
-		err := buildHTMLFile(fileSource, c, src, url, dst, control, cfg.CssUrl, cfg.JsUrl)
+		err := buildHTMLFile(c, src, url, dst, control, cfg.CssUrl, cfg.JsUrl)
 		if err != nil {
 			context.AppendString(err, "Info: error encountered in \""+src+"\"")
 
@@ -537,13 +516,6 @@ func buildProjectControls(cfg *config.Config, cmdArgs CmdArgs) error {
 
 	// whole bundle is updated or none of the bundle
 	if anyUpdated {
-		if cmdArgs.compactOutput {
-			js.NL = ""
-			js.TAB = ""
-			js.COMPACT_NAMING = true
-			macros.COMPACT = true
-		}
-
 		js.TARGET = "browser"
 
 		bundle := scripts.NewFileBundle(cmdArgs.GlobalVars)
@@ -554,7 +526,7 @@ func buildProjectControls(cfg *config.Config, cmdArgs CmdArgs) error {
 			cache.AddControl(control)
 
       // files.StartCacheUpdate() called internally when creating new ControlFileScript
-			controlScript, err := scripts.NewControlFileScript(control, "")
+			controlScript, err := scripts.NewControlFileScript(control)
 			if err != nil {
 				return err
 			}
@@ -614,7 +586,9 @@ func main() {
 		printMessageAndExit(err.Error()+"\n", false)
 	}
 
-	setUpEnv(cmdArgs, cfg)
+  if err := setUpEnv(cmdArgs, cfg); err != nil {
+		printMessageAndExit(err.Error()+"\n", false)
+  }
 
 	if cmdArgs.profFile != "" {
 		fProf, err := os.Create(cmdArgs.profFile)

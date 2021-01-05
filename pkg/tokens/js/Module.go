@@ -17,7 +17,8 @@ type Module interface {
 type ImportedVariable struct {
 	old string
   new string
-	dep *LiteralString // path
+	dep *LiteralString // abs path to a file (not a directory, or pkg/module path)
+  lang files.Lang // we need to remember this so we can tell tree/scripts/NewFileScript exactly what language to transpile
 	v   Variable       // cache it, so we don't need to keep searching for it
   // can also be used during refactoring
 
@@ -31,7 +32,6 @@ type ExportedVariable struct {
 }
 
 type ModuleData struct {
-	dependencies     []*LiteralString // relative paths!
 	importedNames    map[string]*ImportedVariable
 	exportedNames    map[string]*ExportedVariable
 	aggregateExports map[string]*ImportedVariable
@@ -41,7 +41,6 @@ type ModuleData struct {
 func NewModule(ctx context.Context) *ModuleData {
 	// statements are added later
 	return &ModuleData{
-		make([]*LiteralString, 0),
 		make(map[string]*ImportedVariable),
 		make(map[string]*ExportedVariable),
 		make(map[string]*ImportedVariable),
@@ -94,8 +93,7 @@ func (m *ModuleData) GetExportedVariable(gs GlobalScope, name string,
 		if aggregateExport.v != nil {
 			return aggregateExport.v, nil
 		} else {
-			ctx := m.Context()
-			importedModule, err := gs.GetModule(ctx.Path(), aggregateExport.dep.Value())
+			importedModule, err := gs.GetModule(aggregateExport.dep.Value())
 			if err != nil {
 				errCtx := aggregateExport.dep.Context()
 				return nil, errCtx.NewError("Error: module not found")
@@ -118,15 +116,6 @@ func (m *ModuleData) GetExportedVariable(gs GlobalScope, name string,
 
 func (m *ModuleData) Dump() string {
 	var b strings.Builder
-
-	if len(m.dependencies) > 0 {
-		b.WriteString("#Module dependencies:\n")
-		for _, d := range m.dependencies {
-			b.WriteString("#  '")
-			b.WriteString(d.Value())
-			b.WriteString("'\n")
-		}
-	}
 
 	if len(m.importedNames) > 0 {
 		b.WriteString("#Module imported names:\n")
@@ -163,58 +152,75 @@ func (m *ModuleData) Parent() Scope {
 	return nil
 }
 
-func (m *ModuleData) Dependencies() []string {
-	result := make([]string, 0)
+// import statements must be toplevel, so we could instead loop the statements
+func (m *ModuleData) Dependencies() []files.PathLang {
+	result := make([]files.PathLang, 0)
 	done := make(map[string]bool)
 
-	for _, dep := range m.dependencies {
-		if _, ok := done[dep.Value()]; !ok {
-			result = append(result, dep.Value())
-			done[dep.Value()] = true
+  fn := func(iv *ImportedVariable) {
+    pathVal := iv.dep.Value()
+		if _, ok := done[pathVal]; !ok {
+			result = append(result, files.PathLang{pathVal, iv.lang, iv.dep.Context()})
+			done[pathVal] = true
 		}
+  }
+
+  for _, iv := range m.importedNames {
+    fn(iv)
+  }
+
+	for _, iv := range m.aggregateExports {
+    fn(iv)
 	}
 
 	return result
 }
 
-func (m *ModuleData) Write() (string, error) {
+func (m *ModuleData) Write(usage Usage, nl string, tab string) (string, error) {
 	var b strings.Builder
 
 	// TODO: write standard library imports
 
-	b.WriteString(m.writeBlockStatements("", NL))
+	b.WriteString(m.writeBlockStatements(usage, "", nl, tab))
 
 	if b.Len() != 0 {
 		b.WriteString(";")
-		b.WriteString(NL)
+		b.WriteString(nl)
 	}
 
 	return b.String(), nil
 }
 
-func (m *ModuleData) addDependency(dep *LiteralString) error {
-	ctx := m.Context()
-	if _, err := files.Search(ctx.Path(), dep.Value()); err != nil {
-		errCtx := dep.Context()
-		return errCtx.NewError("Error: file not found")
-	}
+func NewImportedVariable(oldName, newName string, pathLiteral *LiteralString, lang files.Lang, ctx context.Context) (*ImportedVariable, error) {
+  path := pathLiteral.Value()
+  // make relative paths absolute
+  absPath := path
+  var err error
+  if strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") {
+    // language doesnt matter, these should be files
+    absPath, err = files.Search(ctx.Path(), path)
+  } else {
+    switch lang {
+    case files.SCRIPT:
+      absPath, err = files.SearchScript(ctx.Path(), path)
+    case files.TEMPLATE:
+      absPath, err = files.SearchTemplate(ctx.Path(), path) 
+    default:
+      err = ctx.NewError("Error: unimportable language")
+    }
+  }
 
-	for _, other := range m.dependencies {
-		if other.Value() == dep.Value() {
-			return nil
-		}
-	}
+  if err != nil {
+    errCtx := pathLiteral.Context()
+    return nil, errCtx.NewError(err.Error())
+  }
 
-	m.dependencies = append(m.dependencies, dep)
+  pathLiteral = NewLiteralString(absPath, pathLiteral.Context())
 
-	return nil
+  return &ImportedVariable{oldName, newName, pathLiteral, lang, nil, ctx}, nil
 }
 
-func (m *ModuleData) AddImportedName(newName, oldName string, pathLiteral *LiteralString, ctx context.Context) error {
-	if err := m.addDependency(pathLiteral); err != nil {
-		return err
-	}
-
+func (m *ModuleData) AddImportedName(newName, oldName string, pathLiteral *LiteralString, lang files.Lang, ctx context.Context) error {
 	if newName != "" {
 		if oldName == "" {
 			panic("invalid oldname")
@@ -226,7 +232,12 @@ func (m *ModuleData) AddImportedName(newName, oldName string, pathLiteral *Liter
 			return err
 		}
 
-		m.importedNames[newName] = &ImportedVariable{oldName, newName, pathLiteral, nil, ctx}
+    iv, err := NewImportedVariable(oldName, newName, pathLiteral, lang, ctx)
+    if err != nil {
+      return err
+    }
+
+		m.importedNames[newName] = iv
 	}
 
 	return nil
@@ -239,16 +250,18 @@ func (m *ModuleData) AddExportedName(outerName, innerName string, v Variable, ct
 		return err
 	}
 
+	if other, ok := m.aggregateExports[outerName]; ok {
+		err := ctx.NewError("Error: name already exported as aggregate")
+		err.AppendContextString("Info: exported here", other.ctx)
+		return err
+	}
+
 	m.exportedNames[outerName] = &ExportedVariable{innerName, v, ctx}
 
 	return nil
 }
 
-func (m *ModuleData) AddAggregateExport(newName, oldName string, pathLiteral *LiteralString, ctx context.Context) error {
-	if err := m.addDependency(pathLiteral); err != nil {
-		return nil
-	}
-
+func (m *ModuleData) AddAggregateExport(newName, oldName string, pathLiteral *LiteralString, lang files.Lang, ctx context.Context) error {
 	if newName == "" || oldName == "" {
 		panic("bad names")
 	}
@@ -265,7 +278,12 @@ func (m *ModuleData) AddAggregateExport(newName, oldName string, pathLiteral *Li
 		return err
 	}
 
-	m.aggregateExports[newName] = &ImportedVariable{oldName, newName, pathLiteral, nil, ctx}
+  iv, err := NewImportedVariable(oldName, newName, pathLiteral, lang, ctx)
+  if err != nil {
+    return err
+  }
+
+	m.aggregateExports[newName] = iv
 
 	return nil
 }
@@ -275,7 +293,7 @@ func (m *ModuleData) ResolveNames(gs GlobalScope) error {
 	ms := m.newScope(gs)
 
 	// cache all imports
-	for name, imported := range m.importedNames {
+	/*for name, imported := range m.importedNames {
 		v, err := ms.GetVariable(name)
 		if err != nil {
 			return err
@@ -283,7 +301,7 @@ func (m *ModuleData) ResolveNames(gs GlobalScope) error {
 
 		imported.v = v
 		m.importedNames[name] = imported
-	}
+	}*/
 
 	// get all aggregate exports, so they are ready in case of EvalAsEntryPoint
 	for name, ae := range m.aggregateExports {

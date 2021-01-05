@@ -1,13 +1,12 @@
 package directives
 
 import (
-  "github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/tree"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
-func NewRoot(source files.Source, cache *FileCache, path string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
-	_, node, err := BuildFile(source, cache, path, "", true)
+func NewRoot(cache *FileCache, path string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
+	_, node, err := BuildFile(cache, path, true)
 	if err != nil {
 		return nil, nil, err
 	}

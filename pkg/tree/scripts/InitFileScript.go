@@ -8,8 +8,8 @@ type InitFileScript struct {
 	FileScriptData
 }
 
-func NewInitFileScript(relPath string, caller string) (*InitFileScript, error) {
-	fileScriptData, err := newFileScriptData(relPath, caller)
+func NewInitFileScript(absPath string) (*InitFileScript, error) {
+	fileScriptData, err := newFileScriptData(absPath)
 	if err != nil {
 		return nil, err
 	}

@@ -113,7 +113,7 @@ var glslParserSettings = ParserSettings{
 }
 
 type GLSLParser struct {
-  module *glsl.Module
+  module *glsl.ModuleData
   Parser
 }
 

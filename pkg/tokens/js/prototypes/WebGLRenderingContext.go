@@ -26,6 +26,14 @@ func (p *WebGLRenderingContext) Check(other_ values.Interface, ctx context.Conte
   }
 }
 
+func IsWebGLRenderingContext(v values.Value) bool {
+  ctx := context.NewDummyContext()
+
+  checkVal := NewWebGLRenderingContext(ctx)
+
+  return checkVal.Check(v, ctx) == nil
+}
+
 func (p *WebGLRenderingContext) GetInstanceMember(key string, includePrivate bool, ctx context.Context) (values.Value, error) {
   b := NewBoolean(ctx)
   f := NewNumber(ctx)

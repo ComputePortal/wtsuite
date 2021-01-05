@@ -44,7 +44,6 @@ func printUsageAndExit() {
 	fmt.Fprintf(os.Stderr, `	
 Options:
   -?, -h, --help         Show this message
-  -I, --include <dir>    Append a search directory to the HTMLPPPATH
 	--auto-link            Convert tags to <a> automatically if they have the 'href' attribute
   --no-aliasing          Don't allow standard html tags to be aliased
   -D<name> <value>       Define a global variable with a value
@@ -134,13 +133,6 @@ func parseArgs() CmdArgs {
 			switch arg {
 			case "-?", "-h", "--help":
 				printUsageAndExit()
-			case "-I", "--include":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					cmdArgs.IncludeDirs = append(cmdArgs.IncludeDirs, os.Args[i+1])
-					i++
-				}
 			case "--no-aliasing":
 				if cmdArgs.noAliasing {
 					printMessageAndExit("Error: "+arg+" already specified", true)
@@ -212,12 +204,6 @@ func parseArgs() CmdArgs {
 	cmdArgs.OutputDir = "/tmp/wt-site"
 	cmdArgs.searchIndexOutput = positional[1]
 
-	for _, includeDir := range cmdArgs.IncludeDirs {
-		if err := files.AssertDir(includeDir); err != nil {
-			printMessageAndExit("Error: include dir '"+includeDir+"' "+err.Error(), true)
-		}
-	}
-
 	if err := files.AssertFile(cmdArgs.ConfigFile); err != nil {
 		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error(), true)
 	}
@@ -239,7 +225,7 @@ func parseArgs() CmdArgs {
 	return cmdArgs
 }
 
-func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
+func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
 	if cmdArgs.noAliasing {
 		directives.NO_ALIASING = true
 	}
@@ -268,6 +254,8 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) {
 	tree.VERBOSITY = cmdArgs.verbosity
 	styles.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
+
+  return files.ResolvePackages(cmdArgs.ConfigFile)
 }
 
 type SearchIndexPage struct {
@@ -365,7 +353,6 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 
 	searchIndex := NewSearchIndex()
 
-  fileSource := files.NewDefaultUIFileSource()
   c := directives.NewFileCache()
 
 	for src, dst := range cfg.GetViews() {
@@ -378,7 +365,7 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 
 			directives.SetActiveURL(url)
 
-			r, _, err := directives.NewRoot(fileSource, c, src, "", cfg.CssUrl, cfg.JsUrl)
+			r, _, err := directives.NewRoot(c, src, "", cfg.CssUrl, cfg.JsUrl)
 			if err != nil {
 				return nil, err
 			}
@@ -547,7 +534,9 @@ func main() {
 		printMessageAndExit(err.Error()+"\n", false)
 	}
 
-	setUpEnv(cmdArgs, cfg)
+  if err := setUpEnv(cmdArgs, cfg); err != nil {
+		printMessageAndExit(err.Error()+"\n", false)
+  }
 
 	searchIndex, err := registerSearchableContent(cmdArgs, cfg)
 	if err != nil {

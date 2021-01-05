@@ -16,8 +16,8 @@ func (t *ForIn) Dump(indent string) string {
 	return t.ForInOf.dump(indent, "in")
 }
 
-func (t *ForIn) WriteStatement(indent string) string {
-	return t.ForInOf.writeStatement(indent, "", "in")
+func (t *ForIn) WriteStatement(usage Usage, indent string, nl string, tab string) string {
+	return t.ForInOf.writeStatement(usage, indent, "", "in", nl, tab)
 }
 
 func (t *ForIn) EvalStatement() error {

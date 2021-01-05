@@ -16,6 +16,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
@@ -31,7 +32,6 @@ var (
 type CmdArgs struct {
 	inputFile   string // entry script
 	outputFile  string // defaults to a.js in current dir
-	includeDirs []string
 	target      string
 
 	compactOutput bool
@@ -48,7 +48,6 @@ Options:
   -?, -h, --help         Show this message, other options are ignored
 	-c, --compact          Compact output with minimal whitespace and short names
 	-f, --force            Force a complete project rebuild
-	-I, --include <dir>    Append a search directory to HTMLPPPATH
 	-o, --output <file>    Defaults to "a.js" if not set
 	--target <js-target>   Defaults to "nodejs", other possibilities are "worker" or "browser"
   --executable           Create an executable with a node hashbang (target must be nodejs)
@@ -77,7 +76,6 @@ func parseArgs() CmdArgs {
 	cmdArgs := CmdArgs{
 		inputFile:     "",
 		outputFile:    "",
-		includeDirs:   make([]string, 0),
 		target:        "",
 		compactOutput: false,
 		forceBuild:    false,
@@ -114,13 +112,6 @@ func parseArgs() CmdArgs {
 					printMessageAndExit("Error: "+arg+" already specified", true)
 				} else {
 					cmdArgs.forceBuild = true
-				}
-			case "-I", "--include":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					cmdArgs.includeDirs = append(cmdArgs.includeDirs, os.Args[i+1])
-					i++
 				}
 			case "-o", "--output":
 				if i == n-1 {
@@ -186,12 +177,6 @@ func parseArgs() CmdArgs {
 		cmdArgs.outputFile = outputFile
 	}
 
-	for _, includeDir := range cmdArgs.includeDirs {
-		if err := files.AssertDir(includeDir); err != nil {
-			printMessageAndExit("Error: include dir '"+includeDir+"' "+err.Error(), false)
-		}
-	}
-
 	if !(cmdArgs.target == "nodejs" || cmdArgs.target == "worker" || cmdArgs.target == "browser") {
 		printMessageAndExit("Error: invalid target", true)
 	}
@@ -199,13 +184,13 @@ func parseArgs() CmdArgs {
 	return cmdArgs
 }
 
-func setUpEnv(cmdArgs CmdArgs) {
+func setUpEnv(cmdArgs CmdArgs) error {
 	files.JS_MODE = true
 
 	if cmdArgs.compactOutput {
-		js.NL = ""
-		js.TAB = ""
-		js.COMPACT_NAMING = true
+    patterns.NL = ""
+		patterns.TAB = ""
+		patterns.COMPACT_NAMING = true
 		macros.COMPACT = true
 	}
 
@@ -220,14 +205,14 @@ func setUpEnv(cmdArgs CmdArgs) {
 	values.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
-	files.AppendIncludeDirs(cmdArgs.includeDirs)
+  return files.ResolvePackages(cmdArgs.inputFile)
 }
 
 func buildProject(cmdArgs CmdArgs) error {
 	cache.LoadJSCache(cmdArgs.outputFile, cmdArgs.forceBuild)
 
 	if cache.RequiresUpdate(cmdArgs.inputFile) {
-		entryScript, err := scripts.NewInitFileScript(cmdArgs.inputFile, "")
+		entryScript, err := scripts.NewInitFileScript(cmdArgs.inputFile)
 		if err != nil {
 			return err
 		}
@@ -264,7 +249,9 @@ func buildProject(cmdArgs CmdArgs) error {
 func main() {
 	cmdArgs := parseArgs()
 
-	setUpEnv(cmdArgs)
+  if err := setUpEnv(cmdArgs); err != nil {
+		printSyntaxErrorAndExit(err)
+  }
 
 	if err := buildProject(cmdArgs); err != nil {
 		printSyntaxErrorAndExit(err)

@@ -3,7 +3,7 @@ package macros
 import (
   "strings"
 
-  "github.com/computeportal/wtsuite/pkg/tokens/js"
+  pat "github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type HeaderBuilder struct {
@@ -19,7 +19,7 @@ func (b *HeaderBuilder) String() string {
 }
 
 func (b *HeaderBuilder) n() {
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) c(s string) {
@@ -54,7 +54,7 @@ func (b *HeaderBuilder) cccn(s1, s2, s3 string) {
 	b.b.WriteString(s1)
 	b.b.WriteString(s2)
 	b.b.WriteString(s3)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) cccccn(s1, s2, s3, s4, s5 string) {
@@ -63,98 +63,98 @@ func (b *HeaderBuilder) cccccn(s1, s2, s3, s4, s5 string) {
 	b.b.WriteString(s3)
 	b.b.WriteString(s4)
 	b.b.WriteString(s5)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) t() {
-  b.b.WriteString(js.TAB)
+  b.b.WriteString(pat.TAB)
 }
 
 func (b *HeaderBuilder) tcn(s string) {
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) tcccn(s1, s2, s3 string) {
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s1)
 	b.b.WriteString(s2)
 	b.b.WriteString(s3)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) ttcn(s string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) ttcccn(s1, s2, s3 string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s1)
 	b.b.WriteString(s2)
 	b.b.WriteString(s3)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) tttcn(s string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) ttttcn(s string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) tttcccn(s1, s2, s3 string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s1)
 	b.b.WriteString(s2)
 	b.b.WriteString(s3)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) ttttcccn(s1, s2, s3 string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s1)
 	b.b.WriteString(s2)
 	b.b.WriteString(s3)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) tttttcn(s string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }
 
 func (b *HeaderBuilder) ttttttcn(s string) {
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
-	b.b.WriteString(js.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
+	b.b.WriteString(pat.TAB)
 	b.b.WriteString(s)
-	b.b.WriteString(js.NL)
+	b.b.WriteString(pat.NL)
 }

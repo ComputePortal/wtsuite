@@ -4,6 +4,7 @@ import (
   "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type TypeExpression struct {
@@ -27,4 +28,34 @@ func (t *TypeExpression) Dump(indent string) string {
 
 func (t *TypeExpression) WriteExpression() string {
   return t.VarExpression.WriteExpression()
+}
+
+func (t *TypeExpression) EvalExpression() (values.Value, error) {
+  panic("use instantiate instead")
+}
+
+func (t *TypeExpression) InstantiateUniform(ctx context.Context) (values.Value, error) {
+  valType, err := t.VarExpression.EvalExpression()
+  if err != nil {
+    return nil, err
+  }
+
+  return valType.Instantiate(ctx)
+}
+
+func (t *TypeExpression) Instantiate(ctx context.Context) (values.Value, error) {
+  val, err := t.InstantiateUniform(ctx)
+  if err != nil {
+    return nil, err
+  }
+
+  if values.IsSampler2D(val) {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: sampler2D only available as uniform")
+  } else if values.IsSamplerCube(val) {
+    errCtx := t.Context()
+    return nil, errCtx.NewError("Error: samplerCube only available as uniform")
+  }
+
+  return val, nil
 }

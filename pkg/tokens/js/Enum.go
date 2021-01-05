@@ -111,7 +111,7 @@ func (t *Enum) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Enum) WriteStatement(indent string) string {
+func (t *Enum) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	name := t.nameExpr.WriteExpression()
@@ -122,8 +122,8 @@ func (t *Enum) WriteStatement(indent string) string {
 	b.WriteString(t.parentExpr.Name())
 	b.WriteString("{")
 
-	b.WriteString(NL)
-	b.WriteString(indent + TAB)
+	b.WriteString(nl)
+	b.WriteString(indent + tab)
 	b.WriteString("static get values(){return Object.freeze([")
 	for i, member := range t.members {
 		b.WriteString(member.val.WriteExpression())
@@ -134,8 +134,8 @@ func (t *Enum) WriteStatement(indent string) string {
 	}
 	b.WriteString("])}")
 
-	b.WriteString(NL)
-	b.WriteString(indent + TAB)
+	b.WriteString(nl)
+	b.WriteString(indent + tab)
 	b.WriteString("static get keys(){return Object.freeze([")
 	for i, member := range t.members {
 		b.WriteString("'")
@@ -148,8 +148,8 @@ func (t *Enum) WriteStatement(indent string) string {
 	b.WriteString("])}")
 
 	for i, member := range t.members {
-		b.WriteString(NL)
-		b.WriteString(indent + TAB)
+		b.WriteString(nl)
+		b.WriteString(indent + tab)
 		b.WriteString("static get ")
 		b.WriteString(member.key.Value())
 		b.WriteString("(){return ")
@@ -160,8 +160,8 @@ func (t *Enum) WriteStatement(indent string) string {
 	}
 
 	// TODO: is the value runtime getter really necessary?
-	b.WriteString(NL)
-	b.WriteString(indent + TAB)
+	b.WriteString(nl)
+	b.WriteString(indent + tab)
 	b.WriteString("static value(key){return ")
 	b.WriteString(name)
 	b.WriteString(".values[{")
@@ -176,13 +176,13 @@ func (t *Enum) WriteStatement(indent string) string {
 	}
 	b.WriteString("}[key]]}")
 
-	b.WriteString(NL)
-	b.WriteString(indent + TAB)
+	b.WriteString(nl)
+	b.WriteString(indent + tab)
 	b.WriteString("constructor(){throw new Error(\"Cannot call constructor on enum\")}")
 
 	// the name getter is probably not used in high performance code, so we can use the simplistic approach
-	b.WriteString(NL)
-	b.WriteString(indent + TAB)
+	b.WriteString(nl)
+	b.WriteString(indent + tab)
 	b.WriteString("static key(v){for(var i=0;i<")
 	b.WriteString(name)
 	b.WriteString(".keys.length;i++){")
@@ -192,7 +192,7 @@ func (t *Enum) WriteStatement(indent string) string {
 	b.WriteString(name)
 	b.WriteString(".keys[i]}}}")
 
-	b.WriteString(NL)
+	b.WriteString(nl)
 	b.WriteString(indent)
 	b.WriteString("}")
 

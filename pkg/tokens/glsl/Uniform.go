@@ -5,17 +5,15 @@ import (
   "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type Uniform struct {
-  typeExpr *TypeExpression
-  nameExpr *VarExpression
-  n int // -1 for scalar
-  TokenData
+  Pointer
 }
 
 func NewUniform(typeExpr *TypeExpression, name string, n int, ctx context.Context) *Uniform {
-  return &Uniform{typeExpr, NewVarExpression(name, ctx), n, newTokenData(ctx)}
+  return &Uniform{newPointer(typeExpr, NewVarExpression(name, ctx), n, ctx)}
 }
 
 func (t *Uniform) Dump(indent string) string {
@@ -28,9 +26,9 @@ func (t *Uniform) Dump(indent string) string {
   b.WriteString(" ")
   b.WriteString(t.nameExpr.Dump(""))
 
-  if (t.n > 0) {
+  if (t.length > 0) {
     b.WriteString("[")
-    b.WriteString(strconv.Itoa(t.n))
+    b.WriteString(strconv.Itoa(t.length))
     b.WriteString("]")
   }
 
@@ -49,11 +47,29 @@ func (t *Uniform) WriteStatement(usage Usage, indent string, nl string, tab stri
   b.WriteString(" ")
   b.WriteString(t.nameExpr.WriteExpression())
 
-  if (t.n > 0) {
+  if (t.length > 0) {
     b.WriteString("[")
-    b.WriteString(strconv.Itoa(t.n))
+    b.WriteString(strconv.Itoa(t.length))
     b.WriteString("]")
   }
 
   return b.String()
+}
+
+// different from Pointer.EvalStatement(), because different types are allowed
+func (t *Uniform) EvalStatement() error {
+  variable := t.nameExpr.GetVariable()
+
+  val, err := t.typeExpr.InstantiateUniform(t.Context())
+  if err != nil {
+    return err
+  }
+
+  if t.length > 0 {
+    val = values.NewArray(val, t.length, t.Context())
+  }
+
+  variable.SetValue(val)
+
+  return nil
 }

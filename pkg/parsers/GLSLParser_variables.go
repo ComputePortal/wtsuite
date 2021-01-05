@@ -7,33 +7,34 @@ import (
 )
 
 func (p *GLSLParser) buildTypeExpression(ts []raw.Token) (*glsl.TypeExpression, error) {
-  if len(ts) != 1 {
-    errCtx := ts[0].Context()
-    return nil, errCtx.NewError("Error: package type expression not yet supported")
-  }
-
-  w, err := raw.AssertWord(ts[0])
+  w, rem, err := condensePackagePeriods(ts)
   if err != nil {
     return nil, err
+  }
+
+  if len(rem) != 0 {
+    errCtx := raw.MergeContexts(rem...)
+    return nil, errCtx.NewError("Error: bad type expression")
   }
 
   return glsl.NewTypeExpression(w.Value(), w.Context()), nil
 }
 
-func (p *GLSLParser) buildAttribute(ts []raw.Token) ([]raw.Token, error) {
+func (p *GLSLParser) buildAttribute(ts []raw.Token, isExport bool) ([]raw.Token, error) {
   ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 
-  if len(ts) != 3 {
+  n := len(ts)
+  if n < 3 {
     errCtx := raw.MergeContexts(ts...)
-    return nil, errCtx.NewError("Error: expected 3 tokens")
+    return nil, errCtx.NewError("Error: expected at least 3 tokens")
   }
 
-  typeExpr, err := p.buildTypeExpression(ts[1:2])
+  typeExpr, err := p.buildTypeExpression(ts[1:n-1])
   if err != nil {
     return nil, err
   }
 
-  name, err := raw.AssertWord(ts[2])
+  name, err := raw.AssertWord(ts[n-1])
   if err != nil {
     return nil, err
   }
@@ -41,6 +42,12 @@ func (p *GLSLParser) buildAttribute(ts []raw.Token) ([]raw.Token, error) {
   st := glsl.NewAttribute(typeExpr, name.Value(), name.Context())
 
   p.module.AddStatement(st)
+
+  if isExport {
+    if err := p.buildSimpleExport(name.Value(), name.Context()); err != nil {
+      return nil, err
+    }
+  }
 
   return remainingTokens, nil
 }
@@ -64,31 +71,33 @@ func (p *GLSLParser) buildPrecisionType(t raw.Token) (glsl.PrecisionType, error)
   }
 }
 
-func (p *GLSLParser) buildVarying(ts []raw.Token) ([]raw.Token, error) {
+func (p *GLSLParser) buildVarying(ts []raw.Token, isExport bool) ([]raw.Token, error) {
   ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
   
-  if len(ts) != 3 && len(ts) != 4 {
+  n := len(ts)
+  if n < 3 {
     errCtx := raw.MergeContexts(ts...)
-    return nil, errCtx.NewError("Error: expected 3 or 4 tokens")
+    return nil, errCtx.NewError("Error: expected at least 3")
   }
   
   var precType glsl.PrecisionType = glsl.DEFAULTP
-  if len(ts) == 4 {
+  if raw.IsWord(ts[1], "highp") || raw.IsWord(ts[1], "mediump") || raw.IsWord(ts[1], "lowp") {
     var err error
     precType, err = p.buildPrecisionType(ts[1])
     if err != nil {
       return nil, err
     }
 
+    n = n - 1
     ts = ts[1:]
   }
 
-  typeExpr, err := p.buildTypeExpression(ts[1:2])
+  typeExpr, err := p.buildTypeExpression(ts[1:n-1])
   if err != nil {
     return nil, err
   }
 
-  name, err := raw.AssertWord(ts[2])
+  name, err := raw.AssertWord(ts[n-1])
   if err != nil {
     return nil, err
   }
@@ -96,6 +105,12 @@ func (p *GLSLParser) buildVarying(ts []raw.Token) ([]raw.Token, error) {
   st := glsl.NewVarying(precType, typeExpr, name.Value(), name.Context())
 
   p.module.AddStatement(st)
+
+  if isExport {
+    if err := p.buildSimpleExport(name.Value(), name.Context()); err != nil {
+      return nil, err
+    }
+  }
 
   return remainingTokens, nil
 }
@@ -140,68 +155,123 @@ func (p *GLSLParser) buildArraySize(t raw.Token) (int, error) {
   return n, nil
 }
 
-func (p *GLSLParser) buildUniform(ts []raw.Token) ([]raw.Token, error) {
+func (p *GLSLParser) buildUniform(ts []raw.Token, isExport bool) ([]raw.Token, error) {
   ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 
-  if len(ts) != 3 && len(ts) != 4 {
+  n := len(ts)
+  if n < 3 {
     errCtx := raw.MergeContexts(ts...)
-    return nil, errCtx.NewError("Error: expected 3 or 4 tokens")
+    return nil, errCtx.NewError("Error: expected at least 3 tokens")
   }
 
-  typeExpr, err := p.buildTypeExpression(ts[1:2])
-  if err != nil {
-    return nil, err
-  }
-
-  name, err := raw.AssertWord(ts[2])
-  if err != nil {
-    return nil, err
-  }
-
-  n := -1
-
-  if len(ts) == 4 {
-    n, err = p.buildArraySize(ts[3])
+  arraySize := -1
+  if raw.IsBracketsGroup(ts[n-1]) {
+    var err error
+    arraySize, err = p.buildArraySize(ts[n-1])
     if err != nil {
       return nil, err
     }
+    n = n - 1
   }
 
-  st := glsl.NewUniform(typeExpr, name.Value(), n, name.Context())
+  typeExpr, err := p.buildTypeExpression(ts[1:n-1])
+  if err != nil {
+    return nil, err
+  }
+
+  name, err := raw.AssertWord(ts[n-1])
+  if err != nil {
+    return nil, err
+  }
+
+  st := glsl.NewUniform(typeExpr, name.Value(), arraySize, name.Context())
   
   p.module.AddStatement(st)
+
+  if isExport {
+    if err := p.buildSimpleExport(name.Value(), name.Context()); err != nil {
+      return nil, err
+    }
+  }
 
   return remainingTokens, nil
 }
 
-func (p *GLSLParser) buildConst(ts []raw.Token) ([]raw.Token, error) {
+func (p *GLSLParser) buildConst(ts []raw.Token, isExport bool) ([]raw.Token, error) {
   ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
-  if len(ts) != 3 && len(ts) != 4 {
+
+  n := len(ts)
+  if n < 4 {
     errCtx := raw.MergeContexts(ts...)
-    return nil, errCtx.NewError("Error: expected 3 or 4 tokens")
+    return nil, errCtx.NewError("Error: expected at least 4 tokens")
   }
 
-  typeExpr, err := p.buildTypeExpression(ts[1:2])
-  if err != nil {
-    return nil, err
+  iequal := nextSeparatorPosition(ts, patterns.EQUAL)
+
+  if iequal == n {
+    errCtx := raw.MergeContexts(ts...)
+    return nil, errCtx.NewError("Error: bad const statement")
   }
 
-  name, err := raw.AssertWord(ts[2])
-  if err != nil {
-    return nil, err
-  }
-
-  n := -1
-
-  if len(ts) == 4 {
-    n, err = p.buildArraySize(ts[3])
+  iname := iequal - 1
+  arraySize := -1
+  if raw.IsBracketsGroup(ts[iname]) {
+    var err error
+    arraySize, err = p.buildArraySize(ts[iname])
     if err != nil {
+      return nil, err
+    }
+    iname = iname - 1
+  }
+
+  typeExpr, err := p.buildTypeExpression(ts[1:iname])
+  if err != nil {
+    return nil, err
+  }
+
+  name, err := raw.AssertWord(ts[iname])
+  if err != nil {
+    return nil, err
+  }
+
+  rhsExpr, err := p.buildExpression(ts[iequal+1:])
+  if err != nil {
+    return nil, err
+  }
+
+  st := glsl.NewConst(typeExpr, name.Value(), arraySize, rhsExpr, name.Context())
+  
+  p.module.AddStatement(st)
+
+  if isExport {
+    if err := p.buildSimpleExport(name.Value(), name.Context()); err != nil {
       return nil, err
     }
   }
 
-  st := glsl.NewConst(typeExpr, name.Value(), n, name.Context())
+  return remainingTokens, nil
+}
+
+func (p *GLSLParser) buildPrecision(ts []raw.Token) ([]raw.Token, error) {
+  ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
   
+  if len(ts) != 3 {
+    errCtx := raw.MergeContexts(ts...)
+    return nil, errCtx.NewError("Error: expected 3 tokens")
+  }
+
+  precType, err := p.buildPrecisionType(ts[1])
+  if err != nil {
+    return nil, err
+  }
+
+  typeExpr, err := p.buildTypeExpression(ts[2:])
+  if err != nil {
+    return  nil, err
+  }
+  
+  st := glsl.NewPrecision(precType, typeExpr, raw.MergeContexts(ts...))
+
   p.module.AddStatement(st)
 
   return remainingTokens, nil

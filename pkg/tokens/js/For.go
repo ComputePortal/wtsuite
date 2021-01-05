@@ -50,7 +50,7 @@ func (t *For) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *For) WriteStatement(indent string) string {
+func (t *For) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	// varType printed before inits, unless len(inits) == 0
 
 	var b strings.Builder
@@ -86,7 +86,7 @@ func (t *For) WriteStatement(indent string) string {
 		}
 	}
 
-	b.WriteString(t.writeStatementFooter(indent))
+	b.WriteString(t.writeStatementFooter(usage, indent, nl, tab))
 
 	return b.String()
 }

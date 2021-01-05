@@ -33,12 +33,12 @@ func (t *Block) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Block) writeBlockStatements(indent string, nl string) string {
+func (t *Block) writeBlockStatements(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	prevWroteSomething := false
 	for _, st := range t.statements {
-		s := st.WriteStatement(indent)
+		s := st.WriteStatement(usage, indent, nl, tab)
 
 		if s != "" {
 			if prevWroteSomething {

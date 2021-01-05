@@ -4,7 +4,7 @@ import ()
 
 type GlobalScope interface {
 	Scope
-	GetModule(caller string, path string) (Module, error)
+	GetModule(path string) (Module, error)
 }
 
 var ActivateMacroHeaders func(name string) = nil

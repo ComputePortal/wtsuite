@@ -11,6 +11,8 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
+	"github.com/computeportal/wtsuite/pkg/tree/shaders"
 )
 
 type FileBundle struct {
@@ -37,7 +39,7 @@ func (b *FileBundle) IsEmpty() bool {
 func (b *FileBundle) Write() (string, error) {
 	var sb strings.Builder
 
-	sb.WriteString(js.WriteGlobalHeaders())
+	sb.WriteString(js.WriteGlobalHeaders(patterns.NL, patterns.TAB))
 	sb.WriteString(macros.WriteHeaders())
 
 	for k, defineVal := range b.cmdDefines {
@@ -69,14 +71,16 @@ func (b *FileBundle) resolveDependencies(s FileScript, deps *map[string]FileScri
 	callerCtx := s.Module().Context()
 	callerPath := callerCtx.Path()
 
-	for _, d := range s.Dependencies() {
+	for _, pl := range s.Dependencies() {
+    d := pl.Path
+
 		files.AddCacheDependency(callerPath, d)
 
 		if _, ok := (*deps)[d]; !ok {
-			new, err := NewFileScript(d, callerPath)
+			new, err := NewFileScript(d, pl.Lang)
 			if err != nil {
 				if err.Error() == "not found" {
-					errCtx := s.Module().Context()
+					errCtx := pl.Context
 					return errCtx.NewError("Error: '" + d + "' not found (from '" + callerPath + "')")
 				} else {
 					return err
@@ -100,7 +104,8 @@ func (b *FileBundle) reportCircularDependencyRecursive(downstream []FileScript, 
 		}
 	}
 
-	for _, d := range fs.Dependencies() {
+	for _, pl := range fs.Dependencies() {
+    d := pl.Path
 		if err := b.reportCircularDependencyRecursive(append(downstream, fs), deps[d], deps); err != nil {
 			return errors.New(err.Error() + " -> " + files.Abbreviate(deps[d].Path()) + "\n")
 		}
@@ -110,7 +115,8 @@ func (b *FileBundle) reportCircularDependencyRecursive(downstream []FileScript, 
 }
 
 func (b *FileBundle) reportCircularDependency(start FileScript, deps map[string]FileScript) error {
-	for _, d := range start.Dependencies() {
+	for _, pl := range start.Dependencies() {
+    d := pl.Path
 		if err := b.reportCircularDependencyRecursive([]FileScript{start}, deps[d], deps); err != nil {
 			return errors.New(err.Error() + " -> " + files.Abbreviate(deps[d].Path()) + "\n")
 		}
@@ -134,7 +140,8 @@ func (b *FileBundle) ResolveDependencies() error {
 
 	allDone := func(fs FileScript) bool {
 		ok := true
-		for _, d := range fs.Dependencies() {
+		for _, pl := range fs.Dependencies() {
+      d := pl.Path
 			if _, ok_ := doneScripts[d]; !ok_ {
 				ok = false
 				break
@@ -325,3 +332,5 @@ func (b *FileBundle) Finalize() error {
 
 	return nil
 }
+
+var _shaderTranspilerRegistered = macros.RegisterTranspileWebGLShaders(shaders.TranspileWebGLShaders)

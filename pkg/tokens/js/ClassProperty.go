@@ -65,11 +65,11 @@ func (p *ClassProperty) Dump(indent string) string {
   return b.String()
 }
 
-func (p *ClassProperty) WriteStatement(indent string) string {
+func (p *ClassProperty) WriteStatement(usage Usage, indent string, nl string, tab string) string {
   return ""
 }
 
-func (p *ClassProperty) writeUniversalPropertyType(indent string) string {
+func (p *ClassProperty) writeUniversalPropertyType(indent string, nl string, tab string) string {
   var b strings.Builder
 
   b.WriteString(indent)
@@ -82,7 +82,7 @@ func (p *ClassProperty) writeUniversalPropertyType(indent string) string {
 
   b.WriteString(p.typeExpr.WriteUniversalRuntimeType())
   b.WriteString(",")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
   return b.String()
 }

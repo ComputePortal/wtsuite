@@ -2,10 +2,10 @@ package parsers
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
-	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	"github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
@@ -85,8 +85,8 @@ type UIParser struct {
 	Parser
 }
 
-func NewUIParser(source files.Source, path string) (*UIParser, error) {
-	rawBytes, err := source.Read(path)
+func NewUIParser(path string) (*UIParser, error) {
+	rawBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -105,13 +105,6 @@ func NewUIParser(source files.Source, path string) (*UIParser, error) {
 	}
 
 	return p, nil
-}
-
-func (p *UIParser) ChangeCaller(caller string) *UIParser {
-	return &UIParser{
-		p.helper,
-		p.changeCaller(caller),
-	}
 }
 
 func (p *UIParser) BuildTags() ([]*html.Tag, error) {

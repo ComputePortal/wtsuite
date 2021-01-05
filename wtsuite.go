@@ -15,7 +15,6 @@ import (
 )
 
 type Transpiler struct {
-  source Source
   fileCache *directives.FileCache
   mutex *sync.RWMutex
   resultsCache map[string][]byte
@@ -23,37 +22,16 @@ type Transpiler struct {
   mathFontURL string
 }
 
-// abstraction of file system
-type Source interface {
-  files.Source
-  // Search(callerPath string, srcPath string) (string, error) // returns abspath
-  // Read(path string) ([]byte, error)
-}
-
-type FileSource struct {
-  files.FileSource
-}
-
-func NewTranspiler(source Source, compact bool, mathFontURL string) *Transpiler {
+func NewTranspiler(compact bool, mathFontURL string) *Transpiler {
   // XXX: should this be done via SetEnv-like function(s) instead?
   styles.MATH_FONT_URL = mathFontURL
 
   return &Transpiler{
-    source, 
     directives.NewFileCache(), 
     &sync.RWMutex{}, 
     make(map[string][]byte),
     compact,
     mathFontURL,
-  }
-}
-
-// pwd is automatically included
-func NewFileSource(include []string) *FileSource {
-  inner := files.NewFileSource(include, files.UIPACKAGE_SUFFIX)
-
-  return &FileSource{
-    *inner,
   }
 }
 
@@ -83,7 +61,7 @@ func (t *Transpiler) TranspileTemplate(path string, name string, args_ map[strin
     }
   }
 
-  fileScope, _, err := directives.BuildFile(t.source, t.fileCache, path, "", false)
+  fileScope, _, err := directives.BuildFile(t.fileCache, path, "", false)
   if err != nil {
     return nil, err
   }

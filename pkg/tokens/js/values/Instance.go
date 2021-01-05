@@ -13,6 +13,7 @@ type Instance struct {
 func newInstance(interf Interface, ctx context.Context) Instance {
   return Instance{interf, ValueData{ctx}}
 }
+
 func NewInstance(interf Interface, ctx context.Context) Value {
   inst := newInstance(interf, ctx)
   return &inst
@@ -127,6 +128,17 @@ func (v *Instance) SetMember(key string, includePrivate bool, arg Value,
   }
 
   return interf.SetInstanceMember(key, includePrivate, arg, ctx)
+}
+
+func AssertInstance(v_ Value) (*Instance, error) {
+  errCtx := v_.Context()
+  v_ = UnpackContextValue(v_)
+
+  if v, ok := v_.(*Instance); ok {
+    return v, nil
+  } 
+
+  return nil, errCtx.NewError("Error: expected an instance, got " + v_.TypeName())
 }
 
 func IsInstance(v_ Value) bool {

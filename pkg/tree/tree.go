@@ -1,9 +1,6 @@
 package tree
 
 var (
-	NL  = "\n"
-	TAB = "  "
-
 	INLINE           = false
 	COMPRESS_NUMBERS = false // always on
 

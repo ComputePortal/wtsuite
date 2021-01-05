@@ -77,27 +77,33 @@ func (p *GLSLParser) buildFunctionArgument(ts []raw.Token) (*glsl.FunctionArgume
 }
 
 func (p *GLSLParser) buildFunctionInterface(ts []raw.Token) (*glsl.FunctionInterface, error) {
-  if len(ts) != 3 {
-    panic("internal error")
+  n := len(ts)
+  if n < 3 {
+    errCtx := raw.MergeContexts(ts...)
+    return nil, errCtx.NewError("Error: bad function definition")
   }
 
-  retTypeExpr, err := p.buildTypeExpression(ts[0:1])
+  var retTypeExpr *glsl.TypeExpression = nil
+  if !raw.IsWord(ts[0], "void") {
+    var err error
+    retTypeExpr, err = p.buildTypeExpression(ts[0:n-2])
+    if err != nil {
+      return nil, err
+    }
+  }
+
+  nameToken, err := raw.AssertWord(ts[n-2])
   if err != nil {
     return nil, err
   }
 
-  nameToken, err := raw.AssertWord(ts[1])
+  argParens, err := raw.AssertParensGroup(ts[n-1])
   if err != nil {
-    panic(err)
-  }
-
-  argParens, err := raw.AssertParensGroup(ts[2])
-  if err != nil {
-    panic(err)
+    return nil, err
   }
 
   if argParens.IsSemiColon() {
-    errCtx := ts[2].Context()
+    errCtx := ts[n-1].Context()
     return nil, errCtx.NewError("Error: expected comma separators")
   }
 
@@ -115,23 +121,26 @@ func (p *GLSLParser) buildFunctionInterface(ts []raw.Token) (*glsl.FunctionInter
   return glsl.NewFunctionInterface(retTypeExpr, nameToken.Value(), fArgs, nameToken.Context()), nil
 }
 
-func (p *GLSLParser) buildFunction(ts []raw.Token) ([]raw.Token, error) {
-  if len(ts) < 4 || !raw.IsAnyWord(ts[1]) || !raw.IsParensGroup(ts[2]) || !raw.IsBracesGroup(ts[3]) {
+func (p *GLSLParser) buildFunction(ts []raw.Token, isExport bool) ([]raw.Token, error) {
+  iparens := raw.FindFirstParensGroup(ts, 0)
+  if iparens == -1 {
     errCtx := ts[0].Context()
-    return nil, errCtx.NewError("Error: bad function")
+    return nil, errCtx.NewError("Error: bad function definition")
   }
 
-  functionInterf, err := p.buildFunctionInterface(ts[0:3])
+  ibrace := iparens + 1
+
+  functionInterf, err := p.buildFunctionInterface(ts[0:ibrace])
   if err != nil {
     return nil, err
   }
 
-  remainingTokens := stripSeparators(0, ts[4:], patterns.SEMICOLON)
+  remainingTokens := stripSeparators(0, ts[ibrace+1:], patterns.SEMICOLON)
 
   // build the statements
-  contentBrace, err := raw.AssertBracesGroup(ts[3])
+  contentBrace, err := raw.AssertBracesGroup(ts[ibrace])
   if err != nil {
-    panic(err)
+    return nil, err
   }
 
   if contentBrace.IsComma() {
@@ -147,6 +156,12 @@ func (p *GLSLParser) buildFunction(ts []raw.Token) ([]raw.Token, error) {
   fn := glsl.NewFunction(functionInterf, statements, raw.MergeContexts(ts...))
 
   p.module.AddStatement(fn)
+
+  if isExport {
+    if err := p.buildSimpleExport(functionInterf.Name(), functionInterf.Context()); err != nil {
+      return nil, err
+    }
+  }
 
   return remainingTokens, nil
 }

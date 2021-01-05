@@ -2,6 +2,7 @@ package parsers
 
 import (
 	"github.com/computeportal/wtsuite/pkg/tokens/glsl"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
@@ -143,7 +144,40 @@ func (p *GLSLParser) buildVarExpression(t raw.Token) (*glsl.VarExpression, error
   return glsl.NewVarExpression(w.Value(), w.Context()), nil
 }
 
-func (p *GLSLParser) buildCallExpression(ts []raw.Token) (*glsl.Call, error) {
+func (p *GLSLParser) buildIndexExpression(ts []raw.Token) (*glsl.Index, error) {
+	n := len(ts)
+
+	lhs, err := p.buildExpression(ts[0 : n-1])
+	if err != nil {
+		return nil, err
+	}
+
+	group, err := raw.AssertBracketsGroup(ts[n-1])
+	if err != nil {
+		return nil, err
+	}
+
+	if group.IsEmpty() {
+		errCtx := group.Context()
+		return nil, errCtx.NewError("Error: index can't be empty")
+	}
+
+	if !group.IsSingle() { // comma's should've been combined in operators
+		errCtx := group.Context()
+		return nil, errCtx.NewError("Error: multi indexing not allowed")
+	}
+
+	field := group.Fields[0]
+
+	index, err := p.buildExpression(field)
+	if err != nil {
+		return nil, err
+	}
+
+	return glsl.NewIndex(lhs, index, group.Context()), nil
+}
+
+func (p *GLSLParser) buildCall(ts []raw.Token) (*glsl.Call, error) {
   parens, err := raw.AssertGroup(ts[len(ts)-1])
   if err != nil {
     return nil, err
@@ -170,7 +204,46 @@ func (p *GLSLParser) buildCallExpression(ts []raw.Token) (*glsl.Call, error) {
     args = append(args, arg)
   }
 
-  return glsl.NewCall(lhs, args, raw.MergeContexts(ts...)), nil
+  ctx := raw.MergeContexts(ts...)
+  return glsl.NewCall(lhs, args, ctx), nil
+}
+
+// can also return a macro
+func (p *GLSLParser) buildCallExpression(ts []raw.Token) (glsl.Expression, error) {
+  call, err := p.buildCall(ts)
+  if err != nil {
+    return nil, err
+  }
+
+  if glsl.IsMacroExpression(call) {
+    return glsl.DispatchMacroExpression(call)
+  } else if glsl.IsMacroStatement(call) {
+    errCtx := call.Context()
+    return nil, errCtx.NewError("Error: is a statement, not an expression")
+  }
+
+  return call, nil
+}
+
+func (p *GLSLParser) buildMemberExpression(ts []raw.Token) (*glsl.Member, error) {
+	n := len(ts)
+
+	if n < 3 {
+		errCtx := ts[n-2].Context()
+		return nil, errCtx.NewError("Error: member of nothing")
+	}
+
+	lhs, err := p.buildExpression(ts[0 : n-2])
+	if err != nil {
+		return nil, err
+	}
+
+	w, err := raw.AssertWord(ts[n-1])
+	if err != nil {
+		panic(err)
+	}
+
+	return glsl.NewMember(lhs, glsl.NewWord(w.Value(), w.Context()), ts[n-2].Context()), nil
 }
 
 func (p *GLSLParser) buildExpression(ts []raw.Token) (glsl.Expression, error) {
@@ -219,6 +292,10 @@ func (p *GLSLParser) buildExpression(ts []raw.Token) (glsl.Expression, error) {
     }
   case raw.IsParensGroup(ts[n-1]):
     return p.buildCallExpression(ts)
+  case raw.IsBracketsGroup(ts[n-1]):
+    return p.buildIndexExpression(ts)
+  case n > 2 && raw.IsSymbol(ts[n-2], patterns.PERIOD) && raw.IsAnyWord(ts[n-1]):
+    return p.buildMemberExpression(ts)
   default:
     errCtx := raw.MergeContexts(ts...)
     return nil, errCtx.NewError("Error: unrecognized expression (hint: missing semicolon?")

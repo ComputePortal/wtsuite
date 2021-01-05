@@ -2,6 +2,8 @@ package styles
 
 import (
 	"strings"
+
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type SelectorRule struct {
@@ -19,24 +21,24 @@ func (r *SelectorRule) writeStart(indent string) string {
 	b.WriteString(indent)
 	b.WriteString(r.sel.Write())
 	b.WriteString("{")
-	b.WriteString(NL)
+	b.WriteString(patterns.NL)
 
 	return b.String()
 }
 
 func (r *SelectorRule) writeAttributes(indent string) string {
-	return stringMapToString(r.attr, NL, indent)
+	return stringMapToString(r.attr, patterns.NL, indent)
 }
 
 func (r *SelectorRule) writeStop(indent string) string {
-	return indent + "}" + NL
+	return indent + "}" + patterns.NL
 }
 
 func (r *SelectorRule) Write(indent string) string {
 	var b strings.Builder
 
 	b.WriteString(r.writeStart(indent))
-	b.WriteString(r.writeAttributes(indent + TAB))
+	b.WriteString(r.writeAttributes(indent + patterns.TAB))
 	b.WriteString(r.writeStop(indent))
 
 	return b.String()

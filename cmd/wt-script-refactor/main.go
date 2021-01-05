@@ -24,7 +24,6 @@ import (
 )
 
 type CmdArgs struct {
-  includeDirs []string
   operation string // eg. rename-package 
 
   // TODO: require file in case of ambiguity
@@ -39,12 +38,10 @@ func printUsageAndExit() {
 	fmt.Fprintf(os.Stderr, `
 Options:
   -?, -h, --help         Show this message, other options are ignored
-  -I, --include <dir>    Append a search directory to HTMLPPPATH
   -n                     Dry run
   -v[v[v[v...]]]         Verbosity
 
 Operations:
-  rename-package <old-name> <new-name>    Change package name, move its directory
   rename-class <old-name> <new-name>      Change class name, move its file
 `)
 
@@ -68,7 +65,6 @@ func printSyntaxErrorAndExit(err error) {
 
 func parseArgs() CmdArgs {
 	cmdArgs := CmdArgs{
-		includeDirs:     make([]string, 0),
     operation: "",
     dryRun: false,
 		verbosity:     0,
@@ -92,13 +88,6 @@ func parseArgs() CmdArgs {
 			switch arg {
 			case "-?", "-h", "--help":
 				printUsageAndExit()
-			case "-I", "--include":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					cmdArgs.includeDirs = append(cmdArgs.includeDirs, os.Args[i+1])
-					i++
-				}
       case "--operation":
 				if i == n-1 {
 					printMessageAndExit("Error: expected argument after "+arg, true)
@@ -116,13 +105,6 @@ func parseArgs() CmdArgs {
 		}
 
 		i++
-	}
-
-
-	for _, includeDir := range cmdArgs.includeDirs {
-		if err := files.AssertDir(includeDir); err != nil {
-			printMessageAndExit("Error: include dir '"+includeDir+"' "+err.Error(), false)
-		}
 	}
 
   switch cmdArgs.operation {
@@ -145,7 +127,7 @@ func parseArgs() CmdArgs {
 	return cmdArgs
 }
 
-func setUpEnv(cmdArgs CmdArgs) {
+func setUpEnv(cmdArgs CmdArgs) error {
 	files.JS_MODE = true
 
 	js.TARGET = "all"
@@ -160,7 +142,12 @@ func setUpEnv(cmdArgs CmdArgs) {
 	values.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
-	files.AppendIncludeDirs(cmdArgs.includeDirs)
+  pwd, err := os.Getwd()
+  if err != nil {
+    return err
+  }
+
+  return files.ResolvePackages(filepath.Join(pwd, files.PACKAGE_JSON))
 }
 
 func applyOperation(cmdArgs CmdArgs) error {
@@ -200,125 +187,11 @@ func applyOperation(cmdArgs CmdArgs) error {
   }
 
   switch cmdArgs.operation {
-  case "rename-package":
-    return renamePackage(bundle, cmdArgs.dryRun, cmdArgs.args[0], cmdArgs.args[1])
   case "rename-class":
     return renameClass(bundle, cmdArgs.dryRun, cmdArgs.args[0], cmdArgs.args[1])
   default:
     panic("not yet implemented")
   }
-}
-
-func renamePackage(bundle *scripts.FileBundle, dryRun bool, oldName string, newName string) error {
-  // TODO: handle ambiguous packages
-  // first we must find the package
-  pwd, err := os.Getwd()
-  if err != nil {
-    return err
-  }
-
-  pkgPath, isPackage, err := files.SearchPackage(pwd, oldName, files.JSPACKAGE_SUFFIX)
-  if err != nil {
-    return err
-  } else if !isPackage {
-    return errors.New("Error: " + oldName + " is not a package")
-  }
-
-  pkgPath = strings.TrimSpace(pkgPath)
-  pkgPathDir := filepath.Dir(pkgPath)
-  newPkgPathDir := filepath.Join(pkgPathDir, filepath.Join("..", newName))
-
-  fmt.Fprintf(os.Stdout, "Found package %s\n", pkgPath)
-
-  contexts := make([]context.Context, 0)
-  // we can now walk the syntax tree to detect an VarExpression that refers to this package
-  if err := bundle.Walk(func(scriptPath string, obj_ interface{}) error {
-    switch obj := obj_.(type) {
-    case *js.VarExpression:
-      // detect if part of package
-      if obj.PackagePath() == pkgPath {
-        ctx := obj.PackageContext()
-        // this context should be pretty well refined
-        contexts = append(contexts, ctx)
-      }
-    case *js.Member:
-      if obj.PackagePath() == pkgPath {
-        ctx := obj.ObjectContext()
-        // this context should be pretty well refined
-        contexts = append(contexts, ctx)
-      }
-    case *js.ImportedVariable:
-      objImportAbsPath := obj.AbsPath()
-      if objImportAbsPath == pkgPath {
-        ctx := obj.PathContext()
-        
-        origPath := ctx.Content()
-
-        origPathParts := strings.Split(filepath.ToSlash(origPath), "/")
-
-        lastNonMatch := 0
-        for i, part := range origPathParts {
-          if part == oldName && i > 0 { // XXX: is this test good enough, or should we check full path?
-            lastNonMatch += len(origPathParts[i-1]) + 1
-          }
-        }
-
-        if lastNonMatch > 0 {
-          ctx = ctx.NewContext(lastNonMatch, len(origPath))
-        }
-
-        contexts = append(contexts, ctx)
-      } else if strings.HasPrefix(objImportAbsPath, pkgPathDir) {
-        // the end that is not part cannot be replaced
-        ctx := obj.PathContext()
-
-        origPath := ctx.Content()
-
-        // cut this from end of the complete path
-        fullPathRoot := filepath.Dir(ctx.Path())
-
-        origPathParts := strings.Split(filepath.ToSlash(origPath), "/")
-
-        found := false
-        start := 0
-        end := len(origPath)
-
-        tmp := fullPathRoot
-        for _, part := range origPathParts {
-          tmp = filepath.Join(tmp, part)
-          if filepath.Clean(tmp) == filepath.Clean(pkgPathDir) {
-            found = true
-            end = start + len(part)
-            break
-          } 
-
-          start += len(part) + 1
-        }
-
-        if found {
-          // only create the newContext if exactly the package name is found in the origPath, and it refers the correct directory
-          ctx = ctx.NewContext(start, end)
-
-          if ctx.Content() != "." {
-            contexts = append(contexts, ctx)
-          }
-        } 
-      }
-    }
-
-    return nil
-  }); err != nil {
-    return err
-  }
-
-  moveMap := make(map[string]string)
-  moveMap[pkgPathDir] = newPkgPathDir
-
-  if err := renameSymbolsAndMoveFiles(dryRun, contexts, oldName, newName, moveMap); err != nil {
-    return err
-  }
-
-  return nil
 }
 
 func renameClass(bundle *scripts.FileBundle, dryRun bool, oldName string, newName string) error {
@@ -524,7 +397,9 @@ func renameSymbolsAndMoveFiles(dryRun bool, contexts []context.Context,
 func main() {
   cmdArgs := parseArgs()
 
-  setUpEnv(cmdArgs)
+  if err := setUpEnv(cmdArgs); err != nil {
+    printSyntaxErrorAndExit(err)
+  }
 
   // setup the cache, even though it isn't needed (to even nil pointer derefence errors in some places
 	cache.LoadJSCache("", true)

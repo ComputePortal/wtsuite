@@ -122,10 +122,10 @@ var (
 	FORMULA_SYMBOLS_REGEXP     = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?])`)
 	JS_SYMBOLS_REGEXP          = regexp.MustCompile(`([>][>][>][=])|([=!][=][=])|([*][*][=])|([<][<][=])|([>][>][=])|([>][>][>])|([<>=!:+\-*/%&|^][=])|([*][*])|([&][&])|([<][<])|([>=][>])|([|][|])|([+][+])|([:][:])|([\-][\-])|([!<>=:,;{}()[\]+*/\-?%\.&|^~])`)
 	MATH_SYMBOLS_REGEXP        = regexp.MustCompile(`([>][>])|([<][<])|([/][/])|([-=][>])|([!<>=~]?[=])|([{}()[\]+\-<>*/\.^_=,])`)
-  GLSL_SYMBOLS_REGEXP        = regexp.MustCompile(`([+][+])|([-][-])|([&][&])|([|][|])|([<>!=*+\-][=])|([!<>;{}()[\]/\-\.+*=,])`)
+  GLSL_SYMBOLS_REGEXP        = regexp.MustCompile(`([+][+])|([-][-])|([&][&])|([|][|])|([<>!=*+\-][=])|([#:!<>;{}()[\]/\-\.+*=,])`)
 
 	HTML_WORD_REGEXP               = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
-	JS_WORD_REGEXP                 = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_\-]*$`)
+	JS_WORD_REGEXP                 = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
 	HTML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%:]*`)
 	FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP

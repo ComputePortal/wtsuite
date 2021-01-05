@@ -42,7 +42,11 @@ func (t *Block) writeBlockStatements(usage Usage, indent string, nl string, tab 
 	for _, st := range t.statements {
 		s := st.WriteStatement(usage, indent, nl, tab)
 
-		if s != "" {
+    if strings.HasPrefix(s, "#") { // is preproc directive
+      b.WriteString("\n")
+      b.WriteString(s)
+      b.WriteString("\n")
+    } else if s != "" {
 			if prevWroteSomething {
 				b.WriteString(";")
 				b.WriteString(nl)
@@ -55,4 +59,56 @@ func (t *Block) writeBlockStatements(usage Usage, indent string, nl string, tab 
 	}
 
 	return b.String()
+}
+
+func (t *Block) ResolveStatementNames(scope Scope) error {
+	for _, st := range t.statements {
+		if err := st.ResolveStatementNames(scope); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *Block) evalStatements() error {
+	for _, st := range t.statements {
+		err := st.EvalStatement()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *Block) ResolveStatementActivity(usage Usage) error {
+	for i := len(t.statements) - 1; i >= 0; i-- {
+		st := t.statements[i]
+
+		if err := st.ResolveStatementActivity(usage); err != nil {
+			return err
+		}
+
+		if i < len(t.statements)-1 {
+			errCtx := context.MergeContexts(st.Context(), t.statements[i+1].Context())
+
+			switch st.(type) {
+			case *Return:
+				return errCtx.NewError("Error: unreachable statement after return statement")
+			}
+		}
+	}
+
+	return nil
+}
+
+func (t *Block) UniqueStatementNames(ns Namespace) error {
+  for _, st := range t.statements {
+    if err := st.UniqueStatementNames(ns); err != nil {
+      return err
+    }
+  }
+
+  return nil
 }

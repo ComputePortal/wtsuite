@@ -491,15 +491,15 @@ func (t *UnaryOp) Args() []Token {
 	return []Token{t.a}
 }
 
-func (t *PostIncrOp) WriteStatement(indent string) string {
+func (t *PostIncrOp) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	return indent + t.a.WriteExpression() + t.op
 }
 
-func (t *PostDecrOp) WriteStatement(indent string) string {
+func (t *PostDecrOp) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	return indent + t.a.WriteExpression() + t.op
 }
 
-func (t *DeleteOp) WriteStatement(indent string) string {
+func (t *DeleteOp) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	return indent + t.op + " " + t.a.WriteExpression()
 }
 

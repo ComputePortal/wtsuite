@@ -118,7 +118,7 @@ func (t *Switch) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Switch) WriteStatement(indent string) string {
+func (t *Switch) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	if t.expr == nil {
@@ -131,9 +131,9 @@ func (t *Switch) WriteStatement(indent string) string {
 	b.WriteString("){")
 
 	for i, clause := range t.clauses {
-		b.WriteString(NL)
+		b.WriteString(nl)
 		b.WriteString(indent)
-		b.WriteString(TAB)
+		b.WriteString(tab)
 		if clause == nil {
 			b.WriteString("default")
 		} else {
@@ -143,18 +143,18 @@ func (t *Switch) WriteStatement(indent string) string {
 
 		if len(t.grouped[i]) > 0 {
 			b.WriteString(":{")
-			b.WriteString(NL)
+			b.WriteString(nl)
 			t.statements = t.grouped[i]
-			b.WriteString(t.writeBlockStatements(indent+TAB+TAB, NL))
-			b.WriteString(NL)
-			b.WriteString(indent + TAB)
+			b.WriteString(t.writeBlockStatements(usage, indent+tab+tab, nl, tab))
+			b.WriteString(nl)
+			b.WriteString(indent + tab)
 			b.WriteString("}")
 		} else {
 			b.WriteString(":")
 		}
 	}
 
-	b.WriteString(NL)
+	b.WriteString(nl)
 	b.WriteString(indent)
 	b.WriteString("}")
 

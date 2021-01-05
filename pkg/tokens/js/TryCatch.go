@@ -92,15 +92,15 @@ func (t *TryCatch) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *TryCatch) WriteStatement(indent string) string {
+func (t *TryCatch) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	writeBlock := func(statements []Statement) {
 		b.WriteString("{")
-		b.WriteString(NL)
+		b.WriteString(nl)
 		t.statements = statements
-		b.WriteString(t.writeBlockStatements(indent+TAB, NL))
-		b.WriteString(NL)
+		b.WriteString(t.writeBlockStatements(usage, indent+tab, nl, tab))
+		b.WriteString(nl)
 		b.WriteString(indent)
 		b.WriteString("}")
 	}

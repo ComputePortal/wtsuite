@@ -6,9 +6,6 @@ import (
 )
 
 var (
-	NL             = "\n"
-	TAB            = "  "
-	LAST_SEMICOLON = ";"
 	VERBOSITY      = 0
 )
 

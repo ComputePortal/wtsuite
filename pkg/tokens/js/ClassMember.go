@@ -11,7 +11,7 @@ type ClassMember interface {
   Context() context.Context
   Name() string
   Dump(indent string) string
-  WriteStatement(indent string) string
+  WriteStatement(usage Usage, indent string, nl string, tab string) string
   Role() prototypes.FunctionRole
 
   IsUniversal() bool // functions are always universal, properties not necessarily

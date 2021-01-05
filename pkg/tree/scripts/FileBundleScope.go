@@ -1,7 +1,6 @@
 package scripts
 
 import (
-	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
 )
@@ -11,13 +10,7 @@ type FileBundleScope struct {
 	b       *FileBundle
 }
 
-// caller can be taken from a context
-func (bs *FileBundleScope) GetModule(caller string, path string) (js.Module, error) {
-	absPath, err := files.Search(caller, path)
-	if err != nil {
-		return nil, err
-	}
-
+func (bs *FileBundleScope) GetModule(absPath string) (js.Module, error) {
 	// TODO: if this is slow -> use a map
 	for _, s := range bs.b.scripts {
 		if s.Path() == absPath {

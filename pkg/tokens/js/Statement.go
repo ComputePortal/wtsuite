@@ -7,7 +7,7 @@ type Statement interface {
 
 	AddStatement(st Statement) // panics if Statement is not Block-like
 
-	WriteStatement(indent string) string
+	WriteStatement(usage Usage, indent string, nl string, tab string) string
 
 	HoistNames(scope Scope) error
 

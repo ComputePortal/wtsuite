@@ -1,12 +1,10 @@
 package scripts
 
 import (
-	"errors"
-	"strings"
-
 	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type FileScript interface {
@@ -27,25 +25,19 @@ type FileScriptData struct {
 	module *js.ModuleData
 }
 
-var NewViewFileScript func(absPath string, caller string) (FileScript, error) = nil
+var NewViewFileScript func(absPath string) (FileScript, error) = nil
 
-func SetNewViewFileScript(fn func(absPath string, caller string) (FileScript, error)) bool {
+func SetNewViewFileScript(fn func(absPath string) (FileScript, error)) bool {
 	NewViewFileScript = fn
 
 	return true
 }
 
-// if relPath is already absolute, then caller can be left empty
-func newFileScriptData(relPath string, caller string) (FileScriptData, error) {
-	path, err := files.Search(caller, relPath)
-	if err != nil {
-		return FileScriptData{}, errors.New("Error: " + relPath + " not found\n")
-	}
-
+func newFileScriptData(absPath string) (FileScriptData, error) {
 	// for caching
-	files.StartCacheUpdate(path)
+	files.StartCacheUpdate(absPath)
 
-	p, err := parsers.NewJSParser(path)
+	p, err := parsers.NewJSParser(absPath)
 	if err != nil {
 		return FileScriptData{}, err
 	}
@@ -55,23 +47,19 @@ func newFileScriptData(relPath string, caller string) (FileScriptData, error) {
 		return FileScriptData{}, err
 	}
 
-	return FileScriptData{path, m}, nil
+	return FileScriptData{absPath, m}, nil
 }
 
-func NewFileScript(relPath string, caller string) (FileScript, error) {
-	if strings.HasSuffix(relPath, files.UIFILE_EXT) {
-		path, err := files.Search(caller, relPath)
-		if err != nil {
-			return &FileScriptData{}, errors.New("Error: " + relPath + " not found\n")
-		}
-
+func NewFileScript(absPath string, lang files.Lang) (FileScript, error) {
+	if lang == files.TEMPLATE {
 		if NewViewFileScript == nil {
 			panic("NewViewFileScript not yet registered")
 		}
 
-		return NewViewFileScript(path, caller)
+		return NewViewFileScript(absPath)
 	} else {
-		s, err := newFileScriptData(relPath, caller)
+    // called is not needed
+		s, err := newFileScriptData(absPath)
 		if err != nil {
 			return nil, err
 		}
@@ -84,25 +72,12 @@ func (s *FileScriptData) Hash() string {
 	return js.HashControl(s.path)
 }
 
-func (s *FileScriptData) Dependencies() []string {
-	relPaths := s.module.Dependencies()
-
-	absPaths := make([]string, len(relPaths))
-
-	for i, relPath := range relPaths {
-		absPath, err := files.Search(s.Path(), relPath)
-		if err != nil {
-			panic(err)
-		}
-
-		absPaths[i] = absPath
-	}
-
-	return absPaths
+func (s *FileScriptData) Dependencies() []files.PathLang {
+  return s.module.Dependencies()
 }
 
 func (s *FileScriptData) Write() (string, error) {
-	return s.module.Write()
+	return s.module.Write(nil, patterns.NL, patterns.TAB)
 }
 
 func (s *FileScriptData) ResolveNames(scope js.GlobalScope) error {

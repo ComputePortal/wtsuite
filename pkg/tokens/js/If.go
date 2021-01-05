@@ -79,7 +79,7 @@ func (t *If) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *If) WriteStatement(indent string) string {
+func (t *If) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	for i, c := range t.conds {
@@ -89,22 +89,22 @@ func (t *If) WriteStatement(indent string) string {
 			b.WriteString(c.WriteExpression())
 			b.WriteString(")")
 		} else if c != nil {
-			b.WriteString(NL)
+			b.WriteString(nl)
 			b.WriteString(indent)
 			b.WriteString("else if(")
 			b.WriteString(c.WriteExpression())
 			b.WriteString(")")
 		} else {
-			b.WriteString(NL)
+			b.WriteString(nl)
 			b.WriteString(indent)
 			b.WriteString("else")
 		}
 
 		t.statements = t.grouped[i]
 		b.WriteString("{")
-		b.WriteString(NL)
-		b.WriteString(t.writeBlockStatements(indent+TAB, NL))
-		b.WriteString(NL)
+		b.WriteString(nl)
+		b.WriteString(t.writeBlockStatements(usage, indent+tab, nl, tab))
+		b.WriteString(nl)
 		b.WriteString(indent)
 		b.WriteString("}")
 	}

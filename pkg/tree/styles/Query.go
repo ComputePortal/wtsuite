@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 // eg. @supports or @media
@@ -18,14 +19,14 @@ func (r *Query) Write(indent string) string {
 	b.WriteString(indent)
 	b.WriteString(r.query)
 	b.WriteString("{")
-	b.WriteString(NL)
+	b.WriteString(patterns.NL)
 
 	for _, c := range r.children {
-		b.WriteString(c.Write(indent + TAB))
+		b.WriteString(c.Write(indent + patterns.TAB))
 	}
 
 	b.WriteString("}")
-	b.WriteString(NL)
+	b.WriteString(patterns.NL)
 
 	return b.String()
 }

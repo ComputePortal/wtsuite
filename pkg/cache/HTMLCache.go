@@ -501,7 +501,7 @@ func (c *HTMLCache) WriteCSSBundle(mathFontUrl string) string {
 		b.WriteString(";src:url(")
 		b.WriteString(mathFontUrl)
 		b.WriteString(")}")
-		b.WriteString(styles.NL)
+		b.WriteString(patterns.NL)
   }
 
 	// only write unique lines
@@ -694,7 +694,7 @@ func compressCSSNested(raw string, topLevel bool) string {
 		finalOutput.WriteByte('{')
 		finalOutput.WriteString(body)
 		finalOutput.WriteByte('}')
-		finalOutput.WriteString(styles.NL)
+		finalOutput.WriteString(patterns.NL)
 	}
 
 	finalOutput.WriteString(output.String())
@@ -704,7 +704,7 @@ func compressCSSNested(raw string, topLevel bool) string {
 		finalOutput.WriteByte('{')
 		finalOutput.WriteString(compressCSSNested(q, false)) // set to true to avoid plainClass compression
 		finalOutput.WriteByte('}')
-		finalOutput.WriteString(styles.NL)
+		finalOutput.WriteString(patterns.NL)
 	}
 
 	return finalOutput.String()

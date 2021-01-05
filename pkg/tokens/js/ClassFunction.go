@@ -72,7 +72,7 @@ func (m *ClassFunction) Dump(indent string) string {
 	return b.String()
 }
 
-func (m *ClassFunction) WriteStatement(indent string) string {
+func (m *ClassFunction) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	if prototypes.IsAbstract(m) {
 		return ""
 	}
@@ -86,7 +86,7 @@ func (m *ClassFunction) WriteStatement(indent string) string {
 	fn := m.function
 	b.WriteString(fn.Name())
 
-	b.WriteString(fn.writeBody(indent, NL, TAB))
+	b.WriteString(fn.writeBody(usage, indent, nl, tab))
 
 	return b.String()
 }

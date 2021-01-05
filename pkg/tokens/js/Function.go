@@ -83,7 +83,7 @@ func (t *Function) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Function) writeBody(indent string, nl string, tab string) string {
+func (t *Function) writeBody(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(t.fi.Write())
@@ -94,7 +94,7 @@ func (t *Function) writeBody(indent string, nl string, tab string) string {
 
 	b.WriteString("{")
 
-	s := t.Block.writeBlockStatements(indent+tab, nl)
+	s := t.Block.writeBlockStatements(usage, indent+tab, nl, tab)
 
 	if s != "" {
 		b.WriteString(nl)
@@ -108,7 +108,7 @@ func (t *Function) writeBody(indent string, nl string, tab string) string {
 	return b.String()
 }
 
-func (t *Function) WriteStatement(indent string) string {
+func (t *Function) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)
@@ -120,7 +120,7 @@ func (t *Function) WriteStatement(indent string) string {
 		b.WriteString("function ")
 		b.WriteString(t.Name())
 	}
-	b.WriteString(t.writeBody(indent, NL, TAB))
+  b.WriteString(t.writeBody(usage, indent, nl, tab))
 
 	return b.String()
 }
@@ -136,7 +136,7 @@ func (t *Function) WriteExpression() string {
 	if !t.isArrow {
 		b.WriteString("function")
 	}
-	b.WriteString(t.writeBody("", "", ""))
+	b.WriteString(t.writeBody(nil, "", "", ""))
 
 	return b.String()
 }
@@ -323,6 +323,8 @@ func (t *Function) ResolveExpressionActivity(usage Usage) error {
 	usage.SetInFunction(true)
 
 	err := t.Block.ResolveStatementActivity(usage)
+
+  // TODO: fi.arg defaults?
 
 	usage.SetInFunction(tmp)
 

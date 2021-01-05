@@ -16,6 +16,10 @@ var TARGET = "nodejs"
 //  * nodejs
 //  * all (used by refactoring tools)
 
+const (
+  CAST_MACRO_NAME = "cast"
+)
+
 type FillPackageFunction func(pkg values.Package)
 
 func handleRegistrationError(err error) {
@@ -33,8 +37,7 @@ func reserveMacroName(scope Scope, name string) {
 }
 
 func ReserveMacroNames(scope Scope) {
-  reserveMacroName(scope, "cast")
-  reserveMacroName(scope, "import")
+  reserveMacroName(scope, CAST_MACRO_NAME)
   reserveMacroName(scope, "SyntaxTree") // to be replaced by __dump__
   reserveMacroName(scope, "__checkType__")
   reserveMacroName(scope, "__rpcContext__")
@@ -233,6 +236,13 @@ func FillBrowserScope(scope Scope) {
   registerValue(scope, "encodeURIComponent", uriFn)
   registerValue(scope, "requestIdleCallback", pr.NewRequestIdleCallbackFunction(ctx))
 
+  // not yet available in worker, because not supported by many browsers
+  // TODO: as soon as this becomes available in most worker scopes, move this to FillCoreScope
+  importFn := values.NewFunction([]values.Value{
+    pr.NewString(ctx), 
+    pr.NewPromise(values.NewAny(ctx), ctx),
+  }, ctx)
+  registerValue(scope, "import", importFn)
 }
 
 func FillNodeJSScope(scope Scope) {
@@ -240,6 +250,21 @@ func FillNodeJSScope(scope Scope) {
 
   registerPrototype(scope, pr.NewNodeJS_BufferPrototype())
   registerPrototype(scope, pr.NewNodeJS_EventEmitterPrototype())
+
+  ctx := context.NewDummyContext()
+
+  // TODO: as soon as this becomes available in most worker scopes, move this to FillCoreScope
+  importFn := values.NewFunction([]values.Value{
+    pr.NewString(ctx), 
+    pr.NewPromise(values.NewAny(ctx), ctx),
+  }, ctx)
+  registerValue(scope, "import", importFn)
+
+  requireFn := values.NewFunction([]values.Value{
+    pr.NewString(ctx), 
+    values.NewAny(ctx),
+  }, ctx)
+  registerValue(scope, "require", requireFn)
 
   // packages are added to scope by NodeJSImport statements
 }
@@ -273,7 +298,7 @@ func NewFilledGlobalScope() *GlobalScopeData {
   return scope
 }
 
-func WriteGlobalHeaders() string {
+func WriteGlobalHeaders(nl string, tab string) string {
 	var b strings.Builder
 
   if TARGET == "all" {
@@ -284,20 +309,20 @@ func WriteGlobalHeaders() string {
 	}
 
 	b.WriteString("class Int extends Number{")
-	b.WriteString(NL)
-	b.WriteString(TAB)
+	b.WriteString(nl)
+	b.WriteString(tab)
 	b.WriteString("constructor(x){super(parseInt(x))}")
-	b.WriteString(NL)
+	b.WriteString(nl)
 	b.WriteString("}")
-	b.WriteString(NL)
+	b.WriteString(nl)
 
   b.WriteString("class Tuple extends Array{")
-  b.WriteString(NL)
-  b.WriteString(TAB)
+  b.WriteString(nl)
+  b.WriteString(tab)
   b.WriteString("constructor(...x){let n=x.length;super(n);for(let i=0;i<n;i++){this[i]=x[i]}}")
-  b.WriteString(NL)
+  b.WriteString(nl)
   b.WriteString("}")
-  b.WriteString(NL)
+  b.WriteString(nl)
 
 	return b.String()
 }

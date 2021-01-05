@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type Parens struct {
@@ -34,4 +35,16 @@ func (t *Parens) WriteExpression() string {
 	b.WriteString(")")
 
 	return b.String()
+}
+
+func (t *Parens) ResolveExpressionNames(scope Scope) error {
+	return t.expr.ResolveExpressionNames(scope)
+}
+
+func (t *Parens) EvalExpression() (values.Value, error) {
+  return t.expr.EvalExpression()
+}
+
+func (t *Parens) ResolveExpressionActivity(usage Usage) error {
+  return t.expr.ResolveExpressionActivity(usage)
 }

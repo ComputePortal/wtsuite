@@ -23,7 +23,7 @@ func (t *Break) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Break) WriteStatement(indent string) string {
+func (t *Break) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)

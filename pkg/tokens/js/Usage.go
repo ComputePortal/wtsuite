@@ -4,17 +4,17 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
-type UsageState struct {
-	used bool
-	ctx  context.Context
-}
-
 type Usage interface {
 	SetInFunction(bool)
 	InFunction() bool
 	Rereference(v Variable, ctx context.Context) error
 	Use(v Variable, ctx context.Context) error
 	DetectUnused() error
+}
+
+type UsageState struct {
+	used bool
+	ctx  context.Context
 }
 
 type UsageData struct {

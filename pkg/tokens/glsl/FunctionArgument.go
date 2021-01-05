@@ -5,6 +5,7 @@ import (
   "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type FunctionArgument struct {
@@ -60,4 +61,39 @@ func (fa *FunctionArgument) WriteArgument() string {
   }
 
   return b.String()
+}
+
+func (fa *FunctionArgument) GetTypeValue() (values.Value, error) {
+  return fa.typeExpr.EvalExpression()
+}
+
+func (fa *FunctionArgument) ResolveNames(scope Scope) error {
+  if err := fa.typeExpr.ResolveExpressionNames(scope); err != nil {
+    return err
+  }
+
+  name := fa.nameExpr.Name()
+  variable := fa.nameExpr.GetVariable()
+
+  val, err := fa.typeExpr.Instantiate(fa.Context())
+  if err != nil {
+    return err
+  }
+
+  if fa.length > 0 {
+    val = values.NewArray(val, fa.length, fa.Context())
+  }
+
+  variable.SetValue(val)
+
+  if err := scope.SetVariable(name, variable); err != nil {
+    return err
+  }
+
+  return nil
+}
+
+func (fa *FunctionArgument) UniqueNames(ns Namespace) error {
+	ns.ArgName(fa.nameExpr.GetVariable())
+  return nil
 }

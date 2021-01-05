@@ -140,11 +140,6 @@ func NewFormulaParser(s string, ctx context.Context) (*FormulaParser, error) {
 	return p, nil
 }
 
-func (p *FormulaParser) ChangeCaller(caller string) *FormulaParser {
-	panic("this is just a check to see if this function is ever used")
-	return &FormulaParser{p.changeCaller(caller)}
-}
-
 func (p *FormulaParser) tokenize() ([]raw.Token, error) {
 	ts, err := p.Parser.tokenize()
 	if err != nil {

@@ -187,7 +187,7 @@ func (t *VarExpression) EvalSet(v values.Value, ctx context.Context) error {
 }
 
 func (t *VarExpression) ResolveExpressionActivity(usage Usage) error {
-	return usage.Use(t.variable, t.Context())
+	return usage.Use(t.GetVariable(), t.Context())
 }
 
 func (t *VarExpression) UniversalExpressionNames(ns Namespace) error {

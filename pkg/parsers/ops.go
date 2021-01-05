@@ -1,6 +1,7 @@
 package parsers
 
 import (
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
@@ -71,4 +72,34 @@ func nextSymbolPositionThatEndsWith(ts []raw.Token, sep string) int {
 	}
 
 	return len(ts)
+}
+
+// turn [Word(aaa), Symbol(.), Word(bbb), ....] into Word(aaa.bbb...)
+func condensePackagePeriods(ts []raw.Token) (*raw.Word, []raw.Token, error) {
+	nameToken, err := raw.AssertWord(ts[0])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	i := 1
+	for i < len(ts) {
+		if raw.IsSymbol(ts[i], patterns.PERIOD) {
+			if i == len(ts)-1 {
+				errCtx := ts[i].Context()
+				return nil, nil, errCtx.NewError("Error: expected tokens after .")
+			}
+
+			nextWord, err := raw.AssertWord(ts[i+1])
+			if err != nil {
+				return nil, nil, err
+			}
+
+			nameToken = raw.NewValueWord(nameToken.Value()+"."+nextWord.Value(), raw.MergeContexts(nameToken, ts[i], ts[i+1]))
+			i += 2
+		} else {
+			break
+		}
+	}
+
+	return nameToken, ts[i:], nil
 }

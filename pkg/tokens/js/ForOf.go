@@ -22,12 +22,12 @@ func (t *ForOf) Dump(indent string) string {
 	return t.ForInOf.dump(indent, op)
 }
 
-func (t *ForOf) WriteStatement(indent string) string {
+func (t *ForOf) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	extra := ""
 	if t.await {
 		extra = "await"
 	}
-	return t.ForInOf.writeStatement(indent, extra, "of")
+	return t.ForInOf.writeStatement(usage, indent, extra, "of", nl, tab)
 }
 
 func (t *ForOf) EvalStatement() error {

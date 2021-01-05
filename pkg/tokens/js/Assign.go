@@ -50,7 +50,7 @@ func (t *Assign) WriteExpression() string {
 	return b.String()
 }
 
-func (t *Assign) WriteStatement(indent string) string {
+func (t *Assign) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)

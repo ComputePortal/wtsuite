@@ -19,11 +19,10 @@ import (
 )
 
 type CmdArgs struct {
-  includeDirs []string // just for search
   graphType string // eg. class
   outputFile string // file needed by the graphviz utility 'dot' to create the visual, must be specified
   entryFile string // this is the entry point
-  analyzedFiles map[string]string // (analyzing everything available in the include dirs would be too messy)
+  analyzedFiles map[string]string // (analyzing everything available from the package.json upwards would be too messy)
 
   verbosity int
 }
@@ -34,7 +33,6 @@ func printUsageAndExit() {
   fmt.Fprintf(os.Stderr, `
 Options:
   -?, -h, --help             Show this message, other options are ignored
-	-I, --include <dir>        Append a search directory to HTMLPPPATH
 	-v[v[v[v...]]]             Verbosity
   --type <graph-type>        Graph type (see below)
   -o, --output <output-file> Output file location for graphviz dot
@@ -64,7 +62,6 @@ func printSyntaxErrorAndExit(err error) {
 
 func parseArgs() CmdArgs {
 	cmdArgs := CmdArgs{
-		includeDirs:     make([]string, 0),
     graphType: "class",
     outputFile: "",
     entryFile: "",
@@ -90,13 +87,6 @@ func parseArgs() CmdArgs {
 			switch arg {
 			case "-?", "-h", "--help":
 				printUsageAndExit()
-			case "-I", "--include":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					cmdArgs.includeDirs = append(cmdArgs.includeDirs, os.Args[i+1])
-					i++
-				}
       case "--type":
 				if i == n-1 {
 					printMessageAndExit("Error: expected argument after "+arg, true)
@@ -119,12 +109,6 @@ func parseArgs() CmdArgs {
 		}
 
 		i++
-	}
-
-	for _, includeDir := range cmdArgs.includeDirs {
-		if err := files.AssertDir(includeDir); err != nil {
-			printMessageAndExit("Error: include dir '"+includeDir+"' "+err.Error(), false)
-		}
 	}
 
   if cmdArgs.outputFile == "" {
@@ -194,7 +178,7 @@ func parseArgs() CmdArgs {
 	return cmdArgs
 }
 
-func setUpEnv(cmdArgs CmdArgs) {
+func setUpEnv(cmdArgs CmdArgs) error {
 	files.JS_MODE = true
 
 	js.TARGET = "all"
@@ -209,7 +193,7 @@ func setUpEnv(cmdArgs CmdArgs) {
 	values.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
-	files.AppendIncludeDirs(cmdArgs.includeDirs)
+  return files.ResolvePackages(cmdArgs.entryFile)
 }
 
 func createGraph(cmdArgs CmdArgs) error {

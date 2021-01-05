@@ -9,10 +9,9 @@ import (
 	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/directives"
-	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tree"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type CmdArgs struct {
@@ -162,10 +161,9 @@ func setUpEnv(cmdArgs CmdArgs) {
 	tree.COMPRESS_NUMBERS = true
 
 	if !cmdArgs.humanReadable {
-		tree.NL = ""
-		tree.TAB = ""
-
-		styles.LAST_SEMICOLON = ""
+		patterns.NL = ""
+		patterns.TAB = ""
+		patterns.LAST_SEMICOLON = ""
 	}
 
 	tree.ABS_PRECISION = cmdArgs.absPrecision
@@ -187,7 +185,7 @@ func buildSVGFile(path string) (string, error) {
 	root := tree.NewSVGRoot(p.NewContext(0, 1))
 	node := directives.NewRootNode(root, directives.SVG)
   // the source isn't really used, because the svg file doesnt contain import statements
-	fileScope := directives.NewFileScope(false, files.NewDefaultUIFileSource(), directives.NewFileCache())
+	fileScope := directives.NewFileScope(false, directives.NewFileCache())
 
 	for _, tag := range rawTags {
 		if err := directives.BuildTag(fileScope, node, tag); err != nil {
@@ -206,7 +204,7 @@ func buildSVGFile(path string) (string, error) {
 
 	root.Minify()
 
-	return root.Write("", tree.NL, tree.TAB), nil
+	return root.Write("", patterns.NL, patterns.TAB), nil
 }
 
 func main() {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type LiteralInt struct {
@@ -25,6 +26,10 @@ func (t *LiteralInt) Dump(indent string) string {
 
 func (t *LiteralInt) WriteExpression() string {
 	return fmt.Sprintf("%d", t.value)
+}
+
+func (t *LiteralInt) EvalExpression() (values.Value, error) {
+  return values.NewLiteralInt(t.value, t.Context()), nil
 }
 
 func IsLiteralInt(t Expression) bool {

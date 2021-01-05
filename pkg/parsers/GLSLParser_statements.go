@@ -104,34 +104,48 @@ func (p *GLSLParser) buildIfStatement(ts []raw.Token) (*glsl.If, []raw.Token, er
 
 func (p *GLSLParser) buildVarStatement(ts []raw.Token) (*glsl.VarStatement, []raw.Token, error) {
   ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
-  if len(ts) < 4 {
+  if len(ts) < 2 {
     errCtx := raw.MergeContexts(ts...)
-    return nil, nil, errCtx.NewError("Error: expected at least 4 tokens")
+    return nil, nil, errCtx.NewError("Error: expected at least 2 tokens")
   }
 
   iequal := nextSeparatorPosition(ts, patterns.EQUAL)
 
-  if iequal < 2 || iequal == len(ts) - 1 {
+  if iequal < 2 {
     errCtx := raw.MergeContexts(ts...)
     return nil, nil, errCtx.NewError("Error: bad var statement")
   }
 
-  nameToken, err := raw.AssertWord(ts[iequal-1])
+  iname := iequal - 1
+  arraySize := -1
+  if raw.IsBracketsGroup(ts[iname]) {
+    var err error
+    arraySize, err = p.buildArraySize(ts[iname])
+    if err != nil {
+      return nil, nil, err
+    }
+    iname = iname - 1
+  }
+
+  nameToken, err := raw.AssertWord(ts[iname])
   if err != nil {
     return nil, nil, err
   }
 
-  typeExpr, err := p.buildTypeExpression(ts[0:iequal-1])
+  typeExpr, err := p.buildTypeExpression(ts[0:iname])
   if err != nil {
     return nil, nil, err
   }
 
-  rhsExpr, err := p.buildExpression(ts[iequal+1:])
-  if err != nil {
-    return nil, nil, err
+  var rhsExpr glsl.Expression = nil
+  if iequal < len(ts) - 1 {
+    rhsExpr, err = p.buildExpression(ts[iequal+1:])
+    if err != nil {
+      return nil, nil, err
+    }
   }
 
-  return glsl.NewVarStatement(typeExpr, nameToken.Value(), rhsExpr, nameToken.Context()), remainingTokens, nil
+  return glsl.NewVarStatement(typeExpr, nameToken.Value(), arraySize, rhsExpr, nameToken.Context()), remainingTokens, nil
 }
 
 func (p *GLSLParser) buildAssignStatement(ts []raw.Token) (*glsl.Assign, []raw.Token, error) {
@@ -219,21 +233,27 @@ func (p *GLSLParser) buildDecrStatement(ts []raw.Token) (*glsl.PostDecrOp, []raw
   return glsl.NewPostDecrOp(lhs, raw.MergeContexts(ts...)), remainingTokens, nil
 }
 
-func (p *GLSLParser) buildCallStatement(ts []raw.Token) (*glsl.Call, []raw.Token, error) {
+func (p *GLSLParser) buildCallStatement(ts []raw.Token) (glsl.Statement, []raw.Token, error) {
   ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
 
-  callExpr_, err := p.buildExpression(ts)
+  call, err := p.buildCall(ts)
   if err != nil {
     return nil, nil, err
   }
 
-  callExpr, ok := callExpr_.(*glsl.Call)
-  if !ok {
-    errCtx := callExpr_.Context()
-    return nil, nil, errCtx.NewError("Error: expected a call")
-  }
+  if glsl.IsMacroStatement(call) {
+    macroStatement, err := glsl.DispatchMacroStatement(call)
+    if err != nil {
+      return nil, nil, err
+    }
 
-  return callExpr, remainingTokens, nil
+    return macroStatement, remainingTokens, nil
+  } else if glsl.IsMacroExpression(call) {
+    errCtx := call.Context()
+    return nil, nil, errCtx.NewError("Error: is an expression, not a statement")
+  } 
+
+  return call, remainingTokens, nil
 }
 
 func (p *GLSLParser) buildStatement(ts []raw.Token) (glsl.Statement, []raw.Token, error) {
@@ -259,7 +279,7 @@ func (p *GLSLParser) buildStatement(ts []raw.Token) (glsl.Statement, []raw.Token
       if raw.ContainsSymbol(ts[0:ilast], patterns.EQUAL) {
         iequal := nextSeparatorPosition(ts[0:ilast], patterns.EQUAL)
 
-        if iequal >= 2 && raw.IsAnyWord(ts[iequal-1]) && raw.IsAnyWord(ts[iequal-2]) {
+        if (iequal >= 2 && raw.IsAnyWord(ts[iequal-1]) && raw.IsAnyWord(ts[iequal-2])) || (iequal >= 3 && raw.IsAnyWord(ts[iequal-2]) && raw.IsAnyWord(ts[iequal-3]) && raw.IsBracketsGroup(ts[iequal-1])) {
           return p.buildVarStatement(ts)
         } else {
           return p.buildAssignStatement(ts)
@@ -272,6 +292,8 @@ func (p *GLSLParser) buildStatement(ts []raw.Token) (glsl.Statement, []raw.Token
         return p.buildDecrStatement(ts)
       } else if ilast >= 2 && raw.IsParensGroup(ts[ilast-1]) && raw.IsAnyWord(ts[ilast-2]) {
         return p.buildCallStatement(ts)
+      } else if (ilast >= 2 && raw.IsAnyWord(ts[ilast-1]) && raw.IsAnyWord(ts[ilast-2])) || (ilast >= 3 && raw.IsAnyWord(ts[ilast-2]) && raw.IsAnyWord(ts[ilast-3]) && raw.IsBracketsGroup(ts[ilast-1])) {
+        return p.buildVarStatement(ts)
       } else {
         errCtx := raw.MergeContexts(ts[0:ilast]...)
         return nil, nil, errCtx.NewError("Error: bad statement")
@@ -318,4 +340,89 @@ func (p *GLSLParser) buildBlockStatementsInternal(fields [][]raw.Token) ([]glsl.
 	}
 
 	return statements, nil
+}
+
+func (p *GLSLParser) buildStructEntry(ts []raw.Token) (*glsl.StructEntry, error) {
+  n := len(ts)
+
+  ctx := raw.MergeContexts(ts...)
+
+  if n < 2 {
+    errCtx := ctx
+    return nil, errCtx.NewError("Error: expected at least two tokens")
+  }
+
+  arraySize := -1
+  if raw.IsBracketsGroup(ts[n-1]) {
+    var err error
+    arraySize, err = p.buildArraySize(ts[n-1])
+    if err != nil {
+      return nil, err
+    }
+    n = n - 1
+  }
+
+  nameExpr, err := p.buildVarExpression(ts[n-1])
+  if err != nil {
+    return nil, err
+  }
+
+  typeExpr, err := p.buildTypeExpression(ts[0:n-1])
+  if err != nil {
+    return nil, err
+  }
+
+  return glsl.NewStructEntry(typeExpr, nameExpr, arraySize, ctx), nil
+}
+
+func (p *GLSLParser) buildStruct(ts []raw.Token, isExport bool) ([]raw.Token, error) {
+  ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
+
+  if len(ts) != 3 {
+    errCtx := raw.MergeContexts(ts...)
+    return nil, errCtx.NewError("Error: expected 3 tokens")
+  }
+
+  name, err := p.buildVarExpression(ts[1])
+  if err != nil {
+    return nil, err
+  }
+
+  entries := make([]*glsl.StructEntry, 0)
+
+  brace, err := raw.AssertBracesGroup(ts[2])
+  if err != nil {
+    return nil, err
+  }
+
+  if brace.IsComma() {
+    errCtx := brace.Context()
+    return nil, errCtx.NewError("Error: expected semicolon separators")
+  }
+
+  for _, field := range brace.Fields {
+    structEntry, err := p.buildStructEntry(field)
+    if err != nil {
+      return nil, err
+    }
+
+    entries = append(entries, structEntry)
+  }
+
+  ctx := raw.MergeContexts(ts...)
+
+  st, err := glsl.NewStruct(name, entries, ctx)
+  if err != nil {
+    return nil, err
+  }
+
+  p.module.AddStatement(st)
+
+  if isExport {
+    if err := p.buildSimpleExport(name.Name(), name.Context()); err != nil {
+      return nil, err
+    }
+  }
+
+  return remainingTokens, nil
 }

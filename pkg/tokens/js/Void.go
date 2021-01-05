@@ -27,7 +27,7 @@ func (t *Void) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *Void) WriteStatement(indent string) string {
+func (t *Void) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)

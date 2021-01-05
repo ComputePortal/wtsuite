@@ -11,7 +11,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/prototypes"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/values"
-	"github.com/computeportal/wtsuite/pkg/tree"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
@@ -81,9 +81,9 @@ type ViewObject struct {
 	ViewVariableData
 }
 
-func NewViewFileScript(source files.Source, cache *FileCache, absPath string, caller string) (scripts.FileScript, error) {
+func NewViewFileScript(cache *FileCache, absPath string) (scripts.FileScript, error) {
 	if js.TARGET == "browser" || js.TARGET == "all" {
-		fileScope, rootNode, err := BuildFile(source, cache, absPath, caller, false)
+		fileScope, rootNode, err := BuildFile(cache, absPath, false)
 		if err != nil {
 			return nil, err
 		}
@@ -196,15 +196,15 @@ func (s *ViewFileScript) Write() (string, error) {
 		b.WriteString("=")
 		b.WriteString(v.Write())
 		b.WriteString(";")
-		b.WriteString(tree.NL)
+		b.WriteString(patterns.NL)
 	}
 
 	return b.String(), nil
 }
 
-func (s *ViewFileScript) Dependencies() []string {
+func (s *ViewFileScript) Dependencies() []files.PathLang {
 	// cache dependencies should've been created during importExport
-	return []string{}
+	return []files.PathLang{}
 }
 
 // no need to add to the scope
@@ -450,10 +450,8 @@ func (v *ViewObject) Write() string {
 
 // in jspp the directives module isn't automatically included, so we need to force (which includes the above lines actually, so this happens twice)
 func ForceNewViewFileScriptRegistration(cache *FileCache) {
-  source := files.NewDefaultUIFileSource()
-
-	scripts.SetNewViewFileScript(func(absPath string, caller string) (scripts.FileScript, error) {
-    return NewViewFileScript(source, cache, absPath, caller)
+	scripts.SetNewViewFileScript(func(absPath string) (scripts.FileScript, error) {
+    return NewViewFileScript(cache, absPath)
 
   })
 }

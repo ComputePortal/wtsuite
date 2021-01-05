@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type If struct {
@@ -104,4 +105,73 @@ func (t *If) WriteStatement(usage Usage, indent string, nl string, tab string) s
 	}
 
 	return b.String()
+}
+
+func (t *If) ResolveStatementNames(scope Scope) error {
+	for i, cond := range t.conds {
+		if cond != nil {
+			if err := cond.ResolveExpressionNames(scope); err != nil {
+				return err
+			}
+		}
+
+    block := t.groups[i]
+
+		subScope := NewScope(scope)
+		if err := block.ResolveStatementNames(subScope); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *If) EvalStatement() error {
+  for i, cond := range t.conds {
+    if cond != nil {
+      condVal, err := cond.EvalExpression()
+      if err != nil {
+        return err
+      }
+
+      if !values.IsBool(condVal) {
+        errCtx := cond.Context()
+        return errCtx.NewError("Error: expected bool condition, got " + condVal.TypeName())
+      }
+    }
+
+    if err := t.groups[i].evalStatements(); err != nil {
+      return err
+    }
+  }
+
+  return nil
+}
+
+func (t *If) ResolveStatementActivity(usage Usage) error {
+	for i := len(t.conds) - 1; i >= 0; i-- {
+		if err := t.groups[i].ResolveStatementActivity(usage); err != nil {
+			return err
+		}
+
+		cond := t.conds[i]
+		if cond != nil {
+			if err := cond.ResolveExpressionActivity(usage); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (t *If) UniqueStatementNames(ns Namespace) error {
+	for _, group := range t.groups {
+		subNs := ns.NewBlockNamespace()
+		if err := group.UniqueStatementNames(subNs); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -324,37 +324,8 @@ func (p *JSParser) buildMemberExpression(ts []raw.Token) (js.Expression, error) 
 	return js.NewMember(lhs, js.NewWord(w.Value(), w.Context()), ts[n-2].Context()), nil
 }
 
-func (p *JSParser) condensePackagePeriods(ts []raw.Token) (*raw.Word, []raw.Token, error) {
-	nameToken, err := raw.AssertWord(ts[0])
-	if err != nil {
-		return nil, nil, err
-	}
-
-	i := 1
-	for i < len(ts) {
-		if raw.IsSymbol(ts[i], patterns.PERIOD) {
-			if i == len(ts)-1 {
-				errCtx := ts[i].Context()
-				return nil, nil, errCtx.NewError("Error: expected tokens after .")
-			}
-
-			nextWord, err := raw.AssertWord(ts[i+1])
-			if err != nil {
-				return nil, nil, err
-			}
-
-			nameToken = raw.NewValueWord(nameToken.Value()+"."+nextWord.Value(), raw.MergeContexts(nameToken, ts[i], ts[i+1]))
-			i += 2
-		} else {
-			break
-		}
-	}
-
-	return nameToken, ts[i:], nil
-}
-
 func (p *JSParser) buildTypeExpression(ts []raw.Token) (*js.TypeExpression, error) {
-	nameToken, ts, err := p.condensePackagePeriods(ts)
+	nameToken, ts, err := condensePackagePeriods(ts)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +414,7 @@ func (p *JSParser) buildClassOrExtendsTypeExpression(ts []raw.Token) (*js.TypeEx
 			te, err := p.buildTypeExpression(ts[:2])
 			return te, ts[2:], err
 		} else if raw.IsAnyWord(ts[0]) {
-			w, rem, err := p.condensePackagePeriods(ts)
+			w, rem, err := condensePackagePeriods(ts)
 			if err != nil {
 				return nil, nil, err
 			}

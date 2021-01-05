@@ -55,10 +55,6 @@ func (p *Parser) refine(start, stop int) Parser {
 	return Parser{0, p.raw[start:stop], p.mask[start:stop], p.settings, p.NewContext(start, stop)}
 }
 
-func (p *Parser) changeCaller(caller string) Parser {
-	return Parser{p.pos, p.raw[:], p.mask[:], p.settings, p.ctx.ChangeCaller(caller)}
-}
-
 func (p *Parser) NewError(start, stop int, msg string) error {
 	errCtx := p.NewContext(start, stop)
 	return errCtx.NewError(msg)

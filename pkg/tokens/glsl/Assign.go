@@ -48,3 +48,69 @@ func (t *Assign) WriteStatement(usage Usage, indent string, nl string, tab strin
 
 	return b.String()
 }
+
+func (t *Assign) ResolveStatementNames(scope Scope) error {
+	if err := t.lhs.ResolveExpressionNames(scope); err != nil {
+		return err
+	}
+
+	if err := t.rhs.ResolveExpressionNames(scope); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *Assign) EvalStatement() error {
+  rhsExpr := t.rhs
+
+  if t.op != "" {
+    switch t.op {
+    case "+":
+      rhsExpr = NewAddOp(t.lhs, t.rhs, t.Context())
+    case "-":
+      rhsExpr = NewSubOp(t.lhs, t.rhs, t.Context())
+    default:
+      errCtx := t.Context()
+      return errCtx.NewError("Error: unrecognized assign op " + t.op)
+    }
+  }
+  
+  rhsValue, err := rhsExpr.EvalExpression()
+  if err != nil {
+    return err
+  }
+
+  switch lhsExpr := t.lhs.(type) {
+  case *VarExpression:
+    return lhsExpr.EvalSet(rhsValue, t.Context())
+  case *Member:
+    return lhsExpr.EvalSet(rhsValue, t.Context())
+  case *Index:
+    return lhsExpr.EvalSet(rhsValue, t.Context())
+  default:
+    errCtx := t.Context()
+    return errCtx.NewError("Error: lhs not assignable")
+  }
+}
+
+func (t *Assign) ResolveStatementActivity(usage Usage) error {
+  if err := t.rhs.ResolveExpressionActivity(usage); err != nil {
+    return err
+  }
+
+  switch t.lhs.(type) {
+  case *VarExpression:
+    // nothing changes when VarExpression is lhs
+  default:
+    if err := t.lhs.ResolveExpressionActivity(usage); err != nil {
+      return err
+    }
+  }
+
+  return nil
+}
+
+func (t *Assign) UniqueStatementNames(ns Namespace) error {
+  return nil
+}

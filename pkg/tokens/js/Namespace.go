@@ -1,9 +1,7 @@
 package js
 
-import ()
-
-const (
-	COMPACT_LETTER = "abcdefghijklmnopqrstuvwxyz"
+import (
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type Namespace interface {
@@ -32,67 +30,6 @@ type NamespaceData struct {
 
 	varNames map[Variable]string // variable -> new (new is also stored in variable itself)
 	nameVars map[string]Variable // new -> variable
-}
-
-type NameGenerator struct {
-	allowCompactNaming bool
-	i                  int
-	name               string
-}
-
-func newCustomStartNameGenerator(allowCompactNaming bool, start int, name string) *NameGenerator {
-	return &NameGenerator{allowCompactNaming, start, name}
-}
-
-func newNameGenerator(allowCompactNaming bool, name string) *NameGenerator {
-	return newCustomStartNameGenerator(allowCompactNaming, 0, name)
-}
-
-func (ng *NameGenerator) GenName() string {
-	if COMPACT_NAMING && ng.allowCompactNaming {
-
-		new := ""
-
-		for new == "" ||
-			(len(ng.name) != 1 && len(new) == 1) ||
-			new == "if" ||
-			new == "of" ||
-			new == "in" ||
-			new == "do" ||
-			new == "as" {
-			i := ng.i
-
-			if i == 0 {
-				new = "A"
-				if len(ng.name) == 1 {
-					new = ng.name
-				}
-			} else {
-				for i > 0 {
-					rem := (i - 1) % 26
-					new = new + COMPACT_LETTER[rem:rem+1]
-					i = (i - 1) / 26
-				}
-			}
-
-			ng.i++
-		}
-
-		return new
-	} else {
-		var new string
-		if ng.i > 0 {
-			ng.name += "_"
-
-			new = ng.name
-		} else {
-			new = ng.name
-		}
-
-		ng.i++
-
-		return new
-	}
 }
 
 func newNamespace(parent Namespace, isFunction bool) Namespace {
@@ -171,7 +108,7 @@ func (ns *NamespaceData) LetName(v Variable) {
 		return
 	}
 
-	ng := newNameGenerator(true, v.Name())
+	ng := patterns.NewNameGenerator(true, v.Name())
 
 	for true {
 		new := ng.GenName()
@@ -194,7 +131,7 @@ func (ns *NamespaceData) VarName(v Variable) {
 		return
 	}
 
-	ng := newNameGenerator(true, v.Name())
+	ng := patterns.NewNameGenerator(true, v.Name())
 
 	fns_ := ns.CurrentFunctionNamespace()
 

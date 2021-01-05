@@ -84,7 +84,7 @@ func (t *VarStatement) Dump(indent string) string {
 	return b.String()
 }
 
-func (t *VarStatement) WriteStatement(indent string) string {
+func (t *VarStatement) WriteStatement(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	b.WriteString(indent)

@@ -341,7 +341,7 @@ func (c Template) instantiate(node *TemplateNode, args *tokens.StringDict,
 		return err
 	}
 
-	templateCtx := ctx //c.ctx.ChangeCaller(ctx.Caller())
+	templateCtx := ctx
 
 	if subScope.HasTemplate(c.extends) {
     subTag := tokens.NewTag(c.extends, templateSuperAttr, c.children, templateCtx)

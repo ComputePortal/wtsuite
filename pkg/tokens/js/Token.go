@@ -5,9 +5,6 @@ import (
 )
 
 var (
-	NL             = "\n"
-	TAB            = "  "
-	COMPACT_NAMING = false
 	VERBOSITY      = 0
 )
 

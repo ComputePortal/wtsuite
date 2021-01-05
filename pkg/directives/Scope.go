@@ -1,7 +1,6 @@
 package directives
 
 import (
-	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/functions"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
@@ -30,7 +29,6 @@ type Scope interface {
 	Eval(key string, args []tokens.Token, ctx context.Context) (tokens.Token, error)
 
   GetCache() *FileCache
-  GetSource() files.Source
 }
 
 func NewSubScope(parent Scope) Scope {

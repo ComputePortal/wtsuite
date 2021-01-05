@@ -130,12 +130,6 @@ func NewMathParser(s string, ctx context.Context) (*MathParser, error) {
 	return p, nil
 }
 
-// called in eg. Def.go, and the def content can be math
-// XXX: verify this statement
-func (p *MathParser) ChangeCaller(caller string) *MathParser {
-	return &MathParser{p.changeCaller(caller)}
-}
-
 func (p *MathParser) tokenize() ([]raw.Token, error) {
 	ts, err := p.Parser.tokenize()
 	if err != nil {

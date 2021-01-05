@@ -36,18 +36,18 @@ func (t *ForBlock) writeStatementHeader(indent string, extra string,
 	return b.String()
 }
 
-func (t *ForBlock) writeStatementFooter(indent string) string {
+func (t *ForBlock) writeStatementFooter(usage Usage, indent string, nl string, tab string) string {
 	var b strings.Builder
 
 	if len(t.statements) == 0 {
 		b.WriteString(";")
 	} else {
 		b.WriteString("){")
-		b.WriteString(NL)
+		b.WriteString(nl)
 
-		b.WriteString(t.writeBlockStatements(indent+TAB, NL))
+		b.WriteString(t.writeBlockStatements(usage, indent+tab, nl, tab))
 
-		b.WriteString(NL)
+		b.WriteString(nl)
 		b.WriteString(indent)
 		b.WriteString("}")
 	}

@@ -21,7 +21,7 @@ func (p *JSParser) buildInterfaceExtendsExpression(ts []raw.Token) ([]*js.VarExp
 
       var condensedNameToken *raw.Word
       var err error
-      condensedNameToken, ts, err = p.condensePackagePeriods(ts[1:]) // shortens ts by 1 or more
+      condensedNameToken, ts, err = condensePackagePeriods(ts[1:]) // shortens ts by 1 or more
       if err != nil {
         return nil, nil, err
       }

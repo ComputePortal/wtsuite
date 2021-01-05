@@ -2,8 +2,10 @@ package glsl
 
 import (
 	"fmt"
+  "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/glsl/values"
 )
 
 type LiteralFloat struct {
@@ -24,7 +26,16 @@ func (t *LiteralFloat) Dump(indent string) string {
 }
 
 func (t *LiteralFloat) WriteExpression() string {
-	return fmt.Sprintf("%g", t.value)
+  res := fmt.Sprintf("%g", t.value)
+  if !strings.ContainsAny(res, ".e") {
+    res += ".0"
+  }
+
+  return res
+}
+
+func (t *LiteralFloat) EvalExpression() (values.Value, error) {
+	return values.NewScalar("float", t.Context()), nil
 }
 
 func IsLiteralFloat(t Expression) bool {

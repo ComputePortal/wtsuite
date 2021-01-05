@@ -8,14 +8,13 @@ import (
 )
 
 type Const struct {
-  typeExpr *TypeExpression
-  nameExpr *VarExpression
-  n int // -1 for scalar
-  TokenData
+  altRHS string
+  rhsExpr Expression // can be nil
+  Pointer
 }
 
-func NewConst(typeExpr *TypeExpression, name string, n int, ctx context.Context) *Const {
-  return &Const{typeExpr, NewVarExpression(name, ctx), n, newTokenData(ctx)}
+func NewConst(typeExpr *TypeExpression, name string, n int, rhsExpr Expression, ctx context.Context) *Const {
+  return &Const{"", rhsExpr, newPointer(typeExpr, NewVarExpression(name, ctx), n, ctx)}
 }
 
 func (t *Const) Dump(indent string) string {
@@ -28,10 +27,18 @@ func (t *Const) Dump(indent string) string {
   b.WriteString(" ")
   b.WriteString(t.nameExpr.Dump(""))
 
-  if (t.n > 0) {
+  if (t.length > 0) {
     b.WriteString("[")
-    b.WriteString(strconv.Itoa(t.n))
+    b.WriteString(strconv.Itoa(t.length))
     b.WriteString("]")
+  }
+
+  if t.altRHS != "" {
+    b.WriteString("=")
+    b.WriteString(t.altRHS)
+  } else if t.rhsExpr != nil {
+    b.WriteString("=")
+    b.WriteString(t.rhsExpr.Dump(""))
   }
 
   b.WriteString(")\n")
@@ -49,11 +56,42 @@ func (t *Const) WriteStatement(usage Usage, indent string, nl string, tab string
   b.WriteString(" ")
   b.WriteString(t.nameExpr.WriteExpression())
 
-  if (t.n > 0) {
+  if (t.length > 0) {
     b.WriteString("[")
-    b.WriteString(strconv.Itoa(t.n))
+    b.WriteString(strconv.Itoa(t.length))
     b.WriteString("]")
   }
 
+  if t.altRHS != "" {
+    b.WriteString("=")
+    b.WriteString(t.altRHS)
+  } else if t.rhsExpr != nil {
+    b.WriteString("=")
+    b.WriteString(t.rhsExpr.WriteExpression())
+  }
+
   return b.String()
+}
+
+func (t *Const) TypeName() string {
+  return t.typeExpr.WriteExpression()
+}
+
+func (t *Const) Length() int {
+  return t.length
+}
+
+func (t *Const) SetAltRHS(str string) {
+  t.altRHS = str
+}
+
+func (t *Const) ResolveStatementNames(scope Scope) error {
+  if err := t.Pointer.ResolveStatementNames(scope); err != nil {
+    return err
+  }
+
+  variable := t.GetVariable()
+  variable.SetObject(t)
+
+  return nil
 }
