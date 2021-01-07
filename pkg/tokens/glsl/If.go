@@ -56,7 +56,7 @@ func (t *If) Dump(indent string) string {
 		b.WriteString(indent)
 		if i == 0 {
 			b.WriteString("If(")
-			b.WriteString(strings.Replace(c.WriteExpression(), "\n", "", -1))
+			b.WriteString(strings.Replace(c.Dump(""), "\n", "", -1))
 			b.WriteString(")\n")
 		} else if c == nil {
 			if i != len(t.conds)-1 {
@@ -65,7 +65,7 @@ func (t *If) Dump(indent string) string {
 			b.WriteString("Else\n")
 		} else {
 			b.WriteString("ElseIf(")
-			b.WriteString(strings.Replace(c.WriteExpression(), "\n", "", -1))
+			b.WriteString(strings.Replace(c.Dump(""), "\n", "", -1))
 			b.WriteString(")\n")
 		}
 

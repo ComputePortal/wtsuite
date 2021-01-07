@@ -5,8 +5,6 @@ import (
   "io/ioutil"
   "os"
   "path/filepath"
-  "regexp"
-  "strings"
 
 	"github.com/computeportal/wtsuite/pkg/cache"
 	"github.com/computeportal/wtsuite/pkg/directives"
@@ -18,6 +16,13 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
+const (
+  DEFAULT_OUTPUTFILE = "a.gv"
+  DEFAULT_TYPE = "class"
+)
+
+var cmdParser *parsers.CLIParser = nil
+
 type CmdArgs struct {
   graphType string // eg. class
   outputFile string // file needed by the graphviz utility 'dot' to create the visual, must be specified
@@ -27,32 +32,9 @@ type CmdArgs struct {
   verbosity int
 }
 
-func printUsageAndExit() {
-  fmt.Fprintf(os.Stderr, "Usage: %s [options] --type <graph-type> --output <output-files> <input-files>\n", os.Args[0])
-
-  fmt.Fprintf(os.Stderr, `
-Options:
-  -?, -h, --help             Show this message, other options are ignored
-	-v[v[v[v...]]]             Verbosity
-  --type <graph-type>        Graph type (see below)
-  -o, --output <output-file> Output file location for graphviz dot
-
-Graph types:
-  class                  Class inheritance, explicit interface implementation
-  instance               Instance properties
-`)
-
-  os.Exit(1)
-}
-
-func printMessageAndExit(msg string, printUsage bool) {
+func printMessageAndExit(msg string) {
 	fmt.Fprintf(os.Stderr, "\u001b[1m"+msg+"\u001b[0m\n\n")
-
-	if printUsage {
-		printUsageAndExit()
-	} else {
-		os.Exit(1)
-	}
+  os.Exit(1)
 }
 
 func printSyntaxErrorAndExit(err error) {
@@ -69,69 +51,36 @@ func parseArgs() CmdArgs {
 		verbosity:     0,
 	}
 
-	positional := make([]string, 0)
+  var positional []string = nil
 
-	i := 1
-	n := len(os.Args)
+  cmdParser = parsers.NewCLIParser(
+    fmt.Sprintf("Usage: %s [options] --type <graph-type> --output <output-file> <input-files>\n", os.Args[0]),
+    `Graph types:
+  class                  Class inheritance, explicit interface implementation
+  instance               Instance properties`,
+    []parsers.CLIOption{
+      parsers.NewCLIUniqueFile("o", "output" , "-o, --output    <output-file> Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
+      parsers.NewCLIUniqueEnum("t", "type"   , "-t, --type      See below", []string{"class", "instance"}, &(cmdArgs.graphType)),
+      parsers.NewCLICountFlag("v", ""        , "-v[v[v..]]      Verbosity", &(cmdArgs.verbosity)),
+    },
+    parsers.NewCLIRemaining(&positional),
+  )
 
-	for i < n {
-		arg := os.Args[i]
-		if strings.HasPrefix(arg, "-v") {
-			re := regexp.MustCompile(`^[\-][v]+$`)
-			if !re.MatchString(arg) {
-				printMessageAndExit("Error: bad verbosity option "+arg, true)
-			} else {
-				cmdArgs.verbosity += len(arg) - 1
-			}
-		} else if strings.HasPrefix(arg, "-") {
-			switch arg {
-			case "-?", "-h", "--help":
-				printUsageAndExit()
-      case "--type":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					cmdArgs.graphType = os.Args[i+1]
-					i++
-				}
-      case "-o", "--output":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.outputFile != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.outputFile = os.Args[i+1]
-					i++
-				}
-			}
-		} else {
-			positional = append(positional, arg)
-		}
-
-		i++
-	}
-
-  if cmdArgs.outputFile == "" {
-    printMessageAndExit("Error: --output not specified", true)
-  }
-
-  var err error
-  cmdArgs.outputFile, err = filepath.Abs(cmdArgs.outputFile)
-  if err != nil {
-    printMessageAndExit("Error: " +err.Error(), false)
+  if err := cmdParser.Parse(os.Args[1:]); err != nil {
+    printMessageAndExit(err.Error())
   }
 
   switch cmdArgs.graphType {
   case "class":
     if len(positional) == 0 {
-      printMessageAndExit("Error: graph type class requires at least one input file", true)
+      printMessageAndExit("Error: graph type class requires at least one input file")
     }
   case "instance":
     if len(positional) == 0 {
-      printMessageAndExit("Error: graph type instance requires at least one input file", true)
+      printMessageAndExit("Error: graph type instance requires at least one input file")
     }
   default:
-    printMessageAndExit("Error: unrecognized --type " + cmdArgs.graphType, true)
+    printMessageAndExit("Error: unrecognized --type " + cmdArgs.graphType)
   }
 
   orderedInputFiles := make([]string, 0)
@@ -139,7 +88,7 @@ func parseArgs() CmdArgs {
   for _, arg := range positional {
     info, err := os.Stat(arg)
     if os.IsNotExist(err) {
-      printMessageAndExit("Error: \"" + arg + "\" not found", true)
+      printMessageAndExit("Error: \"" + arg + "\" not found")
     }
 
     if info.IsDir() {
@@ -156,12 +105,12 @@ func parseArgs() CmdArgs {
 
         return nil
       }); err != nil {
-        printMessageAndExit("Error: " + err.Error(), false)
+        printMessageAndExit("Error: " + err.Error())
       }
     } else {
       absPath, err := filepath.Abs(arg)
       if err != nil {
-        printMessageAndExit("Error: " + err.Error(), false)
+        printMessageAndExit("Error: " + err.Error())
       }
 
       orderedInputFiles = append(orderedInputFiles, absPath)

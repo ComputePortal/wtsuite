@@ -3,13 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/directives"
 	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 )
+
+var cmdParser *parsers.CLIParser = nil
 
 type CmdArgs struct {
 	inputFile string
@@ -21,9 +21,9 @@ func printUsageAndExit() {
 	os.Exit(1)
 }
 
-func messageAndExit(msg string) {
+func printMessageAndExit(msg string) {
 	fmt.Fprintf(os.Stderr, "\u001b[1m"+msg+"\u001b[0m\n\n")
-	printUsageAndExit()
+  os.Exit(1)
 }
 
 func printSyntaxErrorAndExit(err error) {
@@ -36,43 +36,18 @@ func parseArgs() CmdArgs {
 		"",
 	}
 
-	positional := make([]string, 0)
+  cmdParser = parsers.NewCLIParser(
+    fmt.Sprintf("Usage: %s [-?|-h|--help] <input-file>\n", os.Args[0]),
+    "",
+    []parsers.CLIOption{},
+    parsers.NewCLIFile("", "", "", true, &(cmdArgs.inputFile)),
+  )
 
-	i := 1
-	n := len(os.Args)
+  if err := cmdParser.Parse(os.Args[1:]); err != nil {
+    printMessageAndExit(err.Error())
+  }
 
-	for i < n {
-		arg := os.Args[i]
-		if strings.HasPrefix(arg, "-") {
-			switch arg {
-			case "-?", "-h", "--help":
-				printUsageAndExit()
-			}
-		} else {
-			positional = append(positional, arg)
-		}
-
-		i++
-	}
-
-	if len(positional) != 1 {
-		messageAndExit("Error: expected 1 positional argument")
-	}
-
-	cmdArgs.inputFile = positional[0]
-
-	if err := files.AssertFile(cmdArgs.inputFile); err != nil {
-		messageAndExit("Error: input file '" + cmdArgs.inputFile + "' " + err.Error())
-	}
-
-	inputFile, err := filepath.Abs(cmdArgs.inputFile)
-	if err != nil {
-		messageAndExit("Error: input file '" + cmdArgs.inputFile + "' " + err.Error())
-	} else {
-		cmdArgs.inputFile = inputFile
-	}
-
-	return cmdArgs
+  return cmdArgs
 }
 
 func setUpEnv(cmdArgs CmdArgs) {

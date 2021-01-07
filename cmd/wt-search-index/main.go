@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -24,7 +23,10 @@ import (
 	"github.com/computeportal/wtsuite/cmd/wt-site/config"
 )
 
-var VERBOSITY = 0
+var (
+  VERBOSITY = 0
+  cmdParser *parsers.CLIParser = nil
+)
 
 type CmdArgs struct {
 	config.CmdArgs
@@ -39,32 +41,9 @@ type CmdArgs struct {
 	verbosity int
 }
 
-func printUsageAndExit() {
-	fmt.Fprintf(os.Stderr, "Usage: %s [options] configFile searchIndexOutput\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, `	
-Options:
-  -?, -h, --help         Show this message
-	--auto-link            Convert tags to <a> automatically if they have the 'href' attribute
-  --no-aliasing          Don't allow standard html tags to be aliased
-  -D<name> <value>       Define a global variable with a value
-  -B<name>               Define a global flag (its value will be empty string though)
-	-i, --include-view     Include view group or view file. Cannot be combined with -x
-	-x, --exclude-view     Exclude view group or view file. Cannot be combined with -i
-	--include-index        Include index group in final search index. Cannot be combined with --exclude-index
-	--exclude-index        Exclude index group from final search index. Cannot be combined with --include-index
-	-v[v[v[v...]]]         Verbosity
-`)
-
-	os.Exit(1)
-}
-
-func printMessageAndExit(msg string, printUsage bool) {
+func printMessageAndExit(msg string) {
 	config.PrintMessage(msg)
-	if printUsage {
-		printUsageAndExit()
-	} else {
-		os.Exit(1)
-	}
+  os.Exit(1)
 }
 
 func printSyntaxErrorAndExit(err error) {
@@ -87,117 +66,43 @@ func parseArgs() CmdArgs {
 		verbosity: 0,
 	}
 
-	positional := make([]string, 0)
+	var positional []string = nil
 
-	i := 1
-	n := len(os.Args)
+  cmdParser = parsers.NewCLIParser(
+    fmt.Sprintf("Usage: %s [options] <config-file> <search-index-output-file>\n", os.Args[0]),
+    "",
+    []parsers.CLIOption{
+      parsers.NewCLIUniqueFlag("", "auto-link", "--auto-link Convert tags to <a> automatically if the have the 'href' attribute", &(cmdArgs.autoLink)),
+      parsers.NewCLIUniqueFlag("", "no-aliasing", "--no-aliasing Don't allow standard html tag to be aliased", &(cmdArgs.noAliasing)),
+      parsers.NewCLIUniqueKeyValue("D", "-D<name> <value> Define a global variable with a value", cmdArgs.GlobalVars),
+      parsers.NewCLIUniqueKey("B", "-B<name> Define a global flag (its value will be empty string though)", cmdArgs.GlobalVars),
+      parsers.NewCLIAppendString("i", "include-view", "-i, --include-view <view-group>|<view-file>   Can't be combined with -x", &(cmdArgs.IncludeViews)),
+      parsers.NewCLIAppendString("x", "exclude-view", "-x, --exclude-view <view-group>|<view-file>   Can't be combined with -i", &(cmdArgs.ExcludeViews)),
+      parsers.NewCLIAppendString("", "include-index", "--include-index <index-group>   Include index group in final search index. Can't be combined with --exclude-index", &(cmdArgs.includeIndices)),
+      parsers.NewCLIAppendString("", "exclude-index", "--exclude-index <index-group>   Exclude index group in final search index. Can't be combined with --include-index", &(cmdArgs.excludeIndices)),
+      parsers.NewCLICountFlag("-v", "", "Verbosity", &(cmdArgs.verbosity)),
+    },
+    parsers.NewCLIRemaining(&positional),
+  )
 
-	for i < n {
-		arg := os.Args[i]
-		if strings.HasPrefix(arg, "-D") {
-			if i == n-1 {
-				printMessageAndExit("Error: expected argument after "+arg, true)
-			} else if len(arg) < 3 {
-				printMessageAndExit("Error: expected -D<name>, not just -D", true)
-			} else {
-				name := arg[2:]
-				value := os.Args[i+1]
+  if err := cmdParser.Parse(os.Args[1:]); err != nil {
+    printMessageAndExit(err.Error())
+  }
 
-				if _, ok := cmdArgs.GlobalVars[name]; ok {
-					printMessageAndExit("Error: global var "+name+" already defined", true)
-				} else {
-					cmdArgs.GlobalVars[name] = value
-					i++
-				}
-			}
-		} else if strings.HasPrefix(arg, "-B") {
-			if len(arg) < 3 {
-				printMessageAndExit("Error: expected -B<name>, not just -B", true)
-			} else {
-				name := arg[2:]
+  if len(cmdArgs.IncludeViews) != 0 && len(cmdArgs.ExcludeViews) != 0 {
+    printMessageAndExit("Error: --include-views can't be combined with --exclude-view")
+  }
 
-				if _, ok := cmdArgs.GlobalVars[name]; ok {
-					printMessageAndExit("Error: global var "+name+" already defined", true)
-				} else {
-					cmdArgs.GlobalVars[name] = ""
-				}
-			}
-		} else if strings.HasPrefix(arg, "-v") {
-			re := regexp.MustCompile(`^[\-][v]+$`)
-			if !re.MatchString(arg) {
-				printMessageAndExit("Error: bad verbosity option "+arg, true)
-			} else {
-				cmdArgs.verbosity += len(arg) - 1
-			}
-		} else if strings.HasPrefix(arg, "-") {
-			switch arg {
-			case "-?", "-h", "--help":
-				printUsageAndExit()
-			case "--no-aliasing":
-				if cmdArgs.noAliasing {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.noAliasing = true
-				}
-			case "--auto-link":
-				if cmdArgs.autoLink {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.autoLink = true
-				}
-			case "-i", "--include-view":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-
-				} else if len(cmdArgs.ExcludeViews) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --exclude-view (-x)", true)
-				} else {
-					cmdArgs.IncludeViews = append(cmdArgs.IncludeViews, os.Args[i+1])
-					i++
-				}
-			case "-x", "--exclude-view":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if len(cmdArgs.IncludeViews) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --include-view (-i)", true)
-				} else {
-					cmdArgs.ExcludeViews = append(cmdArgs.ExcludeViews, os.Args[i+1])
-					i++
-				}
-			case "--include-index":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if len(cmdArgs.excludeIndices) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --exclude-index", true)
-				} else {
-					cmdArgs.includeIndices = append(cmdArgs.includeIndices, os.Args[i+1])
-					i++
-				}
-			case "--exclude-index":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if len(cmdArgs.includeIndices) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --include-index", true)
-				} else {
-					cmdArgs.excludeIndices = append(cmdArgs.excludeIndices, os.Args[i+1])
-					i++
-				}
-			default:
-				printMessageAndExit("Error: unrecognized flag "+arg, true)
-			}
-		} else {
-			positional = append(positional, arg)
-		}
-
-		i++
-	}
+  if len(cmdArgs.includeIndices) != 0 && len(cmdArgs.excludeIndices) != 0 {
+    printMessageAndExit("Error: --include-indices can't be combined with --exclude-indices")
+  }
 
 	if len(positional) != 2 {
-		printMessageAndExit("Error: expected 2 positional arguments", true)
+		printMessageAndExit("Error: expected 2 positional arguments")
 	}
 
 	if !files.IsFile(positional[0]) {
-		printMessageAndExit("Error: first argument is not a file", true)
+		printMessageAndExit("Error: first argument is not a file")
 	}
 
 	cmdArgs.ConfigFile = positional[0]
@@ -205,12 +110,12 @@ func parseArgs() CmdArgs {
 	cmdArgs.searchIndexOutput = positional[1]
 
 	if err := files.AssertFile(cmdArgs.ConfigFile); err != nil {
-		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error(), true)
+		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error())
 	}
 
 	configFile, err := filepath.Abs(cmdArgs.ConfigFile)
 	if err != nil {
-		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error(), true)
+		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error())
 	} else {
 		cmdArgs.ConfigFile = configFile
 	}
@@ -531,28 +436,28 @@ func main() {
 	// age of the configFile doesn't matter
 	cfg, err := config.ReadConfigFile(&(cmdArgs.CmdArgs))
 	if err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
 	}
 
   if err := setUpEnv(cmdArgs, cfg); err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
   }
 
 	searchIndex, err := registerSearchableContent(cmdArgs, cfg)
 	if err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
 	}
 
 	if err := buildSearchIndex(cfg, searchIndex); err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
 	}
 
 	b, err := json.Marshal(searchIndex)
 	if err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
 	}
 
 	if err := ioutil.WriteFile(cmdArgs.searchIndexOutput, b, 0644); err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
 	}
 }

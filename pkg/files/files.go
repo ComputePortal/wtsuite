@@ -43,7 +43,7 @@ func IsFile(fname string) bool {
 
 func AssertFile(fname string) error {
 	if info, err := os.Stat(fname); os.IsNotExist(err) {
-		return errors.New("doesnt't exist")
+		return errors.New("file \"" + fname + "\" doesn't exist")
 	} else if err != nil {
 		return err
 	} else if info.IsDir() {
@@ -67,11 +67,11 @@ func IsDir(dname string) bool {
 
 func AssertDir(dname string) error {
 	if info, err := os.Stat(dname); os.IsNotExist(err) {
-		return errors.New("doesn't exist")
+		return errors.New("directory \"" + dname + "\" doesn't exist")
 	} else if err != nil {
 		return err
 	} else if !info.IsDir() {
-		return errors.New("is not a directory")
+		return errors.New("\"" + dname + "\" is not a directory")
 	} else {
 		return nil
 	}

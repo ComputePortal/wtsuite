@@ -3,10 +3,7 @@ package main
 import (
   "fmt"
   "os"
-  "path/filepath"
-  "regexp"
   "strconv"
-  "strings"
 
 	"github.com/computeportal/wtsuite/pkg/cache"
 	"github.com/computeportal/wtsuite/pkg/directives"
@@ -30,6 +27,7 @@ const (
 
 var (
   VERBOSITY = 0
+  cmdParser *parsers.CLIParser = nil
 )
 
 type CmdArgs struct {
@@ -64,14 +62,9 @@ Options:
 	os.Exit(1)
 }
 
-func printMessageAndExit(msg string, printUsage bool) {
+func printMessageAndExit(msg string) {
 	fmt.Fprintf(os.Stderr, "\u001b[1m"+msg+"\u001b[0m\n\n")
-
-	if printUsage {
-		printUsageAndExit()
-	} else {
-		os.Exit(1)
-	}
+  os.Exit(1)
 }
 
 func printSyntaxErrorAndExit(err error) {
@@ -86,127 +79,33 @@ func parseArgs() CmdArgs {
 		control:        "",
     mathFontURL: DEFAULT_MATHFONTURL,
     pxPerRem: DEFAULT_PX_PER_REM,
+    autoLink: false,
 		compactOutput: false,
 		verbosity:     0,
 	}
 
-	positional := make([]string, 0)
+  cmdParser = parsers.NewCLIParser(
+    fmt.Sprintf("Usage: %s <input-file> [-o <output-file>] [options]\n", os.Args[0]),
+    "",
+    []parsers.CLIOption{
+      parsers.NewCLIUniqueFlag("c", "compact", "-c, --compact          Compact output with minimal whitespace and short names", &(cmdArgs.compactOutput)),
+      parsers.NewCLIUniqueFlag("", "auto-link", "--auto-link            Convert tags to <a> automatically if they have href attribute", &(cmdArgs.autoLink)),
+  
+      parsers.NewCLIUniqueFile("o", "output", "-o, --output <file>    Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
+      parsers.NewCLIUniqueFile("", "control", "--control <file>    Optional control file", true, &(cmdArgs.control)),
+      parsers.NewCLIUniqueString("", "math-font-url", "--math-font-url <url>  Defaults to \"" + DEFAULT_MATHFONTURL + "\"", &(cmdArgs.mathFontURL)),
+      parsers.NewCLIUniqueInt("", "px-per-rem", "--px-per-rem <int>     Defaults to " + strconv.Itoa(DEFAULT_PX_PER_REM), &(cmdArgs.pxPerRem)),
+      parsers.NewCLICountFlag("v", "", "Verbosity", &(cmdArgs.verbosity)),
+    },
+    parsers.NewCLIFile("", "", "", true, &(cmdArgs.inputFile)),
+  )
 
-	i := 1
-	n := len(os.Args)
+  if err := cmdParser.Parse(os.Args[1:]); err != nil {
+    printMessageAndExit(err.Error())
+  }
 
-	for i < n {
-		arg := os.Args[i]
-		if strings.HasPrefix(arg, "-v") {
-			re := regexp.MustCompile(`^[\-][v]+$`)
-			if !re.MatchString(arg) {
-				printMessageAndExit("Error: bad verbosity option "+arg, true)
-			} else {
-				cmdArgs.verbosity += len(arg) - 1
-			}
-		} else if strings.HasPrefix(arg, "-") {
-			switch arg {
-			case "-?", "-h", "--help":
-				printUsageAndExit()
-			case "-c", "--compact":
-				if cmdArgs.compactOutput {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.compactOutput = true
-				}
-			case "-o", "--output":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.outputFile != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.outputFile = os.Args[i+1]
-					i++
-				}
-			case "--control":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.control != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.control = os.Args[i+1]
-					i++
-				}
-			case "--auto-link":
-				if cmdArgs.autoLink {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.autoLink = true
-				}
-			case "--math-font-url":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.mathFontURL != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.mathFontURL = os.Args[i+1]
-					i++
-				}
-			case "--px-per-rem":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.pxPerRem != -1 {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-          pxPerRem, err := strconv.ParseInt(os.Args[i+1], 10, 64)
-          if err != nil {
-            printMessageAndExit(err.Error(), true)
-          }
-
-          if pxPerRem <= 0 {
-            printMessageAndExit("Error: invalid px-per-rem value " + os.Args[i+1], true)
-          }
-
-					cmdArgs.pxPerRem = int(pxPerRem)
-					i++
-				}
-			}
-		} else {
-			positional = append(positional, arg)
-		}
-
-		i++
-	}
-
-	if len(positional) != 1 {
-		printMessageAndExit("Error: expected 1 positional argument", true)
-	}
-
-	cmdArgs.inputFile = positional[0]
-	if err := files.AssertFile(cmdArgs.inputFile); err != nil {
-		printMessageAndExit("Error: input file '"+cmdArgs.inputFile+"' "+err.Error(), false)
-	}
-
-	inputFile, err := filepath.Abs(cmdArgs.inputFile)
-	if err != nil {
-		printMessageAndExit("Error: input file '"+cmdArgs.inputFile+"' "+err.Error(), false)
-	} else {
-		cmdArgs.inputFile = inputFile
-	}
-
-	outputFile, err := filepath.Abs(cmdArgs.outputFile)
-	if err != nil {
-		printMessageAndExit("Error: output file '"+cmdArgs.outputFile+"' "+err.Error(), false)
-	} else {
-		cmdArgs.outputFile = outputFile
-	}
-
-  if cmdArgs.control != "" {
-    if err := files.AssertFile(cmdArgs.control); err != nil {
-      printMessageAndExit("Error: control file '"+cmdArgs.control+"' "+err.Error(), false)
-    }
-
-    control, err := filepath.Abs(cmdArgs.control)
-    if err != nil {
-      printMessageAndExit("Error: control file '"+cmdArgs.control+"' "+err.Error(), false)
-    } else {
-      cmdArgs.control = control
-    }
+  if cmdArgs.pxPerRem <= 0 {
+    printMessageAndExit("Error: invalid px-per-rem value " + strconv.Itoa(cmdArgs.pxPerRem))
   }
 
   return cmdArgs

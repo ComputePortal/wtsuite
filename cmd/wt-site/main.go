@@ -6,10 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime/pprof"
   "sort"
-	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/cache"
 	"github.com/computeportal/wtsuite/pkg/directives"
@@ -28,8 +26,11 @@ import (
 	"github.com/computeportal/wtsuite/cmd/wt-site/config"
 )
 
-var GitCommit string
-var VERBOSITY = 0
+var (
+  GitCommit string
+  VERBOSITY = 0
+  cmdParser *parsers.CLIParser = nil
+)
 
 type CmdArgs struct {
 	config.CmdArgs // common for this transpiler and wt-search-index
@@ -43,38 +44,9 @@ type CmdArgs struct {
 	verbosity int // defaults to zero, every -v[v[v]] adds a level
 }
 
-func printUsageAndExit() {
-	fmt.Fprintf(os.Stderr, "Usage: %s [options] configFile outputDir\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, `	
-Options:
-  -?, -h, --help                Show this message
-  -c, --compact                 Compact output with minimal whitespace, newline etc.
-  -f, --force                   Force a complete project build
-	--auto-link                   Convert tags to <a> automatically if they have the 'href' attribute
-  --no-aliasing                 Don't allow standard html tags to be aliased
-  -D<name> <value>              Define a global variable with a value
-  -B<name>                      Define a global flag (its value will be empty string though)
-  --prof<file>                  Profile the transpiler, output written to file (analyzeable with go tool pprof)
-	--js-url                      Override js-url in config
-	--css-url                     Override css-url in config
-	-i, --include-view            Include view group or view file. Cannot be combined with -x
-	-x, --exclude-view            Exclude view group or view file. Cannot be combined with -i
-	-j, --include-control         Include control group or control file. Cannot be combined with -y
-	-y, --exclude-control         Exclude control group or control file. Cannot be combined with -j
-	--math-font-url               Math font url (font name is always FreeSerifMath)
-	-v[v[v[v...]]]                Verbosity
-`)
-
-	os.Exit(1)
-}
-
-func printMessageAndExit(msg string, printUsage bool) {
+func printMessageAndExit(msg string) {
 	config.PrintMessage(msg)
-	if printUsage {
-		printUsageAndExit()
-	} else {
-		os.Exit(1)
-	}
+  os.Exit(1)
 }
 
 func printSyntaxErrorAndExit(err error) {
@@ -95,197 +67,78 @@ func parseArgs() CmdArgs {
 		verbosity:     0,
 	}
 
-	positional := make([]string, 0)
+	var positional []string = nil
 
-	i := 1
-	n := len(os.Args)
+  cmdParser = parsers.NewCLIParser(
+    fmt.Sprintf("Usage: %s [options] <config-file> <output-dir>\n", os.Args[0]),
+    "",
+    []parsers.CLIOption{
+      parsers.NewCLIUniqueFlag("c", "compact", "-c, --compact                 Compact output with minimal whitespace, newline etc.", &(cmdArgs.compactOutput)),
+      parsers.NewCLIUniqueFlag("f", "force", "-f, --force                   Force a complete project build", &(cmdArgs.forceBuild)),
+      parsers.NewCLIUniqueFlag("", "auto-link", "--auto-link                   Convert tags to <a> automatically if they have the 'href' attribute", &(cmdArgs.autoLink)), 
+      parsers.NewCLIUniqueFlag("", "no-aliasing", "--no-aliasing                 Don't allow standard html tags to be aliased", &(cmdArgs.noAliasing)),
+      parsers.NewCLIUniqueKeyValue("D", "-D<name> <value>              Define a global variable with a value", cmdArgs.GlobalVars),
+      parsers.NewCLIUniqueKey("B", "-B<name>               Define a global flag (its value is an empty string)", cmdArgs.GlobalVars),
+      parsers.NewCLIUniqueFile("", "prof", "--prof<file>                  Profile the transpiler, output written to file (analyzeable with go tool pprof)", false, &(cmdArgs.profFile)),
+      parsers.NewCLIUniqueString("", "js-url", "--js-url                      Override js-url in config", &(cmdArgs.JsUrl)),
+      parsers.NewCLIUniqueString("", "css-url", "--css-url                      Override css-url in config", &(cmdArgs.CssUrl)),
+      parsers.NewCLIAppendString("i", "include-view", "-i, --include-view <view-group>|<view-file>   Can't be combined with -x", &(cmdArgs.IncludeViews)),
+      parsers.NewCLIAppendString("x", "exclude-view", "-x, --exclude-view <view-group>|<view-file>   Can't be combined with -i", &(cmdArgs.ExcludeViews)),
+      parsers.NewCLIAppendString("j", "include-control", "-j, --include-control <control-group>|<control-file>   Can't be combined with -y", &(cmdArgs.IncludeControls)),
+      parsers.NewCLIAppendString("y", "exclude-control", "-y, --exclude-control <control-group>|<control-file>   Can't be combined with -j", &(cmdArgs.ExcludeControls)),
+      parsers.NewCLIUniqueString("", "math-font-url", "--math-font-url                      Math font url (font name is always FreeSerifMath)", &(cmdArgs.MathFontUrl)),
+      parsers.NewCLICountFlag("-v", "", "Verbosity", &(cmdArgs.verbosity)),
+    },
+    parsers.NewCLIRemaining(&positional),
+  )
 
-	for i < n {
-		arg := os.Args[i]
-		if strings.HasPrefix(arg, "-D") {
-			if i == n-1 {
-				printMessageAndExit("Error: expected argument after "+arg, true)
-			} else if len(arg) < 3 {
-				printMessageAndExit("Error: expected -D<name>, not just -D", true)
-			} else {
-				name := arg[2:]
-				value := os.Args[i+1]
+  if err := cmdParser.Parse(os.Args[1:]); err != nil {
+    printMessageAndExit(err.Error())
+  }
 
-				if _, ok := cmdArgs.GlobalVars[name]; ok {
-					printMessageAndExit("Error: global var "+name+" already defined", true)
-				} else {
-					cmdArgs.GlobalVars[name] = value
-					i++
-				}
-			}
-		} else if strings.HasPrefix(arg, "-B") {
-			if len(arg) < 3 {
-				printMessageAndExit("Error: expected -B<name>, not just -B", true)
-			} else {
-				name := arg[2:]
+  if len(cmdArgs.IncludeViews) != 0 && len(cmdArgs.ExcludeViews) != 0 {
+    printMessageAndExit("Error: --include-view can't be combined with --exclude-view")
+  }
 
-				if _, ok := cmdArgs.GlobalVars[name]; ok {
-					printMessageAndExit("Error: global var "+name+" already defined", true)
-				} else {
-					cmdArgs.GlobalVars[name] = ""
-				}
-			}
-		} else if strings.HasPrefix(arg, "-v") {
-			re := regexp.MustCompile(`^[\-][v]+$`)
-			if !re.MatchString(arg) {
-				printMessageAndExit("Error: bad verbosity option "+arg, true)
-			} else {
-				cmdArgs.verbosity += len(arg) - 1
-			}
-		} else if strings.HasPrefix(arg, "-") {
-			switch arg {
-			case "-?", "-h", "--help":
-				printUsageAndExit()
-			case "-c", "--compact":
-				if cmdArgs.compactOutput {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.compactOutput = true
-				}
-			case "-f", "--force":
-				if cmdArgs.forceBuild {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.forceBuild = true
-				}
-			case "--no-aliasing":
-				if cmdArgs.noAliasing {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.noAliasing = true
-				}
-			case "--auto-link":
-				if cmdArgs.autoLink {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.autoLink = true
-				}
-			case "--js-url":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-
-				} else if cmdArgs.JsUrl != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.JsUrl = os.Args[i+1]
-					i++
-				}
-			case "--css-url":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-
-				} else if cmdArgs.CssUrl != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.CssUrl = os.Args[i+1]
-					i++
-				}
-			case "-i", "--include-view":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-
-				} else if len(cmdArgs.ExcludeViews) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --exclude-view (-x)", true)
-				} else {
-					cmdArgs.IncludeViews = append(cmdArgs.IncludeViews, os.Args[i+1])
-					i++
-				}
-			case "-x", "--exclude-view":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if len(cmdArgs.IncludeViews) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --include-view (-i)", true)
-				} else {
-					cmdArgs.ExcludeViews = append(cmdArgs.ExcludeViews, os.Args[i+1])
-					i++
-				}
-			case "-j", "--include-control":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-
-				} else if len(cmdArgs.ExcludeControls) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --exclude-control (-y)", true)
-				} else {
-					cmdArgs.IncludeControls = append(cmdArgs.IncludeControls, os.Args[i+1])
-					i++
-				}
-			case "-y", "--exclude-control":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if len(cmdArgs.IncludeControls) != 0 {
-					printMessageAndExit("Error: "+arg+" cannot be combined with --include-control (-j)", true)
-				} else {
-					cmdArgs.ExcludeControls = append(cmdArgs.ExcludeControls, os.Args[i+1])
-					i++
-				}
-			case "--prof":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.profFile != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.profFile = os.Args[i+1]
-					i++
-				}
-			case "--math-font-url":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.MathFontUrl != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.MathFontUrl = os.Args[i+1]
-					i++
-				}
-			default:
-				printMessageAndExit("Error: unrecognized flag "+arg, true)
-			}
-		} else {
-			positional = append(positional, arg)
-		}
-
-		i++
-	}
+  if len(cmdArgs.IncludeControls) != 0 && len(cmdArgs.ExcludeControls) != 0 {
+    printMessageAndExit("Error: --include-control can't be combined with --exclude-control")
+  }
 
 	if len(positional) != 2 {
-		printMessageAndExit("Error: expected 2 positional arguments", true)
+		printMessageAndExit("Error: expected 2 positional arguments")
 	}
 
 	if files.IsFile(positional[0]) {
 		if files.IsFile(positional[1]) {
-			printMessageAndExit("Error: got two files, expected 1 dir and 1 file", true)
+			printMessageAndExit("Error: got two files, expected 1 dir and 1 file")
 		}
 		cmdArgs.ConfigFile = positional[0]
 		cmdArgs.OutputDir = positional[1]
 
 	} else if files.IsDir(positional[0]) {
 		if files.IsDir(positional[1]) {
-			printMessageAndExit("Error: got two dirs, expected 1 dir and 1 file", true)
+			printMessageAndExit("Error: got two dirs, expected 1 dir and 1 file")
 		}
 
 		cmdArgs.ConfigFile = positional[1]
 		cmdArgs.OutputDir = positional[0]
 	} else {
-		printMessageAndExit("Error: '"+positional[0]+"' or '"+positional[1]+"' doesn't exist", true)
+		printMessageAndExit("Error: '"+positional[0]+"' or '"+positional[1]+"' doesn't exist")
 	}
 
 	if err := files.AssertFile(cmdArgs.ConfigFile); err != nil {
-		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error(), true)
+		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error())
 	}
 
 	configFile, err := filepath.Abs(cmdArgs.ConfigFile)
 	if err != nil {
-		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error(), true)
+		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error())
 	} else {
 		cmdArgs.ConfigFile = configFile
 	}
 
 	if err := files.AssertDir(cmdArgs.OutputDir); err != nil {
-		printMessageAndExit("Error: output dir '"+cmdArgs.OutputDir+"' "+err.Error(), true)
+		printMessageAndExit("Error: output dir '"+cmdArgs.OutputDir+"' "+err.Error())
 	}
 
 	absOutputDir, err := filepath.Abs(cmdArgs.OutputDir)
@@ -583,17 +436,17 @@ func main() {
 	// age of the configFile doesn't matter
 	cfg, err := config.ReadConfigFile(&(cmdArgs.CmdArgs))
 	if err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
 	}
 
   if err := setUpEnv(cmdArgs, cfg); err != nil {
-		printMessageAndExit(err.Error()+"\n", false)
+		printMessageAndExit(err.Error()+"\n")
   }
 
 	if cmdArgs.profFile != "" {
 		fProf, err := os.Create(cmdArgs.profFile)
 		if err != nil {
-			printMessageAndExit(err.Error(), false)
+			printMessageAndExit(err.Error())
 		}
 
 		pprof.StartCPUProfile(fProf)
@@ -607,7 +460,7 @@ func main() {
 	if cmdArgs.profFile != "" {
 		fMem, err := os.Create(cmdArgs.profFile + ".mprof")
 		if err != nil {
-			printMessageAndExit(err.Error(), false)
+			printMessageAndExit(err.Error())
 		}
 
 		pprof.WriteHeapProfile(fMem)

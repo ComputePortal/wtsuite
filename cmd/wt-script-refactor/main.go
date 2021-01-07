@@ -23,6 +23,10 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
+const DEFAULT_OPERATION = "rename-class"
+
+var cmdParser *parsers.CLIParser = nil
+
 type CmdArgs struct {
   operation string // eg. rename-package 
 
@@ -32,30 +36,9 @@ type CmdArgs struct {
   args []string // remaining positional args
 }
 
-func printUsageAndExit() {
-  fmt.Fprintf(os.Stderr, "Usage: %s [options] --operation <operation> <args>\n", os.Args[0])
-
-	fmt.Fprintf(os.Stderr, `
-Options:
-  -?, -h, --help         Show this message, other options are ignored
-  -n                     Dry run
-  -v[v[v[v...]]]         Verbosity
-
-Operations:
-  rename-class <old-name> <new-name>      Change class name, move its file
-`)
-
-  os.Exit(1)
-}
-
-func printMessageAndExit(msg string, printUsage bool) {
+func printMessageAndExit(msg string) {
 	fmt.Fprintf(os.Stderr, "\u001b[1m"+msg+"\u001b[0m\n\n")
-
-	if printUsage {
-		printUsageAndExit()
-	} else {
-		os.Exit(1)
-	}
+  os.Exit(1)
 }
 
 func printSyntaxErrorAndExit(err error) {
@@ -65,61 +48,35 @@ func printSyntaxErrorAndExit(err error) {
 
 func parseArgs() CmdArgs {
 	cmdArgs := CmdArgs{
-    operation: "",
+    operation: DEFAULT_OPERATION,
     dryRun: false,
 		verbosity:     0,
 	}
 
-	positional := make([]string, 0)
+	var positional []string = nil
 
-	i := 1
-	n := len(os.Args)
+  cmdParser = parsers.NewCLIParser(fmt.Sprintf("Usage: %s [options] [--op-type <operation>] <args>\n", os.Args[0]), 
+  `Operations:
+  rename-class <old-name> <new-name>      Change class name, move its file`,
+    []parsers.CLIOption{
+      parsers.NewCLIUniqueFlag("n", ""       , "-n              Dry run", &(cmdArgs.dryRun)),
+      parsers.NewCLIUniqueEnum("t", "type"   , "-t, --op-type   <operation-type>    Defaults to \"" + DEFAULT_OPERATION + "\", see below for other possibilities", []string{"rename-class"}, &(cmdArgs.operation)),
+      parsers.NewCLICountFlag("v", ""        , "-v[v[v..]]      Verbosity", &(cmdArgs.verbosity)),
+    },
+    parsers.NewCLIRemaining(&positional),
+  )
 
-	for i < n {
-		arg := os.Args[i]
-		if strings.HasPrefix(arg, "-v") {
-			re := regexp.MustCompile(`^[\-][v]+$`)
-			if !re.MatchString(arg) {
-				printMessageAndExit("Error: bad verbosity option "+arg, true)
-			} else {
-				cmdArgs.verbosity += len(arg) - 1
-			}
-		} else if strings.HasPrefix(arg, "-") {
-			switch arg {
-			case "-?", "-h", "--help":
-				printUsageAndExit()
-      case "--operation":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.operation != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.operation = os.Args[i+1]
-					i++
-				}
-      case "-n":
-        cmdArgs.dryRun = true
-			}
-		} else {
-			positional = append(positional, arg)
-		}
-
-		i++
-	}
+  if err := cmdParser.Parse(os.Args[1:]); err != nil {
+    printMessageAndExit(err.Error())
+  }
 
   switch cmdArgs.operation {
-  case "":
-    printMessageAndExit("Error: --operation must be specified", true)
-  case "rename-package":
-    if len(positional) != 2 {
-      printMessageAndExit("Error: both --old-name and --new-name must be set for rename-package operation", true)
-    }
   case "rename-class":
     if len(positional) != 2 {
-      printMessageAndExit("Error: both --old-name and --new-name must be set for rename-class operation", true)
+      printMessageAndExit("Error: both --old-name and --new-name must be set for rename-class operation")
     }
   default:
-    printMessageAndExit("Error: unrecognized --operation " + cmdArgs.operation, true)
+    panic("unhandled") // CLIUniqueEnum should've been able to catch this
   }
 
   cmdArgs.args = positional

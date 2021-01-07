@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/directives"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tree"
 )
+
+var cmdParser *parsers.CLIParser = nil
 
 type CmdArgs struct {
 	fname         string
@@ -23,32 +22,13 @@ type CmdArgs struct {
 	genPrecision  int
 }
 
-func printUsageAndExit() {
-	fmt.Fprintf(os.Stderr, "Usage: %s [options] svg-file\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, `	
-Options:
-  -?, -h, --help         Show this message
-  -o <file>              Output file instead of stdout
-  --human                With newlines and unnecessary spaces, for debugging of minifier
-	--abs-precision <int>  Precision of positions wrt. viewbox (default is 4)
-	--rel-precision <int>  Precision of relative path motions wrt. viewbox (default is 6)
-	--gen-precision <int>  Precision of general floating point number (default is 2)
-`)
-
-	os.Exit(1)
-}
-
 func printMessage(msg string) {
 	fmt.Fprintf(os.Stderr, "\u001b[1m"+msg+"\u001b[0m\n\n")
 }
 
-func printMessageAndExit(msg string, printUsage bool) {
+func printMessageAndExit(msg string) {
 	printMessage(msg)
-	if printUsage {
-		printUsageAndExit()
-	} else {
-		os.Exit(1)
-	}
+  os.Exit(1)
 }
 
 func parseArgs() CmdArgs {
@@ -61,97 +41,22 @@ func parseArgs() CmdArgs {
 		genPrecision:  2,
 	}
 
-	positional := make([]string, 0)
-
-	i := 1
-	n := len(os.Args)
-
-	for i < n {
-		arg := os.Args[i]
-		if strings.HasPrefix(arg, "-") {
-			switch arg {
-			case "-?", "-h", "--help":
-				printUsageAndExit()
-			case "-o":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else if cmdArgs.output != "" {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.output = os.Args[i+1]
-					i++
-				}
-			case "--human":
-				if cmdArgs.humanReadable {
-					printMessageAndExit("Error: "+arg+" already specified", true)
-				} else {
-					cmdArgs.humanReadable = true
-				}
-			case "--abs-precision":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					x64, err := strconv.ParseInt(os.Args[i+1], 10, 64)
-					x := int(x64)
-					if err != nil || x < 0 {
-						printMessageAndExit("Error: bad integer argument after "+arg, true)
-					}
-
-					cmdArgs.absPrecision = x
-					i++
-				}
-			case "--rel-precision":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					x64, err := strconv.ParseInt(os.Args[i+1], 10, 64)
-					x := int(x64)
-					if err != nil || x < 0 {
-						printMessageAndExit("Error: bad integer argument after "+arg, true)
-					}
-
-					cmdArgs.relPrecision = x
-					i++
-				}
-			case "--gen-precision":
-				if i == n-1 {
-					printMessageAndExit("Error: expected argument after "+arg, true)
-				} else {
-					x64, err := strconv.ParseInt(os.Args[i+1], 10, 64)
-					x := int(x64)
-					if err != nil || x < 0 {
-						printMessageAndExit("Error: bad integer argument after "+arg, true)
-					}
-
-					cmdArgs.genPrecision = x
-					i++
-				}
-			}
-		} else {
-			positional = append(positional, arg)
-		}
-
-		i++
-	}
-
-	if len(positional) != 1 {
-		printMessageAndExit("Error: expected 1 positional argument", true)
-	}
-
-	cmdArgs.fname = positional[0]
-	fname, err := filepath.Abs(cmdArgs.fname)
-	if err != nil {
-		printMessageAndExit("Error: svg file '"+cmdArgs.fname+"' "+err.Error(), true)
-	} else {
-		cmdArgs.fname = fname
-	}
-
-	if cmdArgs.output != "" {
-		cmdArgs.output, err = filepath.Abs(cmdArgs.output)
-		if err != nil {
-			printMessageAndExit("Error: output file '"+cmdArgs.fname+"' "+err.Error(), true)
-		}
-	}
+  cmdParser = parsers.NewCLIParser(
+    fmt.Sprintf("Usage: %s [options] <svg-file>\n", os.Args[0]),
+    "",
+    []parsers.CLIOption{
+      parsers.NewCLIUniqueFile("o", "output", "-o, --output <output-file>  Output file instead of stdout", false, &(cmdArgs.output)),
+      parsers.NewCLIUniqueFlag("", "human", "Extra whitespace for readability", &(cmdArgs.humanReadable)),
+      parsers.NewCLIUniqueInt("", "abs-precision", "--abs-precision <int>  Precision of positions wrt. viewbox (default is 4)", &(cmdArgs.absPrecision)),
+      parsers.NewCLIUniqueInt("", "rel-precision", "--rel-precision <int>  Precision of relative path motions wrt. viewbox (default is 6)", &(cmdArgs.relPrecision)),
+      parsers.NewCLIUniqueInt("", "gen-precision", "--gen-precision <int>  Precision of general floating point number (default is 2)", &(cmdArgs.genPrecision)),
+    },
+    parsers.NewCLIFile("", "", "", true, &(cmdArgs.fname)),
+  )
+    
+  if err := cmdParser.Parse(os.Args[1:]); err != nil {
+    printMessageAndExit(err.Error())
+  }
 
 	return cmdArgs
 }
@@ -214,14 +119,14 @@ func main() {
 
 	result, err := buildSVGFile(cmdArgs.fname)
 	if err != nil {
-		printMessageAndExit(err.Error(), false)
+		printMessageAndExit(err.Error())
 	}
 
 	if cmdArgs.output == "" {
 		fmt.Fprintf(os.Stdout, result)
 	} else {
 		if err := ioutil.WriteFile(cmdArgs.output, []byte(result), 0644); err != nil {
-			printMessageAndExit("Error: "+err.Error(), false)
+			printMessageAndExit("Error: "+err.Error())
 		}
 	}
 }
