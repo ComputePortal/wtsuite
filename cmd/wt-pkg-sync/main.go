@@ -1,7 +1,7 @@
 package main
 
 // tag a commit as follows:
-//  git tag -a v1.2.3 -m "release v1.2.3"
+//  git tag -a v1.2.3 -m "release v1.2.3" fx987
 import (
   "fmt"
   "os"
