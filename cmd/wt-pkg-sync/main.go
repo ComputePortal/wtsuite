@@ -52,6 +52,12 @@ func testListTags() error {
     URLs: []string{TEST_URL},
   })
 
+  if err := remote.Fetch(&git.FetchOptions{
+    Tags: git.AllTags,
+  }); err != nil {
+    return err
+  }
+
   lst, err := remote.List(&git.ListOptions{})
   if err != nil {
     return err
