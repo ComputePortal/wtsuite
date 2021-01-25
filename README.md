@@ -1,14 +1,5 @@
 # Introduction
 *wtsuite* is a collection of transpilers and other tools for html5 technologies
-* wt-script
-* wt-script-grapher
-* wt-script-refactor
-* wt-script-syntax-tree
-* wt-search-index
-* wt-site
-* wt-svg-minify
-* wt-template
-* wt-template-syntax-tree
 
 Documentation can be found [here](https://computeportal.github.io/wtsuite-doc)
 
@@ -31,6 +22,7 @@ In your `~/.vimrc` or `~/.config/nvim/init.vim` file:
 ```
 au BufNewFile,BufRead *.wtt set filetype=wtt
 au BufNewFile,BufRead *.wts set filetype=wts
+au BufNewFile,BufRead *.glsl set filetype=glsl
 ```
 
 Run `make install-vim` to install the relevant syntax/indentation files.
