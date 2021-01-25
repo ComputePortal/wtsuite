@@ -90,6 +90,11 @@ func strInternal(args []tokens.Token, ctx context.Context) (*tokens.String, erro
 	}
 }
 
-func Str(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Str(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	return strInternal(args, ctx)
 }

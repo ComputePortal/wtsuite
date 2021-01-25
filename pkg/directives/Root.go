@@ -6,7 +6,7 @@ import (
 )
 
 func NewRoot(cache *FileCache, path string, control string, cssUrl string, jsUrl string) (*tree.Root, [][]string, error) {
-	_, node, err := BuildFile(cache, path, true)
+	_, node, err := BuildFile(cache, path, true, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -25,6 +25,10 @@ func FinalizeRoot(node *RootNode, control string, cssUrl string, jsUrl string) (
 	root.FoldDummy()
 
 	tree.RegisterParents(root)
+
+  if err := root.EvalLazy(); err != nil {
+    return nil, nil, err
+  }
 
 	idMap := tree.NewIDMap()
 	if err := root.CollectIDs(idMap); err != nil {

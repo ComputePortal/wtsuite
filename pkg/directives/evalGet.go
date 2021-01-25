@@ -6,16 +6,17 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func evalGet(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	// avoid false wasWord positives
-	if str, ok := args[0].(*tokens.String); ok && str.WasWord() {
-		args[0] = tokens.NewValueString(str.Value(), str.Context())
-	}
-
-	args, err := functions.EvalArgs(scope, args)
+func evalGet(scope Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  var err error
+  args_, err = args_.EvalAsArgs(scope)
 	if err != nil {
 		return nil, err
 	}
+
+  args, err := functions.CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
 
 	var fallback tokens.Token = nil
 	if len(args) == 2 {

@@ -73,11 +73,11 @@ func copyValue(v_ tokens.Token, ctx context.Context) (tokens.Token, error) {
   }
 }
 
-func Add(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 2 {
-		err := ctx.NewError("Error: expected 2 arguments")
-		return nil, err
-	}
+func Add(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
 
   if scope.Permissive() {
     if tokens.IsNull(args[0]) && tokens.IsNull(args[1]) {

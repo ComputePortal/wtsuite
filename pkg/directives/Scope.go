@@ -1,6 +1,8 @@
 package directives
 
 import (
+  "strings"
+
 	"github.com/computeportal/wtsuite/pkg/functions"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
@@ -15,18 +17,18 @@ type Scope interface {
 
 	HasVar(key string) bool
 	GetVar(key string) functions.Var
-	SetVar(key string, v functions.Var)
+	SetVar(key string, v functions.Var) error
 
 	HasTemplate(key string) bool
 	GetTemplate(key string) Template
-	SetTemplate(key string, d Template)
+	SetTemplate(key string, d Template) error
 
 	listValidVarNames() string
   //setBlockTarget(block *tokens.Tag, target string)
   //getBlockTarget(block *tokens.Tag)
 
 	// implements tokens.Scope
-	Eval(key string, args []tokens.Token, ctx context.Context) (tokens.Token, error)
+	Eval(key string, args *tokens.Parens, ctx context.Context) (tokens.Token, error)
 
   GetCache() *FileCache
 }
@@ -75,6 +77,16 @@ func buildAttributes(scope Scope, tag *tokens.Tag,
 	return attr, nil
 }
 
+func removeForcedSuffix(attr *tokens.StringDict) (*tokens.StringDict, error) {
+  return attr.MapStringKeys(func (k string) string {
+    if strings.HasSuffix(k, "!") {
+      return k[0:len(k)-1]
+    } else {
+      return k
+    }
+  })
+}
+
 // NodeType can change from parentNode to this node
 // collectDefaultOps==true in case Template extends this tag
 func buildTree(parent Scope, parentNode Node, nt NodeType,
@@ -84,9 +96,13 @@ func buildTree(parent Scope, parentNode Node, nt NodeType,
 
 	attr, err := buildAttributes(scope, tagToken, []string{})
 	if err != nil {
-    panic(err)
 		return err
 	}
+
+  attr, err = removeForcedSuffix(attr)
+  if err != nil {
+    return err
+  }
 
 	var tag tree.Tag
 	switch parentNode.Type() {
@@ -138,6 +154,7 @@ func buildTree(parent Scope, parentNode Node, nt NodeType,
 			return err
 		}
 	} else {
+    // there is no way to estimate the number of children before hand?
 		for _, child := range tagToken.Children() {
 			if err := BuildTag(scope, newNode, child); err != nil {
 				return err
@@ -152,6 +169,7 @@ func buildText(node Node, tag *tokens.Tag) error {
 	return node.AppendChild(tree.NewText(tag.Text(), tag.Context()))
 }
 
+// TODO: append, replace, prepend scope based
 func buildDeferred(scope Scope, node *TemplateNode, tag *tokens.Tag) error {
   key := tag.Name()
   switch {
@@ -209,7 +227,7 @@ func BuildTag(scope Scope, node Node, tag *tokens.Tag) error {
 }
 
 // TODO: need access to node here
-func eval(scope Scope, key string, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func eval(scope Scope, key string, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	switch {
 	case scope.HasVar(key):
 		fn, err := functions.AssertFun(scope.GetVar(key).Value)
@@ -234,8 +252,12 @@ func eval(scope Scope, key string, args []tokens.Token, ctx context.Context) (to
 		//return evalSearchStyle(scope, args, ctx)
 	case key == "var":
 		return evalVar(scope, args, ctx)
+  case key == "issymbol":
+    return evalIsSymbol(scope, args, ctx)
+  case key == "import":
+    return evalDynamicImport(scope, args, ctx)
 	case key == "get":
-		if len(args) > 0 && tokens.IsString(args[0]) {
+		if args.Len() > 0 && tokens.IsString(args.Values()[0]) {
 			return evalGet(scope, args, ctx)
 		}
 		fallthrough

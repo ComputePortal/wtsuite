@@ -226,6 +226,7 @@ func (p *JSParser) buildImportStatement(ts []raw.Token) ([]raw.Token, error) {
     }
 
     ts = ts[0:n-2]
+    n -= 2
   }
 
 	if !raw.IsLiteralString(ts[n-1]) {

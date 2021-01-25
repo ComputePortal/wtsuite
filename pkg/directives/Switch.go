@@ -28,7 +28,7 @@ func buildCase(scope Scope, node Node, swValue tokens.Token,
 
 	cond := false
 	if swValue != nil {
-		eqToken_, eqErr := functions.EQ(subScope, []tokens.Token{swValue, value}, tag.Context())
+		eqToken_, eqErr := functions.EQ(subScope, tokens.NewParens([]tokens.Token{swValue, value}, nil, tag.Context()), tag.Context())
 		eqToken, err := tokens.AssertBool(eqToken_)
 		if err != nil {
 			panic(err)

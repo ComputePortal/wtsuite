@@ -6,8 +6,6 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
-var IsAutoUID func(id string) bool = nil
-
 // only requires a subset of that tag methods
 type IDMapTag interface {
 	Name() string

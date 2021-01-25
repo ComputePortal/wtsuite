@@ -34,7 +34,12 @@ func strUpperRange(fn func(string) string, s *tokens.String, start *tokens.Int, 
 	return tokens.NewString(snew+sold, ctx)
 }
 
-func lowerUpper(fn func(string) string, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func lowerUpper(fn func(string) string, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) == 0 {
 		return nil, ctx.NewError("Error: expected at least 1 argument")
 	}
@@ -72,20 +77,21 @@ func lowerUpper(fn func(string) string, args []tokens.Token, ctx context.Context
 	}
 }
 
-func Upper(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Upper(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return lowerUpper(strings.ToUpper, args, ctx)
 }
 
-func Lower(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Lower(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return lowerUpper(strings.ToLower, args, ctx)
 }
 
 // smart capitaloization of titles
 // ref:https://capitalizemytitle.com/#capitalizationrules
-func Caps(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 1 {
-		return nil, ctx.NewError("Error: expected 1 argument")
-	}
+func Caps(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewUnaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
 
 	s, err := tokens.AssertString(args[0])
 	if err != nil {

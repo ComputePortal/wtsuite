@@ -10,11 +10,12 @@ import (
 type Const struct {
   altRHS string
   rhsExpr Expression // can be nil
+  isExport bool // useful for OrigName or not
   Pointer
 }
 
-func NewConst(typeExpr *TypeExpression, name string, n int, rhsExpr Expression, ctx context.Context) *Const {
-  return &Const{"", rhsExpr, newPointer(typeExpr, NewVarExpression(name, ctx), n, ctx)}
+func NewConst(typeExpr *TypeExpression, name string, n int, rhsExpr Expression, isExport bool, ctx context.Context) *Const {
+  return &Const{"", rhsExpr, isExport, newPointer(typeExpr, NewVarExpression(name, ctx), n, ctx)}
 }
 
 func (t *Const) Dump(indent string) string {
@@ -69,6 +70,7 @@ func (t *Const) WriteStatement(usage Usage, indent string, nl string, tab string
     b.WriteString("=")
     b.WriteString(t.rhsExpr.WriteExpression())
   }
+  b.WriteString(";")
 
   return b.String()
 }
@@ -94,4 +96,17 @@ func (t *Const) ResolveStatementNames(scope Scope) error {
   variable.SetObject(t)
 
   return nil
+}
+
+func (t *Const) ResolveStatementActivity(usage Usage) error {
+  return nil
+}
+
+func (t *Const) UniqueStatementNames(ns Namespace) error {
+  if t.isExport {
+    return ns.OrigName(t.GetVariable())
+  } else {
+    ns.VarName(t.GetVariable())
+    return nil
+  }
 }

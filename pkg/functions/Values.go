@@ -41,7 +41,12 @@ func intDictValues(arg tokens.Token, ctx context.Context) (tokens.Token, error) 
 	return tokens.NewValuesList(values, ctx), nil
 }
 
-func Values(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Values(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}

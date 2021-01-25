@@ -104,7 +104,7 @@ func (r *Keyframes) writeFrames(indent string) string {
 		b.WriteString(indent)
 
 		if i < n-1 || frame.pos != 1.0 {
-			b.WriteString(fmt.Sprintf("%0.0f", frame.pos))
+			b.WriteString(fmt.Sprintf("%0.0f", frame.pos*100.0))
 			b.WriteString("%")
 		} else {
 			b.WriteString("100%")

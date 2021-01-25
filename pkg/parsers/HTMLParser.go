@@ -197,7 +197,7 @@ func (p *HTMLParser) buildOperatorToken(v *raw.Operator) (html.Token, error) {
 			return nil, err
 		}
 
-		return html.NewValueFunction("ifelse", []html.Token{a, b, c}, v.Context()), nil
+		return html.NewFunction("ifelse", []html.Token{a, b, c}, v.Context()), nil
   case v.Name() == "bin!!":
     // if-not-null-then operator
 		a, err := p.buildToken(v.Args()[0:1])
@@ -210,9 +210,9 @@ func (p *HTMLParser) buildOperatorToken(v *raw.Operator) (html.Token, error) {
 			return nil, err
 		}
 
-    cond := html.NewValueFunction("ne", []html.Token{a, html.NewNull(v.Context())}, v.Context())
+    cond := html.NewFunction("ne", []html.Token{a, html.NewNull(v.Context())}, v.Context())
 
-    return html.NewValueFunction("ifelse", []html.Token{cond, b, a}, v.Context()), nil
+    return html.NewFunction("ifelse", []html.Token{cond, b, a}, v.Context()), nil
   case v.Name() == "bin??":
     // nullish coalescing operator
 		a, err := p.buildToken(v.Args()[0:1])
@@ -225,9 +225,9 @@ func (p *HTMLParser) buildOperatorToken(v *raw.Operator) (html.Token, error) {
 			return nil, err
 		}
 
-    cond := html.NewValueFunction("eq", []html.Token{a, html.NewNull(v.Context())}, v.Context())
+    cond := html.NewFunction("eq", []html.Token{a, html.NewNull(v.Context())}, v.Context())
 
-    return html.NewValueFunction("ifelse", []html.Token{cond, b, a}, v.Context()), nil
+    return html.NewFunction("ifelse", []html.Token{cond, b, a}, v.Context()), nil
 	case v.Name() == "bin:=": // lhs must be word
 		// accept word or string
 		arg0 := v.Args()[0]
@@ -243,7 +243,7 @@ func (p *HTMLParser) buildOperatorToken(v *raw.Operator) (html.Token, error) {
 				return nil, err
 			}
 
-			return html.NewValueFunction("new", []html.Token{html.NewValueString(a.Value(), a.Context()), b}, v.Context()), nil
+			return html.NewFunction("new", []html.Token{html.NewValueString(a.Value(), a.Context()), b}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
 			return nil, errCtx.NewError("Error: lhs must be word (hint: missing semicolon?)")
@@ -258,7 +258,7 @@ func (p *HTMLParser) buildOperatorToken(v *raw.Operator) (html.Token, error) {
 			return nil, err
 		}
 		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
-			return html.NewValueFunction(fnName, []html.Token{a, b}, v.Context()), nil
+			return html.NewFunction(fnName, []html.Token{a, b}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
 			err := errCtx.NewError("Error: binary operator '" + strings.TrimLeft(v.Name(), "bin") + "' not recognized")
@@ -270,7 +270,7 @@ func (p *HTMLParser) buildOperatorToken(v *raw.Operator) (html.Token, error) {
 			return nil, err
 		}
 		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
-			return html.NewValueFunction(fnName, []html.Token{a}, v.Context()), nil
+			return html.NewFunction(fnName, []html.Token{a}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
 			return nil, errCtx.NewError("Error: pre unary operator '" + strings.TrimLeft(v.Name(), "pre") + "' not recognized")
@@ -281,14 +281,14 @@ func (p *HTMLParser) buildOperatorToken(v *raw.Operator) (html.Token, error) {
 			return nil, err
 		}
 		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
-			return html.NewValueFunction(fnName, []html.Token{a}, v.Context()), nil
+			return html.NewFunction(fnName, []html.Token{a}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
 			return nil, errCtx.NewError("Error: post unary operator '" + strings.TrimLeft(v.Name(), "post") + "' not recognized")
 		}
 	case strings.HasPrefix(v.Name(), "sing"):
 		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
-			return html.NewValueFunction(fnName, []html.Token{}, v.Context()), nil
+			return html.NewFunction(fnName, []html.Token{}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
 			return nil, errCtx.NewError("Error: singular operator '" + strings.TrimLeft(v.Name(), "sing") + "' not recognized")
@@ -406,7 +406,7 @@ func (p *HTMLParser) buildBracketsGroupToken(v *raw.Group) (html.Token, error) {
 					return nil, err
 				}
 
-				return html.NewValueFunction("seq", []html.Token{start, incr, stop},
+				return html.NewFunction("seq", []html.Token{start, incr, stop},
 					context.MergeContexts(v.Context(), op.Context(), op2.Context())), nil
 			} else {
 				errCtx := v.Context()
@@ -416,7 +416,7 @@ func (p *HTMLParser) buildBracketsGroupToken(v *raw.Group) (html.Token, error) {
 					return nil, err
 				}
 
-				return html.NewValueFunction("seq", []html.Token{start, stop},
+				return html.NewFunction("seq", []html.Token{start, stop},
 					context.MergeContexts(v.Context(), op.Context())), nil*/
 			}
 		} else {
@@ -500,9 +500,9 @@ func (p *HTMLParser) buildDefineFunctionToken(vs []raw.Token) (html.Token, []raw
 	ctx := vs[2].Context()
 	list := html.NewValuesList(statements, ctx)
 	index := html.NewValueInt(len(statements)-1, ctx)
-	wrapper := html.NewValueFunction("get", []html.Token{list, index}, ctx)
+	wrapper := html.NewFunction("get", []html.Token{list, index}, ctx)
 
-	return html.NewValueFunction("function", []html.Token{argsWithDefaults, wrapper}, ctx), vs[3:], nil
+	return html.NewFunction("function", []html.Token{argsWithDefaults, wrapper}, ctx), vs[3:], nil
 }
 
 // also return the remaining
@@ -533,16 +533,7 @@ func (p *HTMLParser) buildFunctionToken(vs []raw.Token) (html.Token, []raw.Token
 		panic(err)
 	}
 
-	// check that all alts are nil
-	for _, alt := range args.Alts() {
-		if alt != nil {
-			errCtx := alt.Context()
-      err := errCtx.NewError("Error: unexpected arg expression")
-			return nil, nil, err
-		}
-	}
-
-	return html.NewValueFunction(a.Value(), args.Values(),
+	return html.NewValueFunction(a.Value(), args,
 		context.MergeContexts(a.Context(), vs[1].Context())), vs[2:], nil
 }
 
@@ -586,9 +577,9 @@ func (p *HTMLParser) buildIndexedToken(vs []raw.Token) (html.Token, []raw.Token,
 	}
 
 	// nest these, so have get(get(get(dictname), "key"), index) etc.
-	res := html.NewValueFunction("get", []html.Token{obj}, ctx)
+	res := html.NewFunction("get", []html.Token{obj}, ctx)
 	for _, index := range indices {
-		res = html.NewValueFunction("get", []html.Token{res, index}, index.Context())
+		res = html.NewFunction("get", []html.Token{res, index}, index.Context())
 	}
 
 	return res, vs[(len(indices) + 1):], nil
@@ -598,7 +589,8 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 	for _, v := range vs {
 		if !raw.IsGroup(v) {
 			errCtx := v.Context()
-			return nil, errCtx.NewError("Error: unexpected")
+      err := errCtx.NewError("Error: unexpected (expected group)")
+			return nil, err
 		}
 
 		gr, err := raw.AssertGroup(v)
@@ -622,7 +614,7 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 				switch {
 				case op.Name() == "sing:":
 					ctx := op.Context()
-					obj = html.NewValueFunction("slice", []html.Token{obj, html.NewNull(ctx),
+					obj = html.NewFunction("slice", []html.Token{obj, html.NewNull(ctx),
 						html.NewValueInt(1, ctx), html.NewNull(ctx)}, ctx)
 				case op.Name() == "post:":
 					ctx := op.Context()
@@ -631,7 +623,7 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 						return nil, err
 					}
 
-					obj = html.NewValueFunction("slice", []html.Token{obj, a,
+					obj = html.NewFunction("slice", []html.Token{obj, a,
 						html.NewValueInt(1, ctx), html.NewNull(ctx)}, ctx)
 				case op.Name() == "pre:" || op.Name() == "bin:":
 					var start html.Token
@@ -660,7 +652,7 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 
 							stop := html.NewNull(op2.Context())
 
-							obj = html.NewValueFunction("slice", []html.Token{obj, start,
+							obj = html.NewFunction("slice", []html.Token{obj, start,
 								incr, stop}, context.MergeContexts(op.Context(), op2.Context()))
 						case op2.Name() == "bin:":
 							incr, err := p.buildToken(op2.Args()[0:1])
@@ -673,7 +665,7 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 								return nil, err
 							}
 
-							obj = html.NewValueFunction("slice", []html.Token{obj, start,
+							obj = html.NewFunction("slice", []html.Token{obj, start,
 								incr, stop}, context.MergeContexts(op.Context(), op2.Context()))
 						}
 					} else {
@@ -690,7 +682,7 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 							}
 						}
 
-						obj = html.NewValueFunction("slice", []html.Token{obj, start,
+						obj = html.NewFunction("slice", []html.Token{obj, start,
 							html.NewValueInt(1, op.Context()), stop}, op.Context())
 					}
 				default:
@@ -702,7 +694,7 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 					return nil, err
 				}
 
-				obj = html.NewValueFunction("get", []html.Token{obj, index}, gr.Context())
+				obj = html.NewFunction("get", []html.Token{obj, index}, gr.Context())
 			}
 		case gr.IsParens() && (gr.IsEmpty() || gr.IsSingle() || gr.IsComma()):
 			args := make([]html.Token, 0)
@@ -716,7 +708,7 @@ func (p *HTMLParser) buildEvalsAndIndexing(obj html.Token, vs []raw.Token) (html
 				args = append(args, arg)
 			}
 
-			obj = html.NewValueFunction("eval", []html.Token{obj, html.NewValuesList(args, gr.Context())}, gr.Context())
+			obj = html.NewFunction("eval", []html.Token{obj, html.NewValuesList(args, gr.Context())}, gr.Context())
 		default:
 			errCtx := gr.Context()
 			err := errCtx.NewError("Error: bad indexing/evaluating")
@@ -753,13 +745,9 @@ func (p *HTMLParser) buildToken(vs []raw.Token) (html.Token, error) {
 		case *raw.LiteralNull:
 			return html.NewNull(v.Context()), nil
 		case *raw.LiteralString:
-			if v.WasWord() {
-				return html.NewWordString(v.Value(), v.Context()), nil
-			} else {
-				return html.NewValueString(v.Value(), v.Context()), nil
-			}
+      return html.NewValueString(v.Value(), v.Context()), nil
 		case *raw.Word:
-			return html.NewValueFunction("get", []html.Token{html.NewValueString(v.Value(), v.Context())},
+			return html.NewFunction("get", []html.Token{html.NewValueString(v.Value(), v.Context())},
 				v.Context()), nil
 		case *raw.Operator:
 			// NOTE: raw.Operator tokens are generated by FormulaParser

@@ -5,7 +5,7 @@ import (
 )
 
 type Token interface {
-  Dump(intent string) string
+  Dump(indent string) string
   Context() context.Context
 }
 

@@ -8,16 +8,16 @@ import (
 
 type Function struct {
 	name string
-	args []Token
+	args *Parens
 	TokenData
 }
 
-func NewValueFunction(name string, args []Token, ctx context.Context) *Function {
-	return NewFunction(name, args, ctx)
+func NewValueFunction(name string, args *Parens, ctx context.Context) *Function {
+	return &Function{name, args, TokenData{ctx}}
 }
 
 func NewFunction(name string, args []Token, ctx context.Context) *Function {
-	return &Function{name, args, TokenData{ctx}}
+	return NewValueFunction(name, NewParens(args, nil, ctx), ctx)
 }
 
 func (t *Function) Dump(indent string) string {
@@ -25,8 +25,15 @@ func (t *Function) Dump(indent string) string {
 
 	b.WriteString(indent + "Function " + t.name + "\n")
 
-	for _, arg := range t.args {
-		b.WriteString(arg.Dump(indent + "  "))
+	for i, arg := range t.args.values {
+    alt := t.args.alts[i]
+
+    if alt == nil {
+      b.WriteString(arg.Dump(indent + "  "))
+    } else {
+      b.WriteString(arg.Dump(indent + "  "))
+      b.WriteString(alt.Dump(indent + "= "))
+    }
 	}
 
 	return b.String()
@@ -55,36 +62,37 @@ func AssertFunction(t Token) (*Function, error) {
 }
 
 func (t *Function) Eval(scope Scope) (Token, error) {
-	res, err := scope.Eval(t.name, t.args, t.Context())
-	if err != nil {
-		return nil, err
-	}
+  res, err := scope.Eval(t.name, t.args, t.Context())
+  if err != nil {
+    return nil, err
+  }
 
-	if _, ok := res.(*Function); ok {
-		panic("result of an eval can't be another function")
-	}
+  if _, ok := res.(*Function); ok {
+    errCtx := res.Context()
+    err := errCtx.NewError("Internal Error: result of an eval can't be another function")
+    panic(err)
+  }
 
-	return res, nil
+  return res, nil
+}
+
+func (t *Function) EvalLazy(tag FinalTag) (Token, error) {
+  errCtx := t.Context()
+  return nil, errCtx.NewError("Error: unable to evaluate lazily")
 }
 
 func (a *Function) IsSame(other Token) bool {
 	if b, ok := other.(*Function); ok {
 		if a.name == b.name {
-			if len(a.args) == len(b.args) {
-				for i, _ := range a.args {
-					if !a.args[i].IsSame(b.args[i]) {
-						return false
-					}
-				}
-
-				return true
-			}
+      if a.args.IsSame(b.args) {
+        return true
+      }
 		}
 	}
 
 	return false
 }
 
-func (t *Function) Args() []Token {
-	return t.args[:]
+func (t *Function) Args() *Parens {
+	return t.args
 }

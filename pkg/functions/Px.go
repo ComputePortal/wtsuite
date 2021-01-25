@@ -7,7 +7,12 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Px(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Px(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 arg")
 	}

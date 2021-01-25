@@ -61,6 +61,7 @@ func parseArgs() CmdArgs {
     []parsers.CLIOption{
       parsers.NewCLIUniqueFlag("n", ""       , "-n              Dry run", &(cmdArgs.dryRun)),
       parsers.NewCLIUniqueEnum("t", "type"   , "-t, --op-type   <operation-type>    Defaults to \"" + DEFAULT_OPERATION + "\", see below for other possibilities", []string{"rename-class"}, &(cmdArgs.operation)),
+      parsers.NewCLIUniqueFlag("l", "latest" , "-l, --latest    Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
       parsers.NewCLICountFlag("v", ""        , "-v[v[v..]]      Verbosity", &(cmdArgs.verbosity)),
     },
     parsers.NewCLIRemaining(&positional),

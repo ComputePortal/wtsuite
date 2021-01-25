@@ -8,7 +8,12 @@ import (
 )
 
 // a%b -> remainder
-func Mod(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Mod(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}

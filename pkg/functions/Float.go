@@ -13,7 +13,12 @@ func castFloatToFloat(a *tokens.Float, unit string, ctx context.Context) (tokens
 	return tokens.NewValueUnitFloat(a.Value(), unit, ctx), nil
 }
 
-func Float(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Float(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+  
 	unit := ""
 	if len(args) == 2 {
 		u, ok := args[1].(*tokens.String)

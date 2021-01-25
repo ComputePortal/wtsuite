@@ -29,7 +29,12 @@ func randFloat(r *rand.Rand, a *tokens.Float, b *tokens.Float, ctx context.Conte
 	return tokens.NewValueUnitFloat(value, a.Unit(), ctx), nil
 }
 
-func Rand(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Rand(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 3 {
 		ctx.NewError("Error: expected 3 arguments")
 	}

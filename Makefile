@@ -4,6 +4,9 @@ cmds = wt-site wt-search-index wt-template wt-template-syntax-tree wt-script wt-
 # temporary destination directory of the commands, also used by temporary files from math-font
 export build = $(abspath ./build)
 
+build_windows_amd64=$(abspath ./build/windows_amd64)
+build_darwin_amd64=$(abspath ./build/darwin_amd64)
+
 # installation directory of the commands
 prefix = /usr/local/bin
 
@@ -15,7 +18,12 @@ GIT_COMMIT=$(shell git rev-list -1 HEAD)
 
 dsts = $(addprefix $(build)/,$(cmds))
 
+dsts_windows_amd64 = $(addprefix $(build_windows_amd64)/,$(cmds))
+dsts_darwin_amd64 = $(addprefix $(build_darwin_amd64)/,$(cmds))
+
 all: math-font $(dsts)
+
+alt: math-font $(dsts_windows_amd64) $(dsts_darwin_amd64)
 
 math-font:
 	make -C $@
@@ -28,7 +36,21 @@ $(dsts): $$(shell find ./cmd/$$(notdir $$@) -name \*.go) $(pkg) | $(build)
 	cd $(dir $<); \
 	go build -o $(abspath $@) $(extra_flags)
 
-$(build):
+# TODO: can we do better than just copying these rules for different os's/architectures?
+$(dsts_windows_amd64): $$(shell find ./cmd/$$(notdir $$@) -name \*.go) $(pkg) | $(build_windows_amd64)
+	export GOOS=windows; \
+	export GOARCH=amd64; \
+	cd $(dir $<); \
+	go build -o $(abspath $@) $(extra_flags)
+	
+# TODO: can we do better than just copying these rules for different os's/architectures?
+$(dsts_darwin_amd64): $$(shell find ./cmd/$$(notdir $$@) -name \*.go) $(pkg) | $(build_darwin_amd64)
+	export GOOS=darwin; \
+	export GOARCH=amd64; \
+	cd $(dir $<); \
+	go build -o $(abspath $@) $(extra_flags)
+
+$(build) $(build_windows_amd64) $(build_darwin_amd64):
 	mkdir -p $@
 
 clean:

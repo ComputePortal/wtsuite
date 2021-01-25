@@ -40,6 +40,10 @@ func (t *Int) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+func (t *Int) EvalLazy(tag FinalTag) (Token, error) {
+	return t, nil
+}
+
 func (t *Int) Write() string {
 	return fmt.Sprintf("%d", t.value)
 }

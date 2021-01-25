@@ -24,7 +24,9 @@ syn match DecreaseIndent '\s*\zs[\<]\ze\s*'
 
 " statement keywords that are only sensible on the beginning of a line
 syn match Statement '^\zspermissive\ze\s*'
-syn match Statement '^\zsexport\ze\s\+'
+syn match Statement '^\zsparameters\ze\s*'
+syn match Statement '^\s*\zsexport\ze\s\+'
+
 
 " statements can span multiple lines, so these keywords can be anywhere
 " syn keyword Statement from
@@ -43,11 +45,12 @@ syn region Var start='var' end='=[^{]*' oneline contains=VarKeywords,Block,Actio
 syn keyword FunctionKeywords contained function
 syn region Function_ start='function' end='[^(]*' oneline contains=FunctionKeywords
 
+syn keyword AsKeyword contained as
 syn keyword ImportKeywords contained  import from
-syn region Import start='import' end='$' oneline contains=ImportKeywords,Block,Action,Constant,String, Comment
+syn region Import start='import' end='$' oneline contains=ImportKeywords,Block,Action,Constant,String, Comment, AsKeyword
 
 syn keyword ExportKeywords contained export from
-syn region Export start='export\s*[\[]' end='$' oneline contains=ExportKeywords,Block,Action,Constant,String, Comment
+syn region Export start='export\s*[\{*]' end='$' oneline contains=ExportKeywords,Block,Action,Constant,String, Comment, AsKeyword
 
 syn keyword ForKeywords contained  for in
 syn region For start='^\s*for' end='$' oneline contains=ForKeywords,Block,Action,Constant,String, Comment
@@ -89,7 +92,7 @@ syn keyword PrependKeywords contained prepend
 syn region Prepend start='prepend' end='$' oneline contains=PrependKeywords,Block,Action,Constant,String, Comment
 
 syn region Block start='(' end=')' contains=Block, Action, Comment, String, Constant
-syn region Block start='{' end='}' contains=Block, Action, Comment, String, Constant
+syn region Block start='{' end='}' contains=Block, Action, Comment, String, Constant, AsKeyword
 syn region Block start='\[' end='\]' contains=Block, Action, Comment, String, Constant
 
 syn match Action '\zs[\$]\?[a-zA-Z_][a-zA-Z0-9_\.\-]*\ze[(\[]' contained
@@ -137,6 +140,7 @@ hi def link VarAction PreProc
 hi def link TemplateKeywords Statement
 hi def link VarKeywords Statement
 hi def link ForKeywords Statement
+hi def link AsKeyword Statement
 hi def link ImportKeywords Statement
 hi def link ExportKeywords Statement
 hi def link SwitchKeywords Statement

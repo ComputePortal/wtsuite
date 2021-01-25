@@ -31,7 +31,8 @@ func (t *TypeExpression) WriteExpression() string {
 }
 
 func (t *TypeExpression) EvalExpression() (values.Value, error) {
-  panic("use instantiate instead")
+  errCtx := t.Context()
+  panic(errCtx.NewError("use instantiate instead").Error())
 }
 
 func (t *TypeExpression) InstantiateUniform(ctx context.Context) (values.Value, error) {

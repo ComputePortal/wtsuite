@@ -34,7 +34,12 @@ func joinStrings(a *tokens.String, b *tokens.String, ctx context.Context) (token
 	return tokens.NewString(a.Value()+b.Value(), ctx)
 }
 
-func Join(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Join(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil) 
+  if err != nil {
+    return nil, err
+  }
+
 	switch len(args) {
 	case 1:
 		switch a := args[0].(type) {

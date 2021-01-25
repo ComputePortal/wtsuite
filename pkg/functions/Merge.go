@@ -97,7 +97,7 @@ func MergeStringDictsInplace(scope tokens.Scope, res *tokens.StringDict, new *to
 		default:
 			switch {
 			case tokens.IsDict(oldValue):
-				newValue, err := Merge(scope, []tokens.Token{oldValue, value}, ctx)
+				newValue, err := Merge(scope, tokens.NewParens([]tokens.Token{oldValue, value}, nil, ctx), ctx)
 				if err != nil {
 					return err
 				}
@@ -149,7 +149,7 @@ func mergeIntDicts(scope tokens.Scope, old *tokens.IntDict, new *tokens.IntDict,
 		default:
 			switch {
 			case tokens.IsDict(oldValue):
-				newValue, err := Merge(scope, []tokens.Token{oldValue, value}, ctx)
+				newValue, err := Merge(scope, tokens.NewParens([]tokens.Token{oldValue, value}, nil, ctx), ctx)
 				if err != nil {
 					return err
 				}
@@ -202,7 +202,12 @@ func mergeTwo(scope tokens.Scope, a, b tokens.Token, ctx context.Context) (token
 	}
 }
 
-func Merge(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Merge(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	// must deep copy because internal values might change
 	if len(args) < 2 {
 		return nil, ctx.NewError("Error: expected at least 2 arguments")

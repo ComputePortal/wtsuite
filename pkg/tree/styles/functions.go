@@ -56,7 +56,36 @@ func expandNested(attr *tokens.StringDict, sel Selector) (map[string]string, []R
 			}
 
 			nestedRules = append(nestedRules, fnRules...)
-		} else {
+		} else if tokens.IsStringDict(v) {
+      // key is most likely a css selector
+      key := strings.TrimSpace(k.Value())
+      ctx := k.Context()
+      var fnRules []Rule
+      var err error
+      switch {
+      case key == "::after":
+        fnRules, err = After(sel, []string{}, v, ctx)
+      case key == "::before":
+        fnRules, err = Before(sel, []string{}, v, ctx)
+      case key == ":first-child":
+        fnRules, err = FirstChild(sel, []string{}, v, ctx)
+      case key == ":hover":
+        fnRules, err = Hover(sel, []string{}, v, ctx)
+      case key == ":last-child":
+        fnRules, err = LastChild(sel, []string{}, v, ctx)
+      case key[0] == '[' && key[len(key)-1] == ']':
+        fnRules, err = Filter(sel, []string{key[1:len(key)-1]}, v, ctx)
+      default:
+        args := []string{key}
+        fnRules, err = Child(sel, args, v, ctx)
+      }
+
+      if err != nil {
+        return err
+      }
+
+      nestedRules = append(nestedRules, fnRules...)
+    } else {
 			if err := dictEntryToStringMapEntry(k, v, leafAttributes); err != nil {
 				return err
 			}

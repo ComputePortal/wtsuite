@@ -427,11 +427,13 @@ func transpileWebGLShader(callerPath string, shaderPath_ *js.Word, rtName string
 func TranspileWebGLShaders(callerPath string, vertexPath *js.Word, vertexConsts map[string]jsv.Value,
   fragmentPath *js.Word, fragmentConsts map[string]jsv.Value) (string, string, error) {
 
+  glsl.TARGET = "vertex"
   vertexSource, vertexVaryings, err := transpileWebGLShader(callerPath, vertexPath, "v", vertexConsts)
   if err != nil {
     return "", "", err
   }
 
+  glsl.TARGET = "fragment"
   fragmentSource, fragmentVaryings, err := transpileWebGLShader(callerPath, fragmentPath, "f", fragmentConsts)
   if err != nil {
     return "", "", err

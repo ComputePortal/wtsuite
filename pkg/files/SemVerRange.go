@@ -3,11 +3,26 @@ package files
 import (
   "errors"
   "io/ioutil"
+  "path/filepath"
 )
+
+var LATEST bool = false
 
 type SemVerRange struct {
   min *SemVer // can be nil for -infty, inclusive
   max *SemVer // can be nil for +infty, exclusive
+}
+
+func NewSemVerRange(min *SemVer, max *SemVer) *SemVerRange {
+  return &SemVerRange{min, max}
+}
+
+func (sr *SemVerRange) Min() *SemVer {
+  return sr.min
+}
+
+func (sr *SemVerRange) Max() *SemVer {
+  return sr.max
 }
 
 func (sr *SemVerRange) FindBestVersion(dir string) (string, error) {
@@ -42,6 +57,24 @@ func (sr *SemVerRange) FindBestVersion(dir string) (string, error) {
   if iBest == -1 {
     return "", errors.New("Error: no valid package versions found for " + dir)
   } else {
-    return files[iBest].Name(), nil
+    return filepath.Join(dir, files[iBest].Name()), nil
+  }
+}
+
+func (sr *SemVerRange) Contains(semVer *SemVer) bool {
+  if sr.min != nil {
+    if sr.min.After(semVer) {
+      return false
+    }
+  }
+
+  if sr.max != nil {
+    if sr.max.After(semVer) {
+      return true
+    } else {
+      return false
+    }
+  } else {
+    return true
   }
 }

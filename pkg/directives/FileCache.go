@@ -2,6 +2,8 @@ package directives
 
 import (
   "sync"
+
+  tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
 type fileCacheEntry struct {
@@ -19,30 +21,46 @@ func NewFileCache() *FileCache {
   return &FileCache{make(map[string]fileCacheEntry), &sync.RWMutex{}}
 }
 
-func (c *FileCache) IsCached(path string) bool {
+func pathAndParametersToKey(path string, parameters *tokens.Parens) string {
+  key := path
+
+  if parameters != nil {
+    key += parameters.Dump("")
+  }
+
+  return key
+}
+
+func (c *FileCache) IsCached(path string, parameters *tokens.Parens) bool {
+  key := pathAndParametersToKey(path, parameters)
+
   c.mutex.RLock()
 
-  _, ok := c.entries[path]
+  _, ok := c.entries[key]
 
   c.mutex.RUnlock()
 
   return ok
 }
 
-func (c *FileCache) Get(path string) (*FileScope, *RootNode) {
+func (c *FileCache) Get(path string, parameters *tokens.Parens) (*FileScope, *RootNode) {
+  key := pathAndParametersToKey(path, parameters)
+
   c.mutex.RLock()
 
-  entry := c.entries[path]
+  entry := c.entries[key]
 
   c.mutex.RUnlock()
 
   return entry.scope, entry.node
 }
 
-func (c *FileCache) Set(path string, scope *FileScope, node *RootNode) {
+func (c *FileCache) Set(path string, parameters *tokens.Parens, scope *FileScope, node *RootNode) {
+  key := pathAndParametersToKey(path, parameters)
+
   c.mutex.Lock()
 
-  c.entries[path] = fileCacheEntry{scope, node}
+  c.entries[key] = fileCacheEntry{scope, node}
 
   c.mutex.Unlock()
 }

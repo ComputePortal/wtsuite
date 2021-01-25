@@ -269,11 +269,35 @@ func ParsePathString(d string, ctx context.Context) ([]PathCommand, error) {
 
 	fs := strings.Fields(d)
 
-	if len(fs) == 0 {
+  fsFinal := make([]string, 0)
+  // add a zero to all fields starting with a dot, and split if there is more than one dot
+  for _, f_ := range fs {
+    f := f_
+    if strings.HasPrefix(patterns.PERIOD, f) {
+      f = "0" + f
+    } 
+
+    parts := strings.Split(f, patterns.PERIOD)
+
+    if len(parts) == 1 {
+      fsFinal = append(fsFinal, parts[0])
+    } else if len(parts) == 2 {
+      fsFinal = append(fsFinal, f)
+    } else {
+      fsFinal = append(fsFinal, parts[0] + patterns.PERIOD + parts[1])
+
+      for _, rem := range parts[2:] {
+        fsFinal = append(fsFinal, "0" + patterns.PERIOD + rem)
+      }
+    }
+  }
+
+	if len(fsFinal) == 0 {
 		return nil, ctx.NewError("Error: bad path")
 	}
 
 	result := make([]PathCommand, 0)
 
-	return parsePathCommand("", fs, 0, result, ctx)
+
+	return parsePathCommand("", fsFinal, 0, result, ctx)
 }

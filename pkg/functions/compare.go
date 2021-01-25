@@ -13,7 +13,7 @@ func compare(args []tokens.Token, ctx context.Context,
 	css func(string, string) bool) (tokens.Token, error) {
 
 	if len(args) != 2 {
-		return nil, ctx.NewError("Error: expected 2 arguments")
+    panic("should've been caught before")
 	}
 
 	res := false
@@ -64,7 +64,12 @@ func compare(args []tokens.Token, ctx context.Context,
 	return tokens.NewBool(res, ctx)
 }
 
-func LT(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func LT(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
 	return compare(args, ctx,
 		func(a int, b int) bool { return a < b },
 		func(a int, b float64) bool { return float64(a) < b },
@@ -74,7 +79,12 @@ func LT(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.To
 	)
 }
 
-func LE(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func LE(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
 	return compare(args, ctx,
 		func(a int, b int) bool { return a <= b },
 		func(a int, b float64) bool { return float64(a) <= b },
@@ -84,7 +94,12 @@ func LE(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.To
 	)
 }
 
-func GT(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func GT(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
 	return compare(args, ctx,
 		func(a int, b int) bool { return a > b },
 		func(a int, b float64) bool { return float64(a) > b },
@@ -94,7 +109,12 @@ func GT(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.To
 	)
 }
 
-func GE(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func GE(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
 	return compare(args, ctx,
 		func(a int, b int) bool { return a >= b },
 		func(a int, b float64) bool { return float64(a) >= b },
@@ -104,15 +124,18 @@ func GE(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.To
 	)
 }
 
-func EQ(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-  if len(args) == 2 {
-    if tokens.IsNull(args[1]) && !tokens.IsNull(args[0]) {
-      return tokens.NewBool(false, ctx)
-    } else if tokens.IsNull(args[0]) && !tokens.IsNull(args[1]) {
-      return tokens.NewBool(false, ctx)
-    } else if tokens.IsNull(args[0]) && tokens.IsNull(args[1]) {
-      return tokens.NewBool(true, ctx)
-    }
+func EQ(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
+  if tokens.IsNull(args[1]) && !tokens.IsNull(args[0]) {
+    return tokens.NewBool(false, ctx)
+  } else if tokens.IsNull(args[0]) && !tokens.IsNull(args[1]) {
+    return tokens.NewBool(false, ctx)
+  } else if tokens.IsNull(args[0]) && tokens.IsNull(args[1]) {
+    return tokens.NewBool(true, ctx)
   }
 
 	return compare(args, ctx,
@@ -124,15 +147,18 @@ func EQ(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.To
 	)
 }
 
-func NE(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-  if len(args) == 2 {
-    if tokens.IsNull(args[1]) && !tokens.IsNull(args[0]) {
-      return tokens.NewBool(true, ctx)
-    } else if tokens.IsNull(args[0]) && !tokens.IsNull(args[1]) {
-      return tokens.NewBool(true, ctx)
-    } else if tokens.IsNull(args[0]) && tokens.IsNull(args[1]) {
-      return tokens.NewBool(false, ctx)
-    }
+func NE(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
+  if tokens.IsNull(args[1]) && !tokens.IsNull(args[0]) {
+    return tokens.NewBool(true, ctx)
+  } else if tokens.IsNull(args[0]) && !tokens.IsNull(args[1]) {
+    return tokens.NewBool(true, ctx)
+  } else if tokens.IsNull(args[0]) && tokens.IsNull(args[1]) {
+    return tokens.NewBool(false, ctx)
   }
 
 	return compare(args, ctx,
@@ -144,8 +170,13 @@ func NE(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.To
 	)
 }
 
-func minMax(scope tokens.Scope, args []tokens.Token, ctx context.Context, isMax bool) (tokens.Token, error) {
-	cond, err := LT(scope, args, ctx)
+func minMax(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context, isMax bool) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
+	cond, err := LT(scope, tokens.NewParens(args, nil, ctx), ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -162,15 +193,20 @@ func minMax(scope tokens.Scope, args []tokens.Token, ctx context.Context, isMax 
 	}
 }
 
-func Min(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Min(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return minMax(scope, args, ctx, false)
 }
 
-func Max(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Max(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return minMax(scope, args, ctx, true)
 }
 
-func IsSame(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsSame(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+
 	// different from eq because it can be used for any type, and does a deep comparison
 	// ints cannot be compared to floats!
 	if len(args) != 2 {

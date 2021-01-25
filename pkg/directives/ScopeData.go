@@ -81,7 +81,9 @@ func (scope *ScopeData) Sync(dst Scope, keepAutoVars, keepImports, asImports boo
 			v.Imported = true
 		}
 
-		dst.SetVar(prefix+k, v)
+    if err := dst.SetVar(prefix+k, v); err != nil {
+      return err
+    }
 	}
 
 	for k, c := range scope.templates {
@@ -104,7 +106,9 @@ func (scope *ScopeData) Sync(dst Scope, keepAutoVars, keepImports, asImports boo
 			}
 		}
 
-		dst.SetTemplate(prefix+k, c)
+    if err := dst.SetTemplate(prefix+k, c); err != nil {
+      return err
+    }
 	}
 
 	return nil
@@ -125,7 +129,9 @@ func (scope *ScopeData) SyncPackage(dst Scope, keepAutoVars, keepImports, asImpo
 		}
 
 		if v.Exported {
-			dst.SetVar(prefix+k, v)
+      if err := dst.SetVar(prefix+k, v); err != nil {
+        return err
+      }
 		}
 	}
 
@@ -134,50 +140,49 @@ func (scope *ScopeData) SyncPackage(dst Scope, keepAutoVars, keepImports, asImpo
 			continue
 		}
 
-		if asImports {
-			c = Template{
-				c.name,
-				c.extends,
-				c.scope,
-				c.args,
-				c.argDefaults,
-				c.superAttr,
-				c.children,
-				true,
-				c.exported,
-				c.ctx,
-			}
-		}
 
 		if c.exported {
-			dst.SetTemplate(prefix+k, c)
+      if asImports {
+        c = Template{
+          c.name,
+          c.extends,
+          c.scope,
+          c.args,
+          c.argDefaults,
+          c.superAttr,
+          c.children,
+          true,
+          false,
+          c.ctx,
+        }
+      }
+
+      if err := dst.SetTemplate(prefix+k, c); err != nil {
+        return err
+      }
 		}
 	}
 
 	return nil
 }
 
-func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImports bool, prefix string, lst *tokens.List) error {
-	found := make([]bool, lst.Len())
+func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImports bool, prefix string, names *tokens.StringDict) error {
+	found := make(map[string]bool, names.Len())
 
+  // returned token is just for context
 	filterImport := func(k string) (tokens.Token, bool, error) {
 		b := false
 		var entry tokens.Token = nil
-		if err := lst.Loop(func(i int, v tokens.Token, last bool) error {
-			s, err := tokens.AssertString(v)
-			if err != nil {
-				return err
-			}
-
-			if s.Value() == k {
-				if b || found[i] {
-					errCtx := v.Context()
+		if err := names.Loop(func(oldName *tokens.String, newName tokens.Token, last bool) error {
+			if oldName.Value() == k {
+				if b || found[oldName.Value()] {
+					errCtx := oldName.Context()
 					return errCtx.NewError("Error: duplicate import")
 				}
 
 				b = true
-				found[i] = true
-				entry = v
+				found[oldName.Value()] = true
+				entry = oldName
 			}
 
 			return nil
@@ -201,18 +206,25 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 			v.Imported = true
 		}
 
-		lstEntry, ok, err := filterImport(k)
+		ctxToken, ok, err := filterImport(k)
 		if err != nil {
 			return err
 		}
 
 		if ok {
 			if !v.Exported {
-				errCtx := lstEntry.Context()
-				return errCtx.NewError("Error: var not exported")
+				errCtx := ctxToken.Context()
+        return errCtx.NewError("Error: var \"" + k + "\" not exported")
 			}
 
-			dst.SetVar(prefix+k, v)
+      newName, err := tokens.DictString(names, k)
+      if err != nil {
+        return err
+      }
+
+      if err := dst.SetVar(prefix+newName.Value(), v); err != nil {
+        return err
+      }
 		}
 	}
 
@@ -220,6 +232,8 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 		if c.imported && !keepImports {
 			continue
 		}
+
+    isExported := c.exported
 
 		if asImports {
 			c = Template{
@@ -231,50 +245,71 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 				c.superAttr,
 				c.children,
 				true,
-				c.exported,
+				false,
 				c.ctx,
 			}
 		}
 
-		lstEntry, ok, err := filterImport(k)
+    // namesEntry only for context
+		ctxToken, ok, err := filterImport(k)
 		if err != nil {
 			return err
 		}
 
 		if ok {
-			if !c.exported {
-				errCtx := lstEntry.Context()
-				return errCtx.NewError("Error: var not exported")
+			if !isExported {
+				errCtx := ctxToken.Context()
+				return errCtx.NewError("Error: template \"" + k + "\" not exported")
 			}
 
-			dst.SetTemplate(prefix+k, c)
+      newName, err := tokens.DictString(names, k)
+      if err != nil {
+        return err
+      }
+
+      if err := dst.SetTemplate(prefix+newName.Value(), c); err != nil {
+        return err
+      }
 		}
 	}
 
-	for i, b := range found {
-		if !b {
-			lstEntry, err := lst.Get(i)
-			if err != nil {
-				panic(err)
-			}
-			errCtx := lstEntry.Context()
-			return errCtx.NewError("Error: not found")
-		}
-	}
+  if err := names.Loop(func(oldName *tokens.String, _ tokens.Token, last bool) error {
+    if b, ok := found[oldName.Value()]; !ok || !b {
+			errCtx := oldName.Context()
+			return errCtx.NewError("Error: \"" + oldName.Value() + "\" not found")
+    }
+    return nil
+  }); err != nil {
+    return err
+  }
 
 	return nil
 }
 
-func (scope *ScopeData) SetVar(key string, v functions.Var) {
+func (scope *ScopeData) SetVar(key string, v functions.Var) error {
+  if v.Exported && scope.parent != nil { // if scope.parent == nil then this is the FileScope
+    errCtx := v.Ctx
+    return errCtx.NewError("Error: can't be exported from this scope")
+  }
+
 	if key != "_" { // never set dummy vars
 		// always set at this level
 		scope.vars[key] = v
 	}
+
+  return nil
 }
 
-func (scope *ScopeData) SetTemplate(key string, d Template) {
+func (scope *ScopeData) SetTemplate(key string, d Template) error {
+  if d.exported && scope.parent != nil { // if scope.parent == nil then this is the FileScope
+    errCtx := d.ctx
+    return errCtx.NewError("Error: template can't be exported from this scope")
+  }
+
 	// always set at this level
 	scope.templates[key] = d
+
+  return nil
 }
 
 func (scope *ScopeData) HasVar(key string) bool {
@@ -317,7 +352,7 @@ func (scope *ScopeData) GetTemplate(key string) Template {
 	}
 }
 
-func (scope *ScopeData) Eval(key string, args []tokens.Token,
+func (scope *ScopeData) Eval(key string, args *tokens.Parens,
 	ctx context.Context) (tokens.Token, error) {
 	return eval(scope, key, args, ctx)
 }

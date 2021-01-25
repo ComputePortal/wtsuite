@@ -79,7 +79,7 @@ func (p *JSParser) buildForRegularStatement(parensGroup *raw.Group,
 	// add init expressions
 	if len(initField) > 0 { // init can be empty
 		if len(initField) < 3 {
-			errCtx := context.MergeContexts(raw.MergeContexts(initField...))
+			errCtx := raw.MergeContexts(initField...)
 			return nil, errCtx.NewError("Error: bad for loop init field")
 		}
 

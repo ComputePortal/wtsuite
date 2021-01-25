@@ -83,7 +83,7 @@ type ViewObject struct {
 
 func NewViewFileScript(cache *FileCache, absPath string) (scripts.FileScript, error) {
 	if js.TARGET == "browser" || js.TARGET == "all" {
-		fileScope, rootNode, err := BuildFile(cache, absPath, false)
+		fileScope, rootNode, err := BuildFile(cache, absPath, false, nil)
 		if err != nil {
 			return nil, err
 		}

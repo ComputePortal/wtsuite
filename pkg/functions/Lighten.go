@@ -20,7 +20,12 @@ func addColorBrightness(color *tokens.Color, d float64,
 	return tokens.NewColor(r, g, b, a, ctx)
 }
 
-func Lighten(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Lighten(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewInterface([]string{"color", "factor"}, ctx))
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}

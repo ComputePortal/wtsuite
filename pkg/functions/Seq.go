@@ -108,7 +108,12 @@ func seqFirstIncrLastFloat(first *tokens.Float, incr *tokens.Float, last *tokens
 // seq(last) // starting at 0 and going up
 // seq(first, last) // increasing
 // seq(first, incr, last) (similar to [first:incr:last] in formula form)
-func Seq(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Seq(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	intArgs := make([]*tokens.Int, len(args))
 	for i, arg := range args {
 		if tokens.IsFloat(arg) {

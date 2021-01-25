@@ -25,6 +25,7 @@ syn match Constant '\<\zs\d\+\(\.\d\+\([e][-]\?\d\+\)\?\)\?\ze'
 syn keyword Boolean true false
 
 syn keyword Conditional if else
+syn keyword Repeat for
 syn keyword Statement return
 syn keyword Keyword export import from as
 syn keyword Keyword attribute const highp in inout lowp mediump out precision struct uniform varying void

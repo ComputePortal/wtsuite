@@ -5,10 +5,11 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Not(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 1 {
-		return nil, ctx.NewError("Error: expected 1 argument")
-	}
+func Not(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewUnaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
 
 	b, err := tokens.AssertBool(args[0])
 	if err != nil {

@@ -8,7 +8,12 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tree/svg"
 )
 
-func SVGPathPos(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func SVGPathPos(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
@@ -16,7 +21,7 @@ func SVGPathPos(scope tokens.Scope, args []tokens.Token, ctx context.Context) (t
 	var pathStr string = ""
 	switch a := args[0].(type) {
 	case *tokens.List:
-		pathToken, err := Str(scope, []tokens.Token{a, tokens.NewValueString(" ", ctx)}, ctx)
+		pathToken, err := Str(scope, tokens.NewParens([]tokens.Token{a, tokens.NewValueString(" ", ctx)}, nil, ctx), ctx)
 		if err != nil {
 			return nil, err
 		}

@@ -5,10 +5,11 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Xor(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 2 {
-		return nil, ctx.NewError("Error: expected two arguments")
-	}
+func Xor(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
 
 	a, err := tokens.AssertBool(args[0])
 	if err != nil {

@@ -16,6 +16,10 @@ func (t *Null) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+func (t *Null) EvalLazy(tag FinalTag) (Token, error) {
+	return t, nil
+}
+
 func (t *Null) Dump(indent string) string {
 	return indent + "Null\n"
 }

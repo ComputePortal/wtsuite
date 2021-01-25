@@ -8,7 +8,7 @@ import (
 func For(scope Scope, node Node, tag *tokens.Tag) error {
 	ctx := tag.Context()
 
-	subScope := NewSubScope(scope)
+	subScope := NewBranchScope(scope)
 
 	attr, err := tag.Attributes([]string{"iname", "vname"})
 	if err != nil {
@@ -59,17 +59,23 @@ func For(scope Scope, node Node, tag *tokens.Tag) error {
 	}
 
 	if err := valuesToken.Loop(func(i int, v tokens.Token, last bool) error {
+    loopScope := NewBranchScope(subScope)
+
 		if inameToken != nil {
 			iVar := functions.Var{tokens.NewValueInt(i, ctx), true, true, false, false, ctx}
-			subScope.SetVar(inameToken.Value(), iVar)
+      if err := loopScope.SetVar(inameToken.Value(), iVar); err != nil {
+        return err
+      }
 		}
 		if vnameToken != nil {
 			vVar := functions.Var{v, true, true, false, false, ctx}
-			subScope.SetVar(vnameToken.Value(), vVar)
+      if err := loopScope.SetVar(vnameToken.Value(), vVar); err != nil {
+        return err
+      }
 		}
 
 		for _, child := range tag.Children() {
-			if err := BuildTag(subScope, node, child); err != nil {
+			if err := BuildTag(loopScope, node, child); err != nil {
 				return err
 			}
 		}

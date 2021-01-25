@@ -36,6 +36,10 @@ func (t *Float) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+func (t *Float) EvalLazy(tag FinalTag) (Token, error) {
+	return t, nil
+}
+
 func formatPx(fl float64) string {
 	if math.Mod(fl, 1.0) == 0.0 {
 		return fmt.Sprintf("%gpx", fl)
@@ -138,7 +142,7 @@ func AssertAnyIntOrFloat(t Token) (*Float, error) {
 		return NewValueFloat(float64(i.Value()), i.Context()), nil
 	} else {
 		errCtx := t.Context()
-		return nil, errCtx.NewError("Error: expected Float or Int")
+		return nil, errCtx.NewError("Error: expected Float or Int, got " + reflect.TypeOf(t).String())
 	}
 }
 

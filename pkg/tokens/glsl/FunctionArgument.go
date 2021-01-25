@@ -64,7 +64,7 @@ func (fa *FunctionArgument) WriteArgument() string {
 }
 
 func (fa *FunctionArgument) GetTypeValue() (values.Value, error) {
-  return fa.typeExpr.EvalExpression()
+  return fa.typeExpr.Instantiate(fa.Context())
 }
 
 func (fa *FunctionArgument) ResolveNames(scope Scope) error {

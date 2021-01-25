@@ -13,9 +13,13 @@ const ELEMENT_COUNT_FOLDED = "__idxf__"
 func setElementCount(scope Scope, node Node, ctx context.Context) {
   idx := node.getElementCount()
   idxVar := functions.Var{tokens.NewValueInt(idx, ctx), true, true, false, false, ctx}
-  scope.SetVar(ELEMENT_COUNT, idxVar)
+  if err := scope.SetVar(ELEMENT_COUNT, idxVar); err != nil {
+    panic(err)
+  }
 
   idxf := node.getElementCountFolded()
   idxfVar := functions.Var{tokens.NewValueInt(idxf, ctx), true, true, false, false, ctx}
-  scope.SetVar(ELEMENT_COUNT_FOLDED, idxfVar)
+  if err := scope.SetVar(ELEMENT_COUNT_FOLDED, idxfVar); err != nil {
+    panic(err)
+  }
 }

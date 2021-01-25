@@ -38,17 +38,34 @@ func ParseSemVer(str string) (*SemVer, error) {
     return nil, err
   }
 
-  minor, err := strconv.ParseUint(majorMinorPatch[0], 10, 64)
+  minor, err := strconv.ParseUint(majorMinorPatch[1], 10, 64)
   if err != nil {
     return nil, err
   }
 
-  patch, err := strconv.ParseUint(majorMinorPatch[0], 10, 64)
+  patch, err := strconv.ParseUint(majorMinorPatch[2], 10, 64)
   if err != nil {
     return nil, err
   }
 
   return &SemVer{int(major), int(minor), int(patch), meta}, nil
+}
+
+func (s *SemVer) Write() string {
+  var b strings.Builder
+
+  b.WriteString(strconv.Itoa(s.major))
+  b.WriteString(".")
+  b.WriteString(strconv.Itoa(s.minor))
+  b.WriteString(".")
+  b.WriteString(strconv.Itoa(s.patch))
+
+  if s.meta != "" {
+    b.WriteString("-")
+    b.WriteString(s.meta)
+  }
+
+  return b.String()
 }
 
 func (s *SemVer) After(other *SemVer) bool {

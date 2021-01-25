@@ -131,6 +131,9 @@ func (v *Class) evalConstructor(args []Value, ctx context.Context, allowAbstract
 
       for _, overload := range v.args {
         n := len(overload)
+        if n == 0 {
+          n += 1
+        }
 
         if errSub := checkOverload(overload[0:n-1], args, ctx); err != nil {
           context.AppendError(err, errSub)

@@ -37,6 +37,10 @@ func (t *Color) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+func (t *Color) EvalLazy(tag FinalTag) (Token, error) {
+	return t, nil
+}
+
 func (t *Color) Write() string {
 	formatHex := func(i int) string {
 		return fmt.Sprintf("%02x", i)

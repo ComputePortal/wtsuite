@@ -155,6 +155,19 @@ func (t *List) Eval(scope Scope) (Token, error) {
 	return t.EvalList(scope)
 }
 
+// inplace, returns self
+func (t *List) EvalLazy(tag FinalTag) (Token, error) {
+  for i, value := range t.values {
+    var err error
+    t.values[i], err = value.EvalLazy(tag)
+    if err != nil {
+      return nil, err
+    }
+  }
+
+  return t, nil
+}
+
 func (t *List) Len() int {
 	return len(t.values)
 }

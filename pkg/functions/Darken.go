@@ -20,10 +20,11 @@ func subColorBrightness(color *tokens.Color, d float64,
 	return tokens.NewColor(r, g, b, a, ctx)
 }
 
-func Darken(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 2 {
-		return nil, ctx.NewError("Error: expected 2 arguments")
-	}
+func Darken(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewInterface([]string{"color", "factor"}, ctx))
+  if err != nil {
+    return nil, err
+  }
 
 	color, ok := args[0].(*tokens.Color)
 	if !ok {

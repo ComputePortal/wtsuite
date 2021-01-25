@@ -6,10 +6,9 @@ import (
 )
 
 type LambdaScope interface {
-	//Copy() tokens.Scope
-	Eval(key string, args []tokens.Token, ctx context.Context) (tokens.Token, error)
+	Eval(key string, args *tokens.Parens, ctx context.Context) (tokens.Token, error)
   Permissive() bool
-	SetVar(name string, v Var)
+	SetVar(name string, v Var) error
 }
 
 // must be registered by directives package

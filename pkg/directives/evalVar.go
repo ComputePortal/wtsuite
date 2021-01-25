@@ -35,7 +35,12 @@ func getUndefinedOrNull(scope Scope, keyToken_ tokens.Token, ctx context.Context
 }
 
 // like get but also returns backup if null
-func evalVar(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func evalVar(scope Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := functions.CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
@@ -48,8 +53,8 @@ func evalVar(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Toke
 		}
 
 		fnArgs := fn.Args()
-		if len(fnArgs) == 1 {
-			arg0, err = getUndefinedOrNull(scope, fnArgs[0], ctx)
+		if fnArgs.Len() == 1 {
+			arg0, err = getUndefinedOrNull(scope, fnArgs.Values()[0], ctx)
 			if err != nil {
 				return nil, err
 			}

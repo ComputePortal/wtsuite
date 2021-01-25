@@ -102,6 +102,71 @@ func (p *GLSLParser) buildIfStatement(ts []raw.Token) (*glsl.If, []raw.Token, er
 	return ifStatement, ts, nil
 }
 
+func (p *GLSLParser) buildForStatement(ts []raw.Token) (*glsl.For, []raw.Token, error) {
+  if !raw.IsWord(ts[0], "for") {
+    panic("unexpected")
+  }
+
+  if len(ts) < 3 { 
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: invalid for statement")
+  }
+
+  parensGroup, err := raw.AssertParensGroup(ts[1])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  if len(parensGroup.Fields) != 3 {
+    errCtx := parensGroup.Context()
+    return nil, nil, errCtx.NewError("Error: bad for loop header")
+  }
+
+  initStatement, initRem, err := p.buildVarStatement(parensGroup.Fields[0])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  if len(initRem) != 0 {
+    errCtx := raw.MergeContexts(initRem...)
+    return nil, nil, errCtx.NewError("Error: bad for loop init statement")
+  }
+
+  compareExpr, err := p.buildExpression(parensGroup.Fields[1])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  incrStatement, incrRem, err := p.buildStatement(parensGroup.Fields[2])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  if len(incrRem) != 0 {
+    errCtx := raw.MergeContexts(incrRem...)
+    return nil, nil, errCtx.NewError("Error: unexpected for loop incr tokens")
+  }
+
+  switch incrStatement.(type) {
+  case *glsl.PostIncrOp, *glsl.PostDecrOp:
+  default:
+    errCtx := incrStatement.Context()
+    return nil, nil, errCtx.NewError("Error: expected ++ or -- op")
+  }
+
+  bracesGroup, err := raw.AssertBracesGroup(ts[2])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  innerStatements, err := p.buildBlockStatements(bracesGroup)
+  if err != nil {
+    return nil, nil, err
+  }
+
+  return glsl.NewFor(initStatement, compareExpr, incrStatement, innerStatements, raw.MergeContexts(ts[0], ts[1], ts[2])), ts[3:], nil
+}
+
 func (p *GLSLParser) buildVarStatement(ts []raw.Token) (*glsl.VarStatement, []raw.Token, error) {
   ts, remainingTokens := splitByNextSeparator(ts, patterns.SEMICOLON)
   if len(ts) < 2 {
@@ -273,6 +338,8 @@ func (p *GLSLParser) buildStatement(ts []raw.Token) (glsl.Statement, []raw.Token
 			return nil, nil, errCtx.NewError("Error: stray else")
     case "if":
       return p.buildIfStatement(ts)
+    case "for":
+      return p.buildForStatement(ts)
     default:
       ilast := nextSeparatorPosition(ts, patterns.SEMICOLON)
 

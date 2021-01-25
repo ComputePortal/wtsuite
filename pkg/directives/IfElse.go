@@ -6,7 +6,7 @@ import (
 )
 
 func buildConditional(scope Scope, node Node, tag *tokens.Tag) (bool, error) {
-	subScope := NewSubScope(scope)
+	subScope := NewBranchScope(scope)
 
 	attr, err := tag.Attributes([]string{"cond"})
 	if err != nil {
@@ -37,7 +37,7 @@ func buildConditional(scope Scope, node Node, tag *tokens.Tag) (bool, error) {
 }
 
 func buildElse(scope Scope, node Node, tag *tokens.Tag) error {
-	subScope := NewSubScope(scope)
+	subScope := NewBranchScope(scope)
 
 	if err := tag.AssertNoAttributes(); err != nil {
 		return err
@@ -114,7 +114,7 @@ func buildIfElse(scope Scope, node Node, tags []*tokens.Tag) error {
 }
 
 func IfElse(scope Scope, node Node, tag *tokens.Tag) error {
-	subScope := NewSubScope(scope)
+	subScope := NewBranchScope(scope)
 
 	attr, err := tag.Attributes([]string{})
 	if err != nil {

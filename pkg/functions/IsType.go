@@ -16,7 +16,12 @@ var isTypeTable = map[string]BuiltinFunction{
 	"string": IsString,
 }
 
-func IsBool(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsBool(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -24,7 +29,12 @@ func IsBool(scope tokens.Scope, args []tokens.Token, ctx context.Context) (token
 	return tokens.NewValueBool(tokens.IsBool(args[0]), ctx), nil
 }
 
-func IsColor(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsColor(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -32,7 +42,12 @@ func IsColor(scope tokens.Scope, args []tokens.Token, ctx context.Context) (toke
 	return tokens.NewValueBool(tokens.IsColor(args[0]), ctx), nil
 }
 
-func IsDict(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsDict(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -40,7 +55,12 @@ func IsDict(scope tokens.Scope, args []tokens.Token, ctx context.Context) (token
 	return tokens.NewValueBool(tokens.IsDict(args[0]), ctx), nil
 }
 
-func IsFloat(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsFloat(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -48,7 +68,12 @@ func IsFloat(scope tokens.Scope, args []tokens.Token, ctx context.Context) (toke
 	return tokens.NewValueBool(tokens.IsFloat(args[0]), ctx), nil
 }
 
-func IsFunction(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsFunction(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -56,7 +81,12 @@ func IsFunction(scope tokens.Scope, args []tokens.Token, ctx context.Context) (t
 	return tokens.NewValueBool(tokens.IsAnyFunction(args[0]) || IsAnonFun(args[0]), ctx), nil
 }
 
-func IsInt(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsInt(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -64,7 +94,12 @@ func IsInt(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens
 	return tokens.NewValueBool(tokens.IsInt(args[0]), ctx), nil
 }
 
-func IsList(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsList(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -72,7 +107,12 @@ func IsList(scope tokens.Scope, args []tokens.Token, ctx context.Context) (token
 	return tokens.NewValueBool(tokens.IsList(args[0]), ctx), nil
 }
 
-func IsNull(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsNull(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -81,13 +121,14 @@ func IsNull(scope tokens.Scope, args []tokens.Token, ctx context.Context) (token
 }
 
 // everything except null and undefined
-func IsVar(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsVar(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
-	}
-
-	if str, ok := args[0].(*tokens.String); ok && str.WasWord() {
-		args[0] = tokens.NewValueString(str.Value(), str.Context())
 	}
 
 	arg1, err := args[0].Eval(scope)
@@ -100,7 +141,7 @@ func IsVar(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens
 		return nil, err
 	}
 
-	fn := tokens.NewValueFunction("get", []tokens.Token{name, tokens.NewNull(ctx)}, ctx)
+	fn := tokens.NewFunction("get", []tokens.Token{name, tokens.NewNull(ctx)}, ctx)
 
 	res, err := fn.Eval(scope)
 	if err != nil {
@@ -112,7 +153,12 @@ func IsVar(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens
 	return tokens.NewValueBool(resIsVar, ctx), nil
 }
 
-func IsString(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsString(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -120,7 +166,12 @@ func IsString(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tok
 	return tokens.NewValueBool(tokens.IsString(args[0]), ctx), nil
 }
 
-func IsType(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func IsType(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: excepted 2 arguments")
 	}
@@ -131,7 +182,7 @@ func IsType(scope tokens.Scope, args []tokens.Token, ctx context.Context) (token
 	}
 
 	if tfn, ok := isTypeTable[typeToken.Value()]; ok {
-		return tfn(scope, args[0:1], ctx)
+		return tfn(scope, tokens.NewParens(args[0:1], nil, ctx), ctx)
 	} else {
 		errCtx := typeToken.Context()
 		err := errCtx.NewError("Error: invalid type")

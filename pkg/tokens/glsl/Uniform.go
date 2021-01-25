@@ -52,6 +52,7 @@ func (t *Uniform) WriteStatement(usage Usage, indent string, nl string, tab stri
     b.WriteString(strconv.Itoa(t.length))
     b.WriteString("]")
   }
+  b.WriteString(";")
 
   return b.String()
 }

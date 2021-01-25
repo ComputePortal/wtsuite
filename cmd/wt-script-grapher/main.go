@@ -61,6 +61,7 @@ func parseArgs() CmdArgs {
     []parsers.CLIOption{
       parsers.NewCLIUniqueFile("o", "output" , "-o, --output    <output-file> Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
       parsers.NewCLIUniqueEnum("t", "type"   , "-t, --type      See below", []string{"class", "instance"}, &(cmdArgs.graphType)),
+      parsers.NewCLIUniqueFlag("l", "latest"    , "-l, --latest                Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
       parsers.NewCLICountFlag("v", ""        , "-v[v[v..]]      Verbosity", &(cmdArgs.verbosity)),
     },
     parsers.NewCLIRemaining(&positional),

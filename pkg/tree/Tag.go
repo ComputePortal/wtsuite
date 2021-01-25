@@ -2,6 +2,7 @@ package tree
 
 import (
 	"fmt"
+  "reflect"
 	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
@@ -22,6 +23,7 @@ type Tag interface {
 	DeleteChild(i int) error
 	DeleteAllChildren() error
 
+  EvalLazy() error
 	FoldDummy()
 	VerifyElementCount(i int, ecKey string) error
 
@@ -30,6 +32,7 @@ type Tag interface {
 
 	RegisterParent(Tag)
 	Parent() Tag
+  FinalParent() tokens.FinalTag // exactly the same as Parent(), but just different interface
 
 	CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.InlineBundle) error
 
@@ -98,7 +101,7 @@ func validateAttributes(id string, name string, attr *tokens.StringDict) error {
 			}
 		} else if !(tokens.IsStringDict(value) || tokens.IsNull(value)) && (key.Value() == "style" || key.Value() == "__style__") {
 			errCtx := value.Context()
-			return errCtx.NewError("Error: expected dict")
+			return errCtx.NewError("Error: expected dict, got " + reflect.TypeOf(value).String())
 		} else if (!tokens.IsNull(value) && !tokens.IsPrimitive(value)) && (key.Value() == "class" || key.Value() == "href") {
 			errCtx := value.Context()
 			return errCtx.NewError("Error: expected primitive")
@@ -210,6 +213,8 @@ func (t *tagData) writeAttributes() string {
 
 		k := key.Value()
 		switch {
+    case strings.HasSuffix(k, "!"):
+      panic(k + " is an invalid attribute key")
 		case k == "__elementCount__" || k == "__elementCountFolded__":
 			return nil
 		case k == "__style__" || k == "style":
@@ -411,6 +416,22 @@ func (t *tagData) DeleteAllChildren() error {
 	return nil
 }
 
+func (t *tagData) EvalLazy() error {
+  if t.attributes != nil {
+    if _, err := t.attributes.EvalLazy(t); err != nil {
+      return err
+    }
+  }
+
+  for _, child := range t.children {
+    if err := child.EvalLazy(); err != nil {
+      return err
+    }
+  }
+
+  return nil
+}
+
 func (t *tagData) FoldDummy() {
 	children := make([]Tag, 0)
 
@@ -500,6 +521,10 @@ func (t *tagData) Parent() Tag {
 	return t.parent
 }
 
+func (t *tagData) FinalParent() tokens.FinalTag {
+  return t.Parent()
+}
+
 func RegisterParents(root Tag) {
 	if _, ok := root.(*LeafTag); ok {
 		return
@@ -572,4 +597,44 @@ func WalkText(current Tag, prev []Tag, fn func([]Tag, string) error) error {
 	}
 
 	return nil
+}
+
+// superficial copy, used by TOC
+func Copy(tag_ Tag, ctx context.Context) Tag {
+  switch tag := tag_.(type) {
+  case *Text:
+    return NewText(tag.Value(), ctx)
+  default:
+    name := tag_.Name()
+
+    attr_ := tag_.Attributes()
+
+    var attr *tokens.StringDict = nil
+
+    if attr_ != nil {
+      attr = tokens.NewEmptyStringDict(ctx)
+
+      // superficial copy of stringdict
+      attr_.Loop(func(key *tokens.String, value tokens.Token, last bool) error {
+        if key.Value() != "id" {
+          attr.Set(key, value)
+        }
+
+        return nil
+      })
+    }
+
+    cpy, err := BuildTag(name, attr, ctx)
+    if err != nil {
+      panic(err)
+    }
+
+    children_ := tag_.Children()
+
+    for _, child := range children_ {
+      cpy.AppendChild(Copy(child, ctx))
+    }
+
+    return cpy
+  }
 }

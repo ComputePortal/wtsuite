@@ -177,7 +177,7 @@ func (t *VisibleTagData) write(wrapAutoHref bool, indent string, nl, tab string)
 	hasID := (t.id != "")
 	hasClasses := len(t.classes) > 0
 
-	if hasID && !styles.IsAutoUID(t.id) {
+	if hasID  {
 		valueToken := tokens.NewValueString(t.id, t.Context())
 		t.SetTmpAttribute("id", valueToken)
 	}

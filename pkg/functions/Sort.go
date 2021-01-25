@@ -94,20 +94,20 @@ func sortGeneric(scope tokens.Scope, list *tokens.List, fn Fun, ctx context.Cont
 		switch fn.Len() {
 		case 1:
 			innerArgs[0] = tokens.NewValueInt(i, ctx)
-			a, err := fn.EvalFun(scope, innerArgs, ctx)
+			a, err := fn.EvalFun(scope, tokens.NewParens(innerArgs, nil, ctx), ctx)
 			if err != nil {
 				sortErr = err
 				return true
 			}
 
 			innerArgs[1] = tokens.NewValueInt(j, ctx)
-			b, err := fn.EvalFun(scope, innerArgs, ctx)
+			b, err := fn.EvalFun(scope, tokens.NewParens(innerArgs, nil, ctx), ctx)
 			if err != nil {
 				sortErr = err
 				return true
 			}
 
-			cond, err := LT(scope, []tokens.Token{a, b}, ctx)
+			cond, err := LT(scope, tokens.NewParens([]tokens.Token{a, b}, nil, ctx), ctx)
 			if err != nil {
 				sortErr = err
 				return true
@@ -122,7 +122,7 @@ func sortGeneric(scope tokens.Scope, list *tokens.List, fn Fun, ctx context.Cont
 		case 2:
 			innerArgs[0] = values[i]
 			innerArgs[1] = values[j]
-			cond, err := fn.EvalFun(scope, innerArgs, ctx)
+			cond, err := fn.EvalFun(scope, tokens.NewParens(innerArgs, nil, ctx), ctx)
 			if err != nil {
 				sortErr = err
 				return true
@@ -149,7 +149,12 @@ func sortGeneric(scope tokens.Scope, list *tokens.List, fn Fun, ctx context.Cont
 	return tokens.NewValuesList(values, ctx), nil
 }
 
-func Sort(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Sort(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) == 0 {
 		return nil, ctx.NewError("Error: expected 1 or 2 arguments")
 	}

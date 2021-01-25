@@ -43,6 +43,8 @@ func (p *Node) GetInstanceMember(key string, includePrivate bool, ctx context.Co
     return n, nil
   case "insertBefore", "replaceChild":
     return values.NewMethodLikeFunction([]values.Value{n, n, n}, ctx), nil
+  case "normalize":
+    return values.NewFunction([]values.Value{nil}, ctx), nil
   default:
     return nil, nil
   }

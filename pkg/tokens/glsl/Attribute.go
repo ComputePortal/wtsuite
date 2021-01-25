@@ -36,6 +36,7 @@ func (t *Attribute) WriteStatement(usage Usage, indent string, nl string, tab st
   b.WriteString(t.typeExpr.WriteExpression())
   b.WriteString(" ")
   b.WriteString(t.nameExpr.WriteExpression())
+  b.WriteString(";")
 
   return b.String()
 }

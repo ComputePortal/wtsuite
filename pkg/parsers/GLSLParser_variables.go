@@ -239,7 +239,7 @@ func (p *GLSLParser) buildConst(ts []raw.Token, isExport bool) ([]raw.Token, err
     return nil, err
   }
 
-  st := glsl.NewConst(typeExpr, name.Value(), arraySize, rhsExpr, name.Context())
+  st := glsl.NewConst(typeExpr, name.Value(), arraySize, rhsExpr, isExport, name.Context())
   
   p.module.AddStatement(st)
 

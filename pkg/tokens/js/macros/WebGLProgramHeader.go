@@ -1,5 +1,9 @@
 package macros
 
+import (
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
+)
+
 type WebGLProgramHeader struct {
   HeaderData
 }
@@ -15,12 +19,12 @@ func (h *WebGLProgramHeader) Write() string {
 
   b.cccn("function ", h.Name(), "(gl,v,f){")
   b.tcn("let vs=gl.createShader(gl.VERTEX_SHADER);")
-
   b.tcn("gl.shaderSource(vs,v);")
   b.tcn("gl.compileShader(vs);")
   b.tcn("let ve=gl.getShaderInfoLog(vs);")
   b.tcn("if(ve.length!=0){if(gl.getError()==gl.NO_ERROR){console.log(ve)}else{throw new Error('VertexShader '+ve);}}")
 
+  b.tcn("let fs=gl.createShader(gl.FRAGMENT_SHADER);")
   b.tcn("gl.shaderSource(fs,f);")
   b.tcn("gl.compileShader(fs);")
   b.tcn("let fe=gl.getShaderInfoLog(fs);")
@@ -38,3 +42,7 @@ func (h *WebGLProgramHeader) Write() string {
 }
 
 var webGLProgramHeader = &WebGLProgramHeader{newHeaderData("__newWebGLProgram__")}
+
+func ActivateWebGLProgramHeader() {
+  ResolveHeaderActivity(webGLProgramHeader, context.NewDummyContext())
+}

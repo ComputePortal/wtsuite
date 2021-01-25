@@ -6,15 +6,22 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func evalNew(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func evalNew(scope Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  var err error
+	args_, err = args_.EvalAsArgs(scope)
+	if err != nil {
+		return nil, err
+	}
+
+  args, err := functions.CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
 
-	args, err := functions.EvalArgs(scope, args)
-	if err != nil {
-		return nil, err
-	}
 
 	nameToken, err := tokens.AssertString(args[0])
 	if err != nil {
@@ -37,7 +44,9 @@ func evalNew(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Toke
 		return nil, errCtx.NewError("Error: can't redefine variable")
 	default:
 		v := functions.Var{valueToken, false, false, false, false, ctx}
-		scope.SetVar(key, v)
+    if err := scope.SetVar(key, v); err != nil {
+      return nil, err
+    }
 	}
 
 	return valueToken, nil

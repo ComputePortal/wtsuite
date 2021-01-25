@@ -47,6 +47,10 @@ func (t *Bool) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+func (t *Bool) EvalLazy(tag FinalTag) (Token, error) {
+  return t, nil
+}
+
 func (t *Bool) Write() string {
 	if t.value {
 		return "true"

@@ -171,7 +171,12 @@ func sliceString(args []tokens.Token, ctx context.Context) (tokens.Token, error)
 	return tokens.NewValueString(b.String(), ctx), nil
 }
 
-func Slice(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Slice(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	switch {
 	case len(args) == 0:
 		return nil, ctx.NewError("Error: expected 2, 3 or 4 arguments")

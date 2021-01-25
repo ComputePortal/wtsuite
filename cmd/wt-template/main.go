@@ -45,23 +45,6 @@ type CmdArgs struct {
   verbosity int
 }
 
-func printUsageAndExit() {
-	fmt.Fprintf(os.Stderr, "Usage: %s <input-file> [-o <output-file>] [options]\n", os.Args[0])
-	fmt.Fprintf(os.Stderr, `
-Options:
-  -?, -h, --help         Show this message, other options are ignored
-	-c, --compact          Compact output with minimal whitespace and short names
-	-o, --output <file>    Defaults to "a.js" if not set
-  --control <file>       Optional control file
-  --math-font-url <url>  Defaults to "FreeSerifMath.woff2"
-  --px-per-rem <int>     Defaults to 16
-  --auto-link            Convert tags to <a> automatically if they have href attribute
-	-v[v[v[v...]]]         Verbosity
-`)
-
-	os.Exit(1)
-}
-
 func printMessageAndExit(msg string) {
 	fmt.Fprintf(os.Stderr, "\u001b[1m"+msg+"\u001b[0m\n\n")
   os.Exit(1)
@@ -88,14 +71,15 @@ func parseArgs() CmdArgs {
     fmt.Sprintf("Usage: %s <input-file> [-o <output-file>] [options]\n", os.Args[0]),
     "",
     []parsers.CLIOption{
-      parsers.NewCLIUniqueFlag("c", "compact", "-c, --compact          Compact output with minimal whitespace and short names", &(cmdArgs.compactOutput)),
-      parsers.NewCLIUniqueFlag("", "auto-link", "--auto-link            Convert tags to <a> automatically if they have href attribute", &(cmdArgs.autoLink)),
+      parsers.NewCLIUniqueFlag("c", "compact"       , "-c, --compact          Compact output with minimal whitespace and short names", &(cmdArgs.compactOutput)),
+      parsers.NewCLIUniqueFlag("", "auto-link"      , "--auto-link            Convert tags to <a> automatically if they have href attribute", &(cmdArgs.autoLink)),
   
-      parsers.NewCLIUniqueFile("o", "output", "-o, --output <file>    Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
-      parsers.NewCLIUniqueFile("", "control", "--control <file>    Optional control file", true, &(cmdArgs.control)),
+      parsers.NewCLIUniqueFile("o", "output"        , "-o, --output <file>    Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
+      parsers.NewCLIUniqueFile("", "control"        , "--control <file>       Optional control file", true, &(cmdArgs.control)),
       parsers.NewCLIUniqueString("", "math-font-url", "--math-font-url <url>  Defaults to \"" + DEFAULT_MATHFONTURL + "\"", &(cmdArgs.mathFontURL)),
-      parsers.NewCLIUniqueInt("", "px-per-rem", "--px-per-rem <int>     Defaults to " + strconv.Itoa(DEFAULT_PX_PER_REM), &(cmdArgs.pxPerRem)),
-      parsers.NewCLICountFlag("v", "", "Verbosity", &(cmdArgs.verbosity)),
+      parsers.NewCLIUniqueInt("", "px-per-rem"      , "--px-per-rem <int>     Defaults to " + strconv.Itoa(DEFAULT_PX_PER_REM), &(cmdArgs.pxPerRem)),
+      parsers.NewCLIUniqueFlag("l", "latest"        , "-l, --latest           Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
+      parsers.NewCLICountFlag("v", ""               , "-v[v[v..]]             Verbosity", &(cmdArgs.verbosity)),
     },
     parsers.NewCLIFile("", "", "", true, &(cmdArgs.inputFile)),
   )
@@ -128,6 +112,8 @@ func setUpEnv(cmdArgs CmdArgs) error {
 	if cmdArgs.pxPerRem > 0 {
 		tokens.PX_PER_REM = cmdArgs.pxPerRem
 	}
+
+	directives.ForceNewViewFileScriptRegistration(directives.NewFileCache())
 
   styles.MATH_FONT = "FreeSerifMath"
   styles.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
@@ -187,7 +173,6 @@ func buildHTMLFile(c *directives.FileCache, src string, dst string, control stri
 			return err
 		}
 
-    fmt.Println("including content: ", content)
     if err := r.IncludeControl(content); err != nil {
       return err
     }

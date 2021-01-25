@@ -270,5 +270,16 @@ func (p *Array) GetClassValue() (*values.Class, error) {
       []values.Value{a, a, a, a, a, a, a, a},
       []values.Value{a, a, a, a, a, a, a, a, a},
       []values.Value{a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a},
+      []values.Value{a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a},
     }, NewArrayPrototype(values.NewAny(ctx)), ctx), nil
 }

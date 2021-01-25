@@ -16,6 +16,10 @@ func (t *Flag) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+func (t *Flag) EvalLazy(tag FinalTag) (Token, error) {
+	return t, nil
+}
+
 func (t *Flag) Write() string {
 	return ""
 }

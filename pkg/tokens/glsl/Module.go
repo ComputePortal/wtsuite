@@ -1,6 +1,8 @@
 package glsl
 
 import (
+  "strings"
+
 	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
@@ -123,7 +125,22 @@ func (m *ModuleData) ResolveEntryNames(gs GlobalScope) (Variable, error) {
 }
 
 func (m *ModuleData) Write(usage Usage, nl string, tab string) (string, error) {
-  return m.Block.writeBlockStatements(usage, "", nl, tab), nil
+  var b strings.Builder
+
+	for _, st := range m.statements {
+		s := st.WriteStatement(usage, "", nl, tab)
+
+    if strings.HasPrefix(s, "#") { // is preproc directive
+      b.WriteString("\n")
+      b.WriteString(s)
+      b.WriteString("\n")
+    } else if s != "" {
+			b.WriteString(s)
+      b.WriteString("\n")
+		}
+	}
+
+	return b.String(), nil
 }
 
 func (m *ModuleData) EvalTypes() error {

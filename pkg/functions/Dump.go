@@ -7,7 +7,12 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Dump(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Dump(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	infoErr := ctx.NewError("Info: variable dump")
 
 	doDump := true

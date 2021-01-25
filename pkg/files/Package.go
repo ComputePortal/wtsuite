@@ -159,6 +159,22 @@ func PkgInstallDst(url string) string {
   return filepath.Join(base, url)
 }
 
+func validateURL(url string) error {
+  if url == "" {
+    return errors.New("Error: url can't be empty\n")
+  }
+
+  if strings.HasSuffix(url, ".git") {
+    return errors.New("Error: url .git suffix must be omitted\n")
+  }
+
+  if strings.Contains(url, "+=^~`;<>,|:!?'\"&@%$#*(){}[]\\") {
+    return errors.New("Error: url contains invalid chars (hint: schema must be omitted)\n")
+  }
+
+  return nil
+}
+
 // adds result to _packages too
 func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc) (*Package, error) {
   semVerMin, err := ParseSemVer(depCfg.MinVersion)
@@ -166,21 +182,23 @@ func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc) (*Package, er
     return nil, errors.New("Error: bad minVersion semver\n")
   }
 
-  semVerMax, err := ParseSemVer(depCfg.MaxVersion)
-  if err != nil {
-    return nil, errors.New("Error: bad maxVersion semver\n")
+  var semVerMax *SemVer = nil 
+  if !LATEST {
+    semVerMax, err = ParseSemVer(depCfg.MaxVersion)
+    if err != nil {
+      return nil, errors.New("Error: bad maxVersion semver\n")
+    }
   }
 
-  semVerRange := &SemVerRange{semVerMin, semVerMax}
+  semVerRange := NewSemVerRange(semVerMin, semVerMax)
 
-  if depCfg.URL == "" {
-    return nil, errors.New("Error: url can't be empty\n")
+  if err := validateURL(depCfg.URL); err != nil {
+    return nil, err
   }
 
   pkgDir := PkgInstallDst(depCfg.URL)
 
   if fetcher != nil {
-    // the fetcher can potentially also change the semVerRange, so we can test a "later" package version
     if err := fetcher(depCfg.URL, semVerRange); err != nil {
       return nil, err
     }
@@ -202,7 +220,7 @@ func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc) (*Package, er
   if err != nil {
     return nil, err
   }
-
+  
   pkg, err := readPackage(semVerDir, false, fetcher)
   if err != nil {
     return nil, err
@@ -247,7 +265,7 @@ func ResolvePackages(startFile string) error {
   return resolvePackages(startFile, nil)
 }
 
-func SyncPackage(startFile string, fetcher FetchFunc) error {
+func SyncPackages(startFile string, fetcher FetchFunc) error {
   if fetcher == nil {
     panic("fetcher function can't be nil")
   }
@@ -303,7 +321,7 @@ func SearchPackage(caller string, pkgPath string, lang Lang) (string, error) {
     return modulePath, nil
   }
 
-  pkgParts := filepath.SplitList(filepath.FromSlash(pkgPath))
+  pkgParts := strings.Split(filepath.ToSlash(pkgPath), "/")
 
   if len(pkgParts) == 0 {
     return "", errors.New("Error: unable to determine package name\n")
@@ -312,12 +330,12 @@ func SearchPackage(caller string, pkgPath string, lang Lang) (string, error) {
   pkgName := pkgParts[0]
   moduleName := ""
   if len(pkgParts) > 1 {
-    moduleName = filepath.Join(pkgParts...)
+    moduleName = filepath.Join(pkgParts[1:]...)
   }
 
   pkg, ok := currentPkg.dependencies[pkgName]
   if !ok {
-    return "", errors.New("Error: " + currentPkg.configPath + " doesn't reference a dependency called " + pkgName + "\n")
+    return "", errors.New("Error: " + currentPkg.configPath + " doesn't reference a dependency called " + pkgPath + "\n")
   }
 
   modulePath, ok := pkg.GetModule(moduleName, lang)

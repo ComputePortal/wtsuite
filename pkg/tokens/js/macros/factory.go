@@ -178,6 +178,8 @@ func RegisterActivateMacroHeadersCallback() bool {
 			ActivateSearchIndexHeader()
     case "__checkType__":
       ActivateCheckTypeHeader()
+    case "WebGLProgram":
+      ActivateWebGLProgramHeader()
 		}
 	}
 

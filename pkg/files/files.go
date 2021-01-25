@@ -95,6 +95,10 @@ func Search(callerPath string, srcPath string) (string, error) {
     }
 	}
 
+  if srcPath == "." {
+    return callerPath, nil
+  }
+
 	currentDir := filepath.Dir(callerPath)
 
   fname := filepath.Join(currentDir, srcPath)

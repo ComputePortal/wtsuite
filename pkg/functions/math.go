@@ -7,7 +7,12 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func floatToFloatMath(args []tokens.Token, fn func(val float64) float64, ctx context.Context) (tokens.Token, error) {
+func floatToFloatMath(args_ *tokens.Parens, fn func(val float64) float64, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -20,7 +25,12 @@ func floatToFloatMath(args []tokens.Token, fn func(val float64) float64, ctx con
 	return tokens.NewValueFloat(fn(x.Value()), ctx), nil
 }
 
-func twoFloatsToFloatMath(args []tokens.Token, fn func(x float64, y float64) float64, ctx context.Context) (tokens.Token, error) {
+func twoFloatsToFloatMath(args_ *tokens.Parens, fn func(x float64, y float64) float64, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}
@@ -38,33 +48,35 @@ func twoFloatsToFloatMath(args []tokens.Token, fn func(x float64, y float64) flo
 	return tokens.NewValueFloat(fn(x.Value(), y.Value()), ctx), nil
 }
 
-func Sqrt(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Sqrt(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return floatToFloatMath(args, math.Sqrt, ctx)
 }
 
-func Sin(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Sin(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return floatToFloatMath(args, math.Sin, ctx)
 }
 
-func Cos(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Cos(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return floatToFloatMath(args, math.Cos, ctx)
 }
 
-func Tan(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Tan(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return floatToFloatMath(args, math.Tan, ctx)
 }
 
-func Rad(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Rad(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return floatToFloatMath(args, func(val float64) float64 {
 		return val * math.Pi / 180.0
 	}, ctx)
 }
 
-func Pow(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Pow(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return twoFloatsToFloatMath(args, math.Pow, ctx)
 }
 
-func Pi(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Pi(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args := args_.Values()
+
 	if len(args) != 0 {
 		return nil, ctx.NewError("Error: unexpected arguments")
 	}
@@ -72,10 +84,11 @@ func Pi(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.To
 	return tokens.NewValueFloat(math.Pi, ctx), nil
 }
 
-func round(args []tokens.Token, fn func(val float64) float64, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 1 {
-		return nil, ctx.NewError("Error: expected 1 argument")
-	}
+func round(args_ *tokens.Parens, fn func(val float64) float64, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewUnaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
 
 	switch {
 	case tokens.IsFloat(args[0]):
@@ -104,14 +117,14 @@ func round(args []tokens.Token, fn func(val float64) float64, ctx context.Contex
 	}
 }
 
-func Round(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Round(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return round(args, math.Round, ctx)
 }
 
-func Floor(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Floor(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return round(args, math.Floor, ctx)
 }
 
-func Ceil(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Ceil(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	return round(args, math.Ceil, ctx)
 }

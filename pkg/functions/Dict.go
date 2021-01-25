@@ -32,7 +32,12 @@ func intKeysValuesToDict(a *tokens.List, b *tokens.List, ctx context.Context) (t
 	return result, nil
 }
 
-func Dict(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Dict(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	switch len(args) {
 	case 1:
 		pairs, err := tokens.AssertList(args[0])

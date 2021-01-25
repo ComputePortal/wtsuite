@@ -1,10 +1,12 @@
 package parsers
 
 import (
+  "errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
+  "unicode"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	"github.com/computeportal/wtsuite/pkg/tokens/html"
@@ -88,7 +90,7 @@ type UIParser struct {
 func NewUIParser(path string) (*UIParser, error) {
 	rawBytes, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, err
+    return nil, errors.New("Error: problem reading \"" + path + "\" (" + err.Error() + ")")
 	}
 
 	raw := string(rawBytes)
@@ -202,6 +204,20 @@ func (p *UIParser) BuildTags() ([]*html.Tag, error) {
 			return nil, err
 		}
 
+    if tag.Name() == "parameters" {
+      if len(result) > 0 {
+        if result[0].Name() == "permissive" {
+          if len(result) > 1 {
+            errCtx := tag.Context()
+            return nil, errCtx.NewError("Error: parameters directive must come first in file (after permissive though)")
+          }
+        } else {
+          errCtx := tag.Context()
+          return nil, errCtx.NewError("Error: parameters directive must come first in file (" + result[0].Name() + " is first)")
+        }
+      }
+    }
+
 		if err := appendTag(tag, indent); err != nil {
 			return nil, err
 		}
@@ -236,19 +252,303 @@ func (p *UIParser) buildGenericDirective(name string, ctx context.Context) (*htm
 	return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
 }
 
+func (p *UIParser) buildImportExportNames(ctx context.Context) (*html.RawDict, error) {
+  start := p.pos
+  if r, ok := p.nextGroupStopMatch(patterns.BRACES_GROUP, true); ok {
+    content := p.Write(start, r[0])
+    if content == "" {
+      errCtx := ctx
+      return nil, errCtx.NewError("Error: empty brace")
+    }
+
+    parts := strings.Split(content, patterns.COMMA)
+    names := html.NewEmptyRawDict(context.MergeContexts(ctx, p.NewContext(r[0], r[1])))
+
+    iposRel := 0
+
+    for _, part := range parts {
+      partStart := start+iposRel
+      partEnd := partStart + len(part)
+      iposRel += len(part) + 1
+
+      rr := [2]int{partStart, partEnd}
+
+      fnBack := func() {
+        i := rr[1]-1
+        for ;i > rr[0] && unicode.IsSpace(p.raw[i]); i-- {
+        }
+
+        // eat back to first whitespace
+        for ;i > rr[0] && !unicode.IsSpace(p.raw[i]); i-- {
+        }
+
+        rr[1] = i
+      }
+
+      partParts := strings.Fields(part)
+
+      if len(partParts) == 0 {
+        errCtx := ctx
+        return nil, errCtx.NewError("Error: empty brace")
+      }
+
+      newName := partParts[len(partParts)-1]
+      newNameEnd := rr[1]
+      fnBack()
+
+      newNameStart := rr[1]
+
+      if strings.TrimSpace(p.Write(newNameStart, newNameEnd)) != newName {
+        fmt.Println(newNameStart, newNameEnd, unicode.IsSpace(rune('\n')))
+        fmt.Println("\"" + p.Write(newNameStart, newNameEnd) + "\" should be \"" + newName + "\"")
+        panic("algo error")
+      }
+      newNameCtx := p.NewContext(newNameStart, partEnd)
+      if !patterns.IsValidVar(newName) {
+        errCtx := newNameCtx
+        return nil, errCtx.NewError("Error: not a valid var")
+      }
+
+      if len(partParts) == 1 {
+        names.Set(
+          html.NewValueString(newName, newNameCtx), 
+          html.NewValueString(newName, newNameCtx))
+        continue
+      }
+
+      fnBack()
+      asStart := rr[1]
+      asEnd := newNameStart
+      asCtx := p.NewContext(rr[1], newNameStart)
+      if len(partParts) == 2 {
+        errCtx := asCtx
+        if partParts[0] == "as" {
+          return nil, errCtx.NewError("Error: expected more before as") 
+        } else {
+          fmt.Println("HERE", partParts) 
+          return nil, errCtx.NewError("Error: unexpected")
+        }
+      }
+
+      if strings.TrimSpace(p.Write(asStart, asEnd)) != "as" {
+        fmt.Println("\"" + p.Write(asStart, asEnd) + "\" should be \"as\"")
+        panic("algo error")
+      }
+
+      if partParts[len(partParts)-2] != "as" {
+        errCtx := asCtx
+        return nil, errCtx.NewError("Error: expected \"as\"")
+      }
+
+      oldNameTokens, err := p.tokenizePartial(rr[0], asStart, nil)
+      if err != nil {
+        return nil, err
+      }
+
+      oldNameToken, err := p.buildToken(oldNameTokens, true)
+      if err != nil {
+        return nil, err
+      }
+
+      names.Set(oldNameToken, html.NewValueString(newName, newNameCtx))
+    }
+
+    return names, nil
+  } else {
+    errCtx := ctx
+    return nil, errCtx.NewError("Error: closing brace not found")
+  }
+}
+
+// TODO: completely revamp this to look more like the javascript import/export statements
+// valid forms:
+// import * as namespace from expression...
+// export * from expression...
+// import *(parameters) as namespace from expression...
+// export *(parameters) from expression...
+// import {name1, name2, name3 as alias3} from expression...
+// export {name1, name2, name3 as alias3} from expression...
+// export {name1, name2, name3 as alias3}
+// import {name1, name2, name3 as alias3}(parameters) from expression...
+// export {name1, name2, name3 as alias3}(parameters) from expression...
 func (p *UIParser) buildImportExportDirective(name string, dynamic bool, ctx context.Context) (*html.Tag, error) {
-	fnPre := func(_ html.Token, ts []raw.Token) []raw.Token {
-		return p.convertWords(ts)
-	}
-
-	attr, err := p.buildDirectiveAttributes(-1, -1, ctx, fnPre)
-	if err != nil {
-		return nil, err
-	}
-
+  attr := html.NewEmptyRawDict(ctx)
 	attr.Set(html.NewValueString(".dynamic", ctx), html.NewValueBool(dynamic, ctx))
 
-	// children are appended later
+  p.eatWhitespace()
+
+  all := false
+  starPos := -1
+  if p.raw[p.pos] == '*' {
+    starPos = p.pos
+    p.eatWhitespace()
+    all = true
+    p.pos+=1
+  }
+
+  p.eatWhitespace()
+
+  r := [2]int{-1, -1}
+  if p.raw[p.pos] != '(' {
+    r, _ = p.eatNonWhitespace()
+  } else {
+    r = [2]int{p.pos+1, p.pos+2}
+  }
+
+  if r[0]==r[1] {
+    return nil, ctx.NewError("Error: bad " + name + " directive (expected word or parens after \"*\")")
+  }
+
+  var names *html.RawDict = nil
+  namesRange := [2]int{-1, -1}
+
+  nextStr := p.Write(r[0], r[1])
+  if strings.HasPrefix(nextStr, "{") {
+    // we went a too far, and must reset the position
+    p.pos = r[0] + 1
+    if all {
+      return nil, ctx.NewError("Error: * can't be combined with named " + name)
+    }
+
+    var err error
+    namesStart := r[0]
+    names, err = p.buildImportExportNames(p.NewContext(r[0], r[0]+1))
+    if err != nil {
+      return nil, err
+    }
+
+    p.eatWhitespaceToEndOfLine()
+    if p.raw[p.pos] != '(' {
+      r, _ = p.eatNonWhitespace()
+    } else if p.raw[p.pos] == '\n' || p.raw[p.pos] == '\r' {
+      r = [2]int{p.pos, p.pos}
+    } else {
+      r = [2]int{p.pos+1, p.pos+2}
+    }
+
+    namesRange = [2]int{namesStart, r[0]-1}
+
+    if r[0] == r[1] {
+      // return immediately
+      if name == "import" {
+        return nil, ctx.NewError("Error: bad " + name + " directive (expected word or parens after \"}\")")
+      } else {
+        return nil, ctx.NewError("Error: export lists haven't yet been implemented")
+
+        //attr.Set(html.NewValueString("names", ctx), names)
+        //return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
+      }
+    } 
+
+    nextStr = p.Write(r[0], r[1])
+  } 
+
+  if p.raw[r[0]-1] == '(' {
+    // parameters found
+    parameters, err := p.buildParens(r[0] - 1, p.NewContext(r[0], r[0]+1))
+    if err != nil {
+      return nil, err
+    }
+
+    attr.Set(html.NewValueString("parameters", p.NewContext(r[0], p.pos)),
+      parameters)
+
+    p.eatWhitespace()
+    r, _ = p.eatNonWhitespace()
+    if r[0] == r[1] {
+      return nil, ctx.NewError("Error: bad " + name + " directive (expected word after \")\")")
+    }
+
+    nextStr = p.Write(r[0], r[1])
+  }
+
+  if nextStr == "as" {
+    if !all {
+      errCtx := p.NewContext(r[0], r[1])
+      return nil, errCtx.NewError("Error: must be preceded by *")
+    }
+
+    if name == "export" {
+      errCtx := p.NewContext(r[0], r[1])
+      return nil, errCtx.NewError("Error: can't export nested namespace")
+    }
+
+    p.eatWhitespace()
+
+    rr, _ := p.eatNonWhitespace()
+    if rr[0] == rr[1] {
+      return nil, ctx.NewError("Error: bad " + name + " directive (expected word after \"as\")")
+    }
+
+    namesRange = [2]int{starPos, rr[1]}
+
+    namespaceWord := p.Write(rr[0], rr[1])
+    if !patterns.IsValidVar(namespaceWord) {
+      errCtx := p.NewContext(rr[0], rr[1])
+      return nil, errCtx.NewError("Error: bad namespace name")
+    }
+
+    names = html.NewEmptyRawDict(ctx)
+    names.Set(
+      html.NewValueString("*", p.NewContext(starPos, starPos+1)), 
+      html.NewValueString(namespaceWord, p.NewContext(rr[0], rr[1])))
+
+    p.eatWhitespace()
+    r, _ = p.eatNonWhitespace()
+    if r[0] == r[1] {
+      return nil, ctx.NewError("Error: bad " + name + " directive (expected word after \"" + namespaceWord + "\")")
+    }
+
+    nextStr = p.Write(r[0], r[1])
+  }
+
+  
+  if nextStr != "from" {
+    errCtx := p.NewContext(r[0], r[1])
+    return nil, errCtx.NewError("Error: bad " + name + " directive (expected \"from\", got \"" + nextStr + "\")")
+  }
+  fromRange := [2]int{r[0], r[1]}
+
+  // now we should be able to eat the from expression
+  if all && names == nil {
+    names = html.NewEmptyRawDict(ctx)
+    starCtx := p.NewContext(starPos, starPos+1)
+    names.Set(
+      html.NewValueString("*", starCtx),
+      html.NewValueString("*", starCtx))
+  }
+
+
+  srcRange, postRange, err := p.matchNextDirectiveAttribute(-1)
+  if err != nil {
+    return nil, err
+  }
+
+  if postRange[0] != postRange[1] {
+    errCtx := p.NewContext(postRange[0], postRange[1])
+    return nil, errCtx.NewError("Error: unexpected tokens")
+  }
+
+  fromTokens, err := p.tokenizePartial(srcRange[0], srcRange[1], nil)
+  if err != nil {
+    return nil, err
+  }
+
+  if len(fromTokens) == 0 {
+    errCtx := p.NewContext(fromRange[0], fromRange[1])
+    return nil, errCtx.NewError("Error: expected tokens after (on same line)")
+  }
+
+  fromExpr, err := p.buildToken(fromTokens, true)
+  if err != nil {
+    return nil, err
+  }
+
+  attr.Set(html.NewValueString("names", p.NewContext(namesRange[0], namesRange[1])),
+    names)
+  attr.Set(html.NewValueString("from", p.NewContext(r[0], r[1])),
+    fromExpr)
+  
 	return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
 }
 
@@ -348,6 +648,52 @@ func (p *UIParser) buildPermissiveDirective(ctx context.Context) (*html.Tag, err
     errCtx := tag.RawAttributes().Context()
     return nil, errCtx.NewError("Error: unexpected attributes")
   }
+
+  return tag, nil
+}
+
+func (p *UIParser) buildParens(start int, ctx context.Context) (*html.Parens, error) {
+  p.pos = start + 1
+  if r, ok := p.nextGroupStopMatch(patterns.PARENS_GROUP, true); ok {
+    ts, err := p.tokenizePartial(start, r[1], nil)
+    if err != nil {
+      return nil, err
+    }
+
+    parens_, err := p.buildToken(ts, true)
+    if err != nil {
+      return nil, err
+    }
+
+    if parens, err := html.AssertParens(parens_); err != nil {
+      return nil, err
+    } else {
+      return parens, nil
+    }
+  } else {
+    errCtx := ctx
+    return nil, errCtx.NewError("Error: closing parens not found")
+  }
+}
+
+func (p *UIParser) buildParametersDirective(ctx context.Context) (*html.Tag, error) {
+	parensStart, parensFound := p.advanceToOpenParens()
+  if !parensFound {
+    errCtx := ctx
+    return nil, errCtx.NewError("Error: parameters tag must be followed by parens group")
+  }
+
+  startCtx := p.NewContext(p.pos-1, p.pos)
+
+  parens, err := p.buildParens(parensStart, startCtx)
+  if err != nil {
+    return nil, err
+  }
+
+  attr := html.NewEmptyRawDict(parens.Context())
+  attr.Set(html.NewValueString("parameters", ctx), parens)
+
+  tag := html.NewTag("parameters", attr, []*html.Tag{}, ctx)
 
   return tag, nil
 }
@@ -632,7 +978,7 @@ func (p *UIParser) buildExportedDirective(ctx context.Context) (*html.Tag, error
 
 			return tag, nil
 		default:
-      if !strings.HasPrefix(name, "[") && !strings.HasPrefix(name, "{") {
+      if !strings.HasPrefix(name, "[") && !strings.HasPrefix(name, "{") && !strings.HasPrefix(name, "*") {
         errCtx := exportCtx
         return nil, errCtx.NewError("Error: invalid export statement")
       }
@@ -643,7 +989,7 @@ func (p *UIParser) buildExportedDirective(ctx context.Context) (*html.Tag, error
 	}
 }
 
-func (p *UIParser) buildGenericTag(name string, inline bool, ctx context.Context) (*html.Tag, error) {
+func (p *UIParser) advanceToOpenParens() (int, bool) {
 	// find parens on this line!
 	// or none at all
 	parensFound := false
@@ -662,11 +1008,19 @@ func (p *UIParser) buildGenericTag(name string, inline bool, ctx context.Context
 		break
 	}
 
+  return parensStart, parensFound
+}
+
+func (p *UIParser) buildGenericTag(name string, inline bool, ctx context.Context) (*html.Tag, error) {
+	// find parens on this line!
+	// or none at all
+	parensStart, parensFound := p.advanceToOpenParens()
+
 	var tag *html.Tag = nil
 	if !parensFound {
 		tag = html.NewTag(name, html.NewEmptyRawDict(ctx), []*html.Tag{}, ctx)
 	} else {
-		startCtx := p.NewContext(p.pos, p.pos+1)
+		startCtx := p.NewContext(p.pos-1, p.pos)
 
 		if r, ok := p.nextGroupStopMatch(patterns.PARENS_GROUP, true); ok {
 			ts, err := p.tokenizePartial(parensStart, r[1], nil)
@@ -755,9 +1109,7 @@ func (p *UIParser) buildTag(indent int) (*html.Tag, error) {
 	case isString:
 		return p.buildTextTag(str, indent == -1, tagCtx)
 	case indent != -1 && str == "export":
-		if indent != 0 {
-			return nil, tagCtx.NewError("Error: export cannot be indented")
-		}
+    // exports can be indented so they can benefit from branching
 		return p.buildExportedDirective(tagCtx)
   case indent != -1 && str == "permissive":
     if indent != 0 {
@@ -766,6 +1118,11 @@ func (p *UIParser) buildTag(indent int) (*html.Tag, error) {
       return nil, tagCtx.NewError("Error: 'permissive' must be first word, and can't be indented")
     }
     return p.buildPermissiveDirective(tagCtx)
+  case indent != -1 && str == "parameters":
+    if indent != 0 {
+      return nil, tagCtx.NewError("Error: 'parameters' cannot be indented")
+    }
+    return p.buildParametersDirective(tagCtx)
 	case indent != -1 && str == "import":
 		return p.buildImportExportDirective(str, indent != 0, tagCtx)
 	case indent != -1 && !followedByParens && str == "template":
@@ -1274,6 +1631,21 @@ func (p *UIParser) eatWhitespace() (int, bool) {
 	}
 
 	return 0, true
+}
+
+// beware eatNonWhitespace still eat over a newline
+func (p *UIParser) eatWhitespaceToEndOfLine() {
+	for ; p.pos < p.Len(); p.pos++ {
+		c := p.raw[p.pos]
+
+		if c == '\n' || c == '\r' {
+			break
+		} else if c != ' ' && c != '\t' && p.mask[p.pos] != COMMENT {
+      break
+		} else {
+			continue
+		}
+	}
 }
 
 func (p *UIParser) eatNonWhitespace() ([2]int, bool) {

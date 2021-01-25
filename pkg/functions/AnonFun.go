@@ -1,7 +1,6 @@
 package functions
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
@@ -10,22 +9,34 @@ import (
 
 type AnonFun struct {
 	scope       tokens.Scope
-	args        []string
-	argDefaults []tokens.Token
+	args        *tokens.Parens
 	value       tokens.Token
 	ctx         context.Context
 }
 
-func NewAnonFun(scope tokens.Scope, args []string, argDefaults []tokens.Token, value tokens.Token, ctx context.Context) *AnonFun {
-	return &AnonFun{scope, args, argDefaults, value, ctx}
+func NewAnonFun(scope tokens.Scope, args *tokens.Parens, value tokens.Token, ctx context.Context) *AnonFun {
+	return &AnonFun{scope, args, value, ctx}
 }
 
 func (f *AnonFun) Dump(indent string) string {
-	return indent + "AnonFun(" + strings.Join(f.args, ",") + ")\n"
+  var b strings.Builder
+
+  b.WriteString(indent)
+  b.WriteString("AnonFun(")
+
+  b.WriteString(f.args.Dump("  "))
+  b.WriteString(")\n")
+
+  return b.String()
 }
 
 func (f *AnonFun) Eval(scope tokens.Scope) (tokens.Token, error) {
 	return f, nil
+}
+
+func (f *AnonFun) EvalLazy(tag tokens.FinalTag) (tokens.Token, error) {
+  errCtx := f.Context()
+  return nil, errCtx.NewError("Error: function can't be lazily evaluated")
 }
 
 func (f *AnonFun) Context() context.Context {
@@ -34,51 +45,70 @@ func (f *AnonFun) Context() context.Context {
 
 func (a *AnonFun) IsSame(other tokens.Token) bool {
 	if b, ok := other.(*AnonFun); ok {
-		if len(a.args) == len(b.args) {
-			if !a.value.IsSame(b.value) {
-				return false
-			}
+		if a.args.IsSame(b.args) {
+      return true
 		}
 	}
 
 	return false
 }
 
-func (f *AnonFun) EvalFun(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) > len(f.args) {
-		err := ctx.NewError(fmt.Sprintf("Error: too many arguments (expected %d, got %d)", len(f.args), len(args)))
-		err.AppendContextString("Info: function defined here", f.Context())
-		return nil, err
-	}
+func CompleteArgsAndFillScope(scope LambdaScope, args_ *tokens.Parens, interf *tokens.Parens) error {
+  // whatever comes in has already been oi
+  args, err := CompleteArgs(args_, interf)
+  if err != nil {
+    return err
+  }
+
+  fnSet := func(i int, arg tokens.Token) error {
+		v := Var{arg, false, true, false, false, arg.Context()}
+
+    argWord, err := tokens.AssertWord(interf.Values()[i])
+    if err != nil {
+      return err
+    }
+
+    if err := scope.SetVar(argWord.Value(), v); err != nil {
+      return err
+    }
+
+    return nil
+  }
+
+  // evaluate the defaults
+  for i, arg := range args {
+    argDefault_ := interf.Alts()[i]
+    if argDefault_ == arg {
+      argDefault, err := argDefault_.Eval(scope)
+      if err != nil {
+        return err
+      }
+
+      if err := fnSet(i, argDefault); err != nil {
+        return err
+      }
+    } else {
+      if err := fnSet(i, arg); err != nil {
+        return err
+      }
+    }
+  }
+
+  return nil
+}
+
+func (f *AnonFun) EvalFun(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  var err error
+  args_, err = args_.EvalAsArgs(scope)
+  if err != nil {
+    return nil, err
+  }
 
 	lambdaScope := NewLambdaScope(f.scope, scope)
 
-	for i, arg := range args {
-		// eval the incoming args too
-		evaluatedArg, err := arg.Eval(scope)
-		if err != nil {
-			return nil, err
-		}
-
-		v := Var{evaluatedArg, false, true, false, false, arg.Context()}
-		lambdaScope.SetVar(f.args[i], v)
-	}
-
-	// apply defaults for remainder
-	for i := len(args); i < len(f.argDefaults); i++ {
-		argDefault := f.argDefaults[i]
-		if argDefault != nil {
-			evaluatedArg, err := argDefault.Eval(lambdaScope)
-			if err != nil {
-				return nil, err
-			}
-
-			v := Var{evaluatedArg, false, true, false, false, argDefault.Context()}
-			lambdaScope.SetVar(f.args[i], v)
-		}
-
-		// TODO: should we give an error if default is not available?
-	}
+  if err := CompleteArgsAndFillScope(lambdaScope, args_, f.args); err != nil {
+    return nil, err
+  }
 
 	result, err := f.value.Eval(lambdaScope)
 	if err != nil {
@@ -90,7 +120,7 @@ func (f *AnonFun) EvalFun(scope tokens.Scope, args []tokens.Token, ctx context.C
 }
 
 func (f *AnonFun) Len() int {
-	return len(f.args)
+	return f.args.Len()
 }
 
 func IsAnonFun(t tokens.Token) bool {

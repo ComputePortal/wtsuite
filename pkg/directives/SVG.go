@@ -299,14 +299,20 @@ func svgToURI(tag tree.Tag, ctx context.Context) (tokens.Token, error) {
 	return tokens.NewValueString(b.String(), ctx), nil
 }
 
-func evalSVGURI(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 2 {
-		return nil, ctx.NewError("Error: expected 2 arguments")
-	}
-
-	args, err := functions.EvalArgs(scope, args)
+func evalSVGURI(scope Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  var err error
+	args_, err = args_.EvalAsArgs(scope)
 	if err != nil {
 		return nil, err
+	}
+
+  args, err := functions.CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
+	if len(args) != 2 {
+		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
 
 	templateToken, err := tokens.AssertString(args[0])

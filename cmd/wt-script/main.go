@@ -74,6 +74,7 @@ func parseArgs() CmdArgs {
       parsers.NewCLIUniqueFlag("f", "force"     , "-f, --force                 Force a complete project rebuild", &(cmdArgs.forceBuild)),
       parsers.NewCLIUniqueEnum("t", "target"    , "-t, --target <js-target>    Defaults to \"" + DEFAULT_TARGET + "\", other possibilities are \"browser\" or \"worker\"", []string{"nodejs", "browser", "worker"}, &(cmdArgs.target)),
       parsers.NewCLIUniqueFlag("x", "executable", "-x, --executable            Create an executable with a node hashbang (target must be nodejs)", &(cmdArgs.executable)),
+      parsers.NewCLIUniqueFlag("l", "latest"    , "-l, --latest                Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
       parsers.NewCLICountFlag("v", ""           , "-v[v[v..]]                  Verbosity", &(cmdArgs.verbosity)),
     },
     parsers.NewCLIFile("", "", "", true, &(cmdArgs.inputFile)),

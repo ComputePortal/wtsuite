@@ -59,6 +59,7 @@ func parseArgs() CmdArgs {
       parsers.NewCLIUniqueFlag("c", "compact", "-c, --compact   Compact output with minimal whitespace and short names", &(cmdArgs.compactOutput)),
       parsers.NewCLIUniqueEnum("t", "target" , "-t, --target    \"vertex\" or \"fragment\", defaults to \"vertex\"", []string{"vertex", "fragment"}, &(cmdArgs.target)),
       parsers.NewCLICountFlag("v", ""        , "-v[v[v..]]      Verbosity", &(cmdArgs.verbosity)),
+      parsers.NewCLIUniqueFlag("l", "latest" , "-l, --latest    Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
     },
     parsers.NewCLIFile("", "", "", true, &(cmdArgs.inputFile)),
   )

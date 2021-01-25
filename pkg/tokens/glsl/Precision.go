@@ -37,6 +37,7 @@ func (t *Precision) WriteStatement(usage Usage, indent string, nl string, tab st
   b.WriteString(PrecisionTypeToString(t.precType))
   b.WriteString(" ")
   b.WriteString(t.typeExpr.WriteExpression())
+  b.WriteString(";")
 
   return b.String()
 }

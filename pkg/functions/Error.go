@@ -7,7 +7,12 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Error(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Error(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	var b strings.Builder
 	b.WriteString("User Error: ")
 

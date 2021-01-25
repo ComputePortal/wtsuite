@@ -90,6 +90,10 @@ func (t *LeafTag) FoldDummy() {
 	return
 }
 
+func (t *LeafTag) EvalLazy() error {
+  return nil
+}
+
 func (t *LeafTag) VerifyElementCount(i int, ecKey string) error {
 	return nil
 }
@@ -117,4 +121,8 @@ func (t *LeafTag) RegisterParent(p Tag) {
 
 func (t *LeafTag) Parent() Tag {
 	return t.parent
+}
+
+func (t *LeafTag) FinalParent() tokens.FinalTag {
+	return t.Parent()
 }

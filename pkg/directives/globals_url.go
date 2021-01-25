@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/computeportal/wtsuite/pkg/files"
-	//"github.com/computeportal/wtsuite/pkg/functions"
+	"github.com/computeportal/wtsuite/pkg/functions"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
@@ -65,7 +65,12 @@ func UnsetActiveURL() {
 
 }*/
 
-func evalFileURL(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func evalFileURL(scope Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := functions.CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}

@@ -87,6 +87,7 @@ func (t *RawDict) toKeyDict(scope Scope, dtype DictType, scanFn func(Token, Toke
 
 		if dtype == ANY {
 			switch key.(type) {
+      case *Lazy:
 			case *String:
 				dtype = STRING
 			case *Int:
@@ -112,53 +113,57 @@ func (t *RawDict) toKeyDict(scope Scope, dtype DictType, scanFn func(Token, Toke
 			}
 		}
 
-		switch dtype {
-		case ANY:
-			panic("should'be been set")
-		case STRING:
-			strKey, ok := key.(*String)
-			if !ok {
-				errCtx := key.Context()
-				return nil, errCtx.NewError("Error: expected string, got " + reflect.TypeOf(key).String())
-			}
+    if IsLazy(key) {
+      result = append(result, struct{ key, value Token }{key, value}) // keep evaluated key for context
 
-			// is key already defined?
-			if other, ok := strTable[strKey.Value()]; ok {
-				errCtx := strKey.Context()
-				err := errCtx.NewError("Error: key \"" + strKey.Value() + "\" already defined")
-				err.AppendContextString("Info: defined here", other.Context())
+    } else {
+      switch dtype {
+      case ANY:
+        panic("should'be been set")
+      case STRING:
+        strKey, ok := key.(*String)
+        if !ok {
+          errCtx := key.Context()
+          return nil, errCtx.NewError("Error: expected string, got " + reflect.TypeOf(key).String())
+        }
 
-				return nil, err
-			}
+        // is key already defined?
+        if other, ok := strTable[strKey.Value()]; ok {
+          errCtx := strKey.Context()
+          err := errCtx.NewError("Error: key \"" + strKey.Value() + "\" already defined")
+          err.AppendContextString("Info: defined here", other.Context())
 
-			// single underscore attributes are always ignored and can be used as a scope for tag variables (eg. __elementCount__)
-			if strKey.Value() != "_" {
-				strTable[strKey.Value()] = value
-				result = append(result, struct{ key, value Token }{strKey, value}) // keep evaluated key for context
-			}
+          return nil, err
+        }
 
-		case INT:
-			intKey, ok := key.(*Int)
-			if !ok {
-				errCtx := key.Context()
-				return nil, errCtx.NewError("Error: expected string, got " + reflect.TypeOf(key).String())
-			}
+        // single underscore attributes are always ignored and can be used as a scope for tag variables (eg. __elementCount__)
+        if strKey.Value() != "_" {
+          strTable[strKey.Value()] = value
+          result = append(result, struct{ key, value Token }{strKey, value}) // keep evaluated key for context
+        }
+      case INT:
+        intKey, ok := key.(*Int)
+        if !ok {
+          errCtx := key.Context()
+          return nil, errCtx.NewError("Error: expected string, got " + reflect.TypeOf(key).String())
+        }
 
-			// is key already defined?
-			if other, ok := intTable[intKey.Value()]; ok {
-				errCtx := intKey.Context()
-				err := errCtx.NewError("Error: key \"" + fmt.Sprintf("%d", intKey.Value()) + "\" already defined")
-				err.AppendContextString("Info: defined here", other.Context())
+        // is key already defined?
+        if other, ok := intTable[intKey.Value()]; ok {
+          errCtx := intKey.Context()
+          err := errCtx.NewError("Error: key \"" + fmt.Sprintf("%d", intKey.Value()) + "\" already defined")
+          err.AppendContextString("Info: defined here", other.Context())
 
-				return nil, err
-			}
+          return nil, err
+        }
 
-			intTable[intKey.Value()] = value
+        intTable[intKey.Value()] = value
 
-			result = append(result, struct{ key, value Token }{intKey, value}) // keep evaluated key for context
-		default:
-			panic("unhandled")
-		}
+        result = append(result, struct{ key, value Token }{intKey, value}) // keep evaluated key for context
+      default:
+        panic("unhandled")
+      }
+    }
 	}
 
 	switch dtype {
@@ -215,6 +220,56 @@ func (t *RawDict) Eval(scope Scope) (Token, error) {
 	}
 
 	return d, nil
+}
+
+func (t *RawDict) evalLazy(tag FinalTag, dType DictType) error {
+  // inplace evaluation of lazy
+  for i, item := range t.items {
+    keyPre := item.key
+    valPre := item.value
+
+    keyPost := keyPre
+    if IsLazy(keyPre) {
+      var err error
+      keyPost, err = keyPre.EvalLazy(tag)
+      if err != nil {
+        return err
+      }
+
+      switch dType {
+      case STRING:
+        // TODO: check uniqueness
+        if _, err := AssertString(keyPost); err != nil {
+          return err
+        }
+      case INT:
+        // TODO: check uniqueness
+        if _, err := AssertInt(keyPost); err != nil {
+          return err
+        }
+      }
+    }
+
+    valPost, err := valPre.EvalLazy(tag)
+    if err != nil {
+      return err
+    }
+
+    t.items[i] = struct{key, value Token}{
+      keyPost,
+      valPost,
+    }
+  }
+
+  return nil
+}
+
+func (t *RawDict) EvalLazy(tag FinalTag) (Token, error) {
+  if err := t.evalLazy(tag, ANY); err != nil {
+    return nil, err
+  }
+
+  return t, nil
 }
 
 func (t *RawDict) convertKey(x interface{}) string {
@@ -319,7 +374,7 @@ func ToStringDict(t Token) (*StringDict, error) {
 		return res, nil
 	default:
 		errCtx := t.Context()
-		err := errCtx.NewError("Error: expected dict")
+		err := errCtx.NewError("Error: expected dict, got " + reflect.TypeOf(t).String())
 		return nil, err
 	}
 }

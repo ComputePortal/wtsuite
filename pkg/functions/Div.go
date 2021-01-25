@@ -34,10 +34,11 @@ func divFloats(a *tokens.Float, b *tokens.Float, ctx context.Context) (tokens.To
 	return tokens.NewValueUnitFloat(a.Value()/b.Value(), unit, ctx), nil
 }
 
-func Div(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 2 {
-		return nil, ctx.NewError("Error: expected 2 arguments")
-	}
+func Div(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewBinaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
 
 	switch a := args[0].(type) {
 	case *tokens.Int:
@@ -47,8 +48,8 @@ func Div(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.T
 		case *tokens.Float:
 			return divIntFloat(a, b, ctx)
 		default:
-			errCtx := b.Context()
-			return nil, errCtx.NewError("Error: expected Int or Float")
+			errCtx := ctx
+			return nil, errCtx.NewError("Error: expected Int or Float rhs")
 		}
 	case *tokens.Float:
 		switch b := args[1].(type) {
@@ -57,11 +58,11 @@ func Div(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.T
 		case *tokens.Float:
 			return divFloats(a, b, ctx)
 		default:
-			errCtx := b.Context()
-			return nil, errCtx.NewError("Error: expected Int or Float")
+			errCtx := ctx
+			return nil, errCtx.NewError("Error: expected Int or Float rhs")
 		}
 	default:
-		errCtx := a.Context()
-		return nil, errCtx.NewError("Error: expected Int or Float")
+		errCtx := ctx
+		return nil, errCtx.NewError("Error: expected Int or Float lhs")
 	}
 }

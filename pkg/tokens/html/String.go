@@ -1,25 +1,19 @@
 package html
 
 import (
-	"fmt"
-	"os"
 	"reflect"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type String struct {
-	wasWord bool // used by ui for special checking
 	value   string
 	TokenData
 }
 
 func NewValueString(value string, ctx context.Context) *String {
-	return &String{false, value, TokenData{ctx}}
-}
-
-func NewWordString(value string, ctx context.Context) *String {
-	return &String{true && VERBOSITY >= 3, value, TokenData{ctx}}
+	return &String{value, TokenData{ctx}}
 }
 
 func NewString(value string, ctx context.Context) (*String, error) {
@@ -27,7 +21,7 @@ func NewString(value string, ctx context.Context) (*String, error) {
 }
 
 func NewDummyContextString(value string) *String {
-	return &String{false, value, TokenData{context.NewDummyContext()}}
+	return &String{value, TokenData{context.NewDummyContext()}}
 }
 
 func (t *String) Value() string {
@@ -39,25 +33,10 @@ func (t *String) Len() int {
 }
 
 func (t *String) Eval(scope Scope) (Token, error) {
-	if t.wasWord {
-		ctx := t.Context()
-		nonWord := &String{false, t.value, TokenData{ctx}}
-		res, err := scope.Eval("get", []Token{nonWord, NewNull(ctx)}, ctx)
-		if err != nil {
-			panic("should never return error")
-		}
+	return t, nil
+}
 
-		if !IsNull(res) {
-			errCtx := ctx
-			err := errCtx.NewError("Warning: word is also a variable")
-			fmt.Fprintf(os.Stderr, err.Error())
-
-			t.wasWord = false // only warn once
-		}
-
-		return nonWord, nil
-	}
-
+func (t *String) EvalLazy(tag FinalTag) (Token, error) {
 	return t, nil
 }
 
@@ -85,6 +64,20 @@ func AssertString(t Token) (*String, error) {
 	}
 }
 
+func AssertWord(t Token) (*String, error) {
+  errCtx := t.Context()
+	if s, ok := t.(*String); !ok {
+		err := errCtx.NewError("Error: expected string")
+		return nil, err
+	} else {
+    if !patterns.IsValidVar(s.Value()) {
+      return nil, errCtx.NewError("Error: not a valid word (" + s.Value() + ")")
+    }
+
+		return s, nil
+	}
+}
+
 func (t *String) InnerContext() context.Context {
 	n := len(t.value)
 	if n == t.ctx.Len()-2 {
@@ -100,8 +93,4 @@ func (a *String) IsSame(other Token) bool {
 	} else {
 		return false
 	}
-}
-
-func (t *String) WasWord() bool {
-	return t.wasWord
 }

@@ -7,7 +7,9 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Year(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Year(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args := args_.Values()
+
 	if len(args) != 0 {
 		return nil, ctx.NewError("Error: unexpected arguments")
 	}

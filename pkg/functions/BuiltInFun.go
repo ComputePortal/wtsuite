@@ -22,6 +22,11 @@ func (f *BuiltInFun) Eval(scope tokens.Scope) (tokens.Token, error) {
 	return f, nil
 }
 
+func (f *BuiltInFun) EvalLazy(tag tokens.FinalTag) (tokens.Token, error) {
+  errCtx := f.Context()
+  return nil, errCtx.NewError("Error: function can't be lazily evaluated")
+}
+
 func (f *BuiltInFun) Context() context.Context {
 	return f.ctx
 }
@@ -33,7 +38,7 @@ func (a *BuiltInFun) IsSame(other tokens.Token) bool {
 	return false
 }
 
-func (f *BuiltInFun) EvalFun(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func (f *BuiltInFun) EvalFun(scope tokens.Scope, args *tokens.Parens, ctx context.Context) (tokens.Token, error) {
 	result, err := scope.Eval(f.name, args, ctx)
 	if err != nil {
 		context.AppendContextString(err, "Info: function defined here", f.Context())

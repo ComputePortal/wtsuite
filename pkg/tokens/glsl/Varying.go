@@ -44,6 +44,7 @@ func (t *Varying) WriteStatement(usage Usage, indent string, nl string, tab stri
   b.WriteString(t.typeExpr.WriteExpression())
   b.WriteString(" ")
   b.WriteString(t.nameExpr.WriteExpression())
+  b.WriteString(";")
 
   return b.String()
 }
@@ -64,6 +65,16 @@ func (t *Varying) EvalStatement() error {
 
   return nil
 }
+
+func (t *Varying) ResolveStatementActivity(usage Usage) error {
+  // can be set without usage in case of vertex shader
+  if TARGET == "fragment" {
+    return t.Pointer.ResolveStatementActivity(usage)
+  } else {
+    return nil
+  }
+}
+
 func (t *Varying) Collect(varyings map[string]string) error {
   // expecting only simple types
   varyings[t.Name()] = t.typeExpr.WriteExpression()

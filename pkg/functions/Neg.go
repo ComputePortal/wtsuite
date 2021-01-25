@@ -13,11 +13,12 @@ func negFloat(a *tokens.Float, ctx context.Context) (tokens.Token, error) {
 	return tokens.NewValueUnitFloat(-a.Value(), a.Unit(), ctx), nil
 }
 
-func Neg(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 1 {
-		return nil, ctx.NewError("Error: expected 1 argument")
-	}
-
+func Neg(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewUnaryInterface(ctx))
+  if err != nil {
+    return nil, err
+  }
+  
 	switch a := args[0].(type) {
 	case *tokens.Int:
 		return negInt(a, ctx)

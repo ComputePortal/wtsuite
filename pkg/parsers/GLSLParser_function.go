@@ -63,12 +63,12 @@ func (p *GLSLParser) buildFunctionArgument(ts []raw.Token) (*glsl.FunctionArgume
   }
 
   n := -1
-  if len(ts) == 2 {
+  if len(ts) == 3 {
     n, err = p.buildArraySize(ts[2])
     if err != nil {
       return nil, err
     }
-  } else if len(ts) > 2 {
+  } else if len(ts) > 3 {
     errCtx := ts[3].Context()
     return nil, errCtx.NewError("Error: unexpected tokens")
   }

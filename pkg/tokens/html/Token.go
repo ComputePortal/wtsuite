@@ -10,13 +10,14 @@ var (
 
 type Scope interface {
 	// caller can differ from scope
-	Eval(key string, args []Token, ctx context.Context) (Token, error)
+	Eval(key string, args *Parens, ctx context.Context) (Token, error)
 	Permissive() bool
 }
 
 type Token interface {
 	Dump(indent string) string // to inspect the syntax-tree
 	Eval(scope Scope) (Token, error)
+  EvalLazy(tag FinalTag) (Token, error) // final evaluation of attributes
 	IsSame(other Token) bool
 	Context() context.Context
 }

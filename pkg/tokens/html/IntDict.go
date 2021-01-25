@@ -31,6 +31,14 @@ func (t *IntDict) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+func (t *IntDict) EvalLazy(tag FinalTag) (Token, error) {
+  if err := t.evalLazy(tag, INT); err != nil {
+    return nil, err
+  }
+
+  return t, nil
+}
+
 func (a *IntDict) IsSame(other Token) bool {
 	if b, ok := other.(*IntDict); ok {
 		if a.Len() != b.Len() {

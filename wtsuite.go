@@ -61,7 +61,7 @@ func (t *Transpiler) TranspileTemplate(path string, name string, args_ map[strin
     }
   }
 
-  fileScope, _, err := directives.BuildFile(t.fileCache, path, "", false)
+  fileScope, _, err := directives.BuildFile(t.fileCache, path, "", false, nil)
   if err != nil {
     return nil, err
   }

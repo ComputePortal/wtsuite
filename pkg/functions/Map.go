@@ -5,7 +5,12 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Map(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Map(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+  
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
@@ -50,7 +55,7 @@ func Map(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.T
 		}
 
 		var err error
-		result[i], err = fn.EvalFun(scope, innerArgs, ctx)
+		result[i], err = fn.EvalFun(scope, tokens.NewParens(innerArgs, nil, ctx), ctx)
 		return err
 	}); err != nil {
 		return nil, err

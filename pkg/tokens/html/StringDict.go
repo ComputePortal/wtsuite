@@ -37,6 +37,15 @@ func (t *StringDict) Eval(scope Scope) (Token, error) {
 	return t, nil
 }
 
+// inplace, returns self
+func (t *StringDict) EvalLazy(tag FinalTag) (Token, error) {
+  if err := t.evalLazy(tag, STRING); err != nil {
+    return nil, err
+  }
+
+  return t, nil
+}
+
 func (t *StringDict) ToRaw() *RawDict {
 	return &RawDict{t.items, TokenData{t.Context()}}
 }
@@ -174,6 +183,26 @@ func (t *StringDict) Loop(fn func(key *String, value Token, last bool) error) er
 	}
 
 	return nil
+}
+
+func (t *StringDict) MapStringKeys(fn func(k string) string) (*StringDict, error) {
+  res := NewEmptyStringDict(t.Context())
+
+  res.items = make([]struct{key, value Token}, len(t.items))
+
+  for i, item := range t.items {
+    key_ := item.key
+
+    key, err := AssertString(key_)
+    if err != nil {
+      panic(err)
+    }
+
+    res.items[i].key = NewValueString(fn(key.Value()), key.Context())
+    res.items[i].value = item.value
+  }
+
+  return res, nil
 }
 
 func (t *StringDict) AssertOnlyValidKeys(validKeys []string) error {

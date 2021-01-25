@@ -7,10 +7,11 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Mix(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
-	if len(args) != 3 {
-		return nil, ctx.NewError("Error: expected 3 arguments")
-	}
+func Mix(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, NewInterface([]string{"a", "b", "f"}, ctx))
+  if err != nil {
+    return nil, err
+  }
 
 	color1, err := tokens.AssertColor(args[0])
 	if err != nil {

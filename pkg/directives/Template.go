@@ -14,8 +14,8 @@ type Template struct {
 	name        string
 	extends     string
 	scope       Scope
-	args        *tokens.List
-	argDefaults *tokens.List
+	args        *tokens.List // works a little different from Parens
+	argDefaults *tokens.List // works a little different from Parens
 	superAttr   *tokens.RawDict // passed on to super
 	children    []*tokens.Tag
 	imported    bool
@@ -185,7 +185,9 @@ func AddTemplate(scope Scope, node Node, tag *tokens.Tag) error {
 		err.AppendContextString("Info: defined here", scope.GetTemplate(key).ctx)
 		return err
 	default:
-		scope.SetTemplate(key, newTemplate(key, extends, scope, args, argDefaults, superAttr, tag.Children(), exported, tag.Context()))
+    if err := scope.SetTemplate(key, newTemplate(key, extends, scope, args, argDefaults, superAttr, tag.Children(), exported, tag.Context())); err != nil {
+      return err
+    }
 	}
 
 	return nil
@@ -269,6 +271,7 @@ func (c Template) instantiate(node *TemplateNode, args *tokens.StringDict,
 	ctx context.Context) error {
 	subScope := NewSubScope(c.scope)
   setElementCount(subScope, node, c.ctx)
+  setLazyTagVars(subScope, c.ctx) // __nchildren__ is only usable in the attributes
   setParentStyle(subScope, node, c.ctx)
 
 	// loop incoming attr and check if it is in c.args
@@ -289,7 +292,9 @@ func (c Template) instantiate(node *TemplateNode, args *tokens.StringDict,
 		} else if ok {
       // dont set if forced but not actually available
       vVar := functions.Var{v, true, true, false, false, v.Context()}
-      subScope.SetVar(kVal, vVar)
+      if err := subScope.SetVar(kVal, vVar); err != nil {
+        return err
+      }
     }
 		return nil
 	}); err != nil {
@@ -327,7 +332,9 @@ func (c Template) instantiate(node *TemplateNode, args *tokens.StringDict,
         }
 
         vVar := functions.Var{v, true, true, false, false, v.Context()}
-        subScope.SetVar(argName, vVar)
+        if err := subScope.SetVar(argName, vVar); err != nil {
+          return err
+        }
       }
 		}
 

@@ -16,6 +16,10 @@ import (
 func Math(scope Scope, node Node, tag *tokens.Tag) error {
 	attrScope := NewSubScope(scope)
 
+  if err := tag.AssertEmpty(); err != nil {
+    return err
+  }
+
 	// eval the incoming attr
 	attr, err := tag.Attributes([]string{"value", "inline"}) // inline defaults to true
 	if err != nil {
@@ -318,7 +322,12 @@ func parseMathAnchors(attr *tokens.StringDict) (int, int, float64, error) {
 }
 
 // assume it is used for inline, wrap around
-func evalMathURI(scope Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func evalMathURI(scope Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := functions.CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
 		return nil, ctx.NewError("Error: expected 1 argument")
 	}

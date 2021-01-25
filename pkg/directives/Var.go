@@ -96,7 +96,9 @@ func AddVar(scope Scope, node Node, tag *tokens.Tag) error {
 	default:
 		v := functions.Var{valueToken, constant, false, false, isExported,
 			nameToken.InnerContext()}
-		scope.SetVar(key, v)
+    if err := scope.SetVar(key, v); err != nil {
+      return err
+    }
 	}
 
 	return nil

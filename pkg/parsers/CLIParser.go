@@ -24,7 +24,7 @@ type CLIParser struct {
 }
 
 func NewCLIParser(info string, postInfo string, options []CLIOption, last CLIOption) *CLIParser {
-  if last.NArgs() == 0 {
+  if last != nil && last.NArgs() == 0 {
     panic("last option can't be a flag")
   }
 
@@ -56,6 +56,7 @@ func (p *CLIParser) Info() string {
 
     b.WriteString("  ")
     b.WriteString(optInfo)
+    b.WriteString("\n")
   }
 
   if p.postInfo != "" {
@@ -327,7 +328,7 @@ func (p *CLIParser) Parse(args []string) error {
     }
   } 
 
-  if len(positional) != p.last.NArgs() {
+  if p.last.NArgs() >= 0 && len(positional) != p.last.NArgs() {
     return p.Error("expected " + strconv.Itoa(p.last.NArgs()) + " positional args, got " + strconv.Itoa(len(positional)))
   }
 

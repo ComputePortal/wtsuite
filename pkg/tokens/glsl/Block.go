@@ -38,7 +38,6 @@ func (t *Block) Dump(indent string) string {
 func (t *Block) writeBlockStatements(usage Usage, indent string, nl string, tab string) string {
   var b strings.Builder
 
-	prevWroteSomething := false
 	for _, st := range t.statements {
 		s := st.WriteStatement(usage, indent, nl, tab)
 
@@ -47,14 +46,9 @@ func (t *Block) writeBlockStatements(usage Usage, indent string, nl string, tab 
       b.WriteString(s)
       b.WriteString("\n")
     } else if s != "" {
-			if prevWroteSomething {
-				b.WriteString(";")
-				b.WriteString(nl)
-			}
-
 			b.WriteString(s)
-
-			prevWroteSomething = true
+      b.WriteString(";")
+      b.WriteString(nl)
 		}
 	}
 

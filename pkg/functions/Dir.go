@@ -7,9 +7,14 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 )
 
-func Dir(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Dir(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 1 {
-		return nil, ctx.NewError("Error: exepected 1 argument")
+		return nil, ctx.NewError("Error: expected 1 argument")
 	}
 
 	path, err := tokens.AssertString(args[0])

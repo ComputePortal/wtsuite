@@ -32,8 +32,7 @@ func filterList(scope tokens.Scope, arg0 tokens.Token, arg1 tokens.Token, ctx co
 			return errCtx.NewError("Error: unsupported number of fn-args (expected 1 or 2)")
 		}
 
-		var err error
-		cond, err := fn.EvalFun(scope, innerArgs, ctx)
+		cond, err := fn.EvalFun(scope, tokens.NewParens(innerArgs, nil, ctx), ctx)
 		if err != nil {
 			return err
 		}
@@ -46,7 +45,7 @@ func filterList(scope tokens.Scope, arg0 tokens.Token, arg1 tokens.Token, ctx co
 		if b.Value() {
 			result = append(result, value)
 		}
-		return err
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -112,7 +111,12 @@ func filterDict(scope tokens.Scope, arg0 tokens.Token, arg1 tokens.Token, ctx co
 	return res, nil
 }
 
-func Filter(scope tokens.Scope, args []tokens.Token, ctx context.Context) (tokens.Token, error) {
+func Filter(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
+  args, err := CompleteArgs(args_, nil)
+  if err != nil {
+    return nil, err
+  }
+
 	if len(args) != 2 {
 		return nil, ctx.NewError("Error: expected 2 arguments")
 	}
@@ -122,10 +126,15 @@ func Filter(scope tokens.Scope, args []tokens.Token, ctx context.Context) (token
 		return nil, err
 	}
 
+	arg1, err := args[1].Eval(scope)
+	if err != nil {
+		return nil, err
+	}
+
 	if tokens.IsStringDict(arg0) {
-		return filterDict(scope, arg0, args[1], ctx)
+		return filterDict(scope, arg0, arg1, ctx)
 	} else if tokens.IsList(arg0) {
-		return filterList(scope, arg0, args[1], ctx)
+		return filterList(scope, arg0, arg1, ctx)
 	} else {
 		return nil, ctx.NewError("Error: expected list or dict for first arg")
 	}
