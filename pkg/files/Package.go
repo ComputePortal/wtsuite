@@ -256,7 +256,8 @@ func resolvePackages(startFile string, fetcher FetchFunc) error {
     return err
   }
 
-  _packages[dir] = pkg
+  //fmt.Println("Resolved package.json in ", dir, " for ", startFile, filepath.Dir(pkg.configPath)
+  _packages[filepath.Dir(pkg.configPath)] = pkg
 
   return nil
 }
