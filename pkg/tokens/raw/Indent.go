@@ -28,10 +28,6 @@ func IsIndent(t Token) bool {
   return ok
 }
 
-func IsWhitespace(t Token) bool {
-  return IsIndent(t) || IsNL(t)
-}
-
 func AssertIndent(t_ Token) (*Indent, error) {
   t, ok := t_.(*Indent)
   if ok {

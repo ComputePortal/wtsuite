@@ -90,7 +90,30 @@ var uiParserSettings = ParserSettings{
 		maskType: SYMBOL,
 		pattern:  patterns.TEMPLATE_SYMBOLS_REGEXP,
 	},
-	operators:                newOperatorsSettings([]operatorSettings{}), // handled by FormulaParser
+	operators:                newOperatorsSettings([]operatorSettings{
+    operatorSettings{17, "$", PRE},
+		operatorSettings{16, "-", PRE},
+		operatorSettings{16, "!", PRE},
+		operatorSettings{14, "/", BIN | L2R},
+		operatorSettings{14, "*", BIN | L2R},
+		operatorSettings{13, "-", BIN | L2R},
+		operatorSettings{13, "+", BIN | L2R},
+		operatorSettings{11, "<", BIN | L2R},
+		operatorSettings{11, "<=", BIN | L2R},
+		operatorSettings{11, ">", BIN | L2R},
+		operatorSettings{11, ">=", BIN | L2R},
+		operatorSettings{10, "!=", BIN | L2R},
+		operatorSettings{10, "==", BIN | L2R},
+		operatorSettings{10, "===", BIN | L2R},
+		operatorSettings{8, "&&", BIN | L2R},
+		operatorSettings{7, "||", BIN | L2R},
+		operatorSettings{6, "!!", BIN | L2R},
+    operatorSettings{5, "??", BIN | L2R},
+		operatorSettings{4, ":=", BIN}, // so we can use new in ternary operators
+		operatorSettings{3, "?", BIN},  // so we can use ternary operator inside dicts
+		operatorSettings{2, ":", SING | PRE | POST | BIN},
+		operatorSettings{1, "=", BIN},
+  }),
 	tmpGroupWords:            true,
 	tmpGroupPeriods:          false,
 	tmpGroupArrows:           false,
@@ -101,7 +124,6 @@ var uiParserSettings = ParserSettings{
 }
 
 type TemplateParser struct {
-	helper *HTMLParser
 	Parser
 }
 
@@ -116,7 +138,6 @@ func NewTemplateParser(path string) (*TemplateParser, error) {
 
 	ctx := context.NewContext(src, path)
 	p := &TemplateParser{
-		NewEmptyHTMLParser(context.NewDummyContext()),
 		newParser(raw, uiParserSettings, ctx),
 	}
 
@@ -265,7 +286,7 @@ func (p *TemplateParser) buildTextTag(inline bool, ts []raw.Token) (*html.Tag, [
   var rem []raw.Token
   var err error
   if !inline {
-    expr_, rem, err = p.buildExpression(ts)
+    expr_, rem, err = p.buildEndOfLineExpression(ts)
     if err != nil {
       return nil, nil, err
     }
@@ -302,7 +323,7 @@ func (p *TemplateParser) buildTextTag(inline bool, ts []raw.Token) (*html.Tag, [
 func (p *TemplateParser) buildImportExportNames(ts []raw.Token) (*html.RawDict, []raw.Token, error) {
   ctx := ts[0].Context()
   if r, ok := raw.FindGroupStop(ts, 1, ts[0]); ok {
-    groups, err := p.nestGroups(p.removeWhitespace(ts[0:r[1]+1]))
+    groups, err := p.nestGroups(raw.RemoveWhitespace(ts[0:r[1]+1]))
     if err != nil {
       return nil, nil, err
     }
@@ -359,7 +380,7 @@ func (p *TemplateParser) buildImportExportNames(ts []raw.Token) (*html.RawDict, 
         return nil, nil, errCtx.NewError("Error: expected \"as\"")
       }
 
-      oldNameExpr, rem, err := p.buildExpression(field[0:len(field)-2])
+      oldNameExpr, rem, err := p.buildEndOfLineExpression(field[0:len(field)-2])
       if err != nil {
         return nil, nil, err
       }
@@ -479,7 +500,7 @@ func (p *TemplateParser) buildImportExportDirective(dynamic bool, ts []raw.Token
   fromCtx := ts[0].Context()
   ts, _ = p.eatWhitespace(ts[1:])
 
-  srcExpr, rem, err := p.buildExpression(ts)
+  srcExpr, rem, err := p.buildEndOfLineExpression(ts)
   if err != nil {
     return nil, nil, err
   }
@@ -512,7 +533,7 @@ func (p *TemplateParser) buildFunctionDirective(ts []raw.Token) (*html.Tag, []ra
 
   ts = append([]raw.Token{keywordToken}, ts...)
 
-	fnValue, rem, err := p.buildExpression(ts)
+	fnValue, rem, err := p.buildEndOfLineExpression(ts)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -547,7 +568,7 @@ func (p *TemplateParser) buildVarDirective(ts []raw.Token) (*html.Tag, []raw.Tok
 
   ts, _ = p.eatWhitespace(ts[1:])
 
-  rhsExpr, rem, err := p.buildExpression(ts)
+  rhsExpr, rem, err := p.buildEndOfLineExpression(ts)
   if err != nil {
     return nil, nil, err
   }
@@ -593,7 +614,7 @@ func (p *TemplateParser) buildPermissiveDirective(ts []raw.Token) (*html.Tag, []
 
 func (p *TemplateParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token, error) {
   if r, ok := raw.FindGroupStop(ts, 1, ts[0]); ok {
-    groups, err := p.nestGroups(p.removeWhitespace(ts[0:r[1]+1]))
+    groups, err := p.nestGroups(raw.RemoveWhitespace(ts[0:r[1]+1]))
     if err != nil {
       return nil, nil, err
     }
@@ -621,7 +642,7 @@ func (p *TemplateParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token,
 
     for i, field := range group.Fields {
       if len(field) == 1 {
-        valExpr, rem, err := p.buildExpression(field)
+        valExpr, rem, err := p.buildEndOfLineExpression(field)
         if err != nil {
           return nil, nil, err
         }
@@ -641,7 +662,7 @@ func (p *TemplateParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token,
 
         values[i] = html.NewValueString(keyToken.Value(), keyToken.Context())
 
-        altExpr, rem, err := p.buildExpression(field[2:])
+        altExpr, rem, err := p.buildEndOfLineExpression(field[2:])
         if err != nil {
           return nil, nil, err
         }
@@ -660,7 +681,7 @@ func (p *TemplateParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token,
 
         values[i] = html.NewValueString(keyToken.Value() + "!", keyToken.Context())
 
-        altExpr, rem, err := p.buildExpression(field[2:])
+        altExpr, rem, err := p.buildEndOfLineExpression(field[2:])
         if err != nil {
           return nil, nil, err
         }
@@ -672,7 +693,7 @@ func (p *TemplateParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token,
 
         alts[i] = altExpr
       } else {
-        valExpr, rem, err := p.buildExpression(field)
+        valExpr, rem, err := p.buildEndOfLineExpression(field)
         if err != nil {
           return nil, nil, err
         }
@@ -778,7 +799,7 @@ func (p *TemplateParser) buildTemplateDirective(ts []raw.Token) (*html.Tag, []ra
 
   extendsCtx := ts[0].Context()
 
-  extendsExpr, extendsRem, err := p.buildExpression(ts[1:])
+  extendsExpr, extendsRem, err := p.buildEndOfLineExpression(ts[1:])
   if err != nil {
     return nil, nil, err
   }
@@ -826,7 +847,7 @@ func (p *TemplateParser) buildForDirective(ts []raw.Token) (*html.Tag, []raw.Tok
     return nil, nil, errCtx.NewError("Error: expected \"in\"")
   }
 
-  rhsExpr, rem, err := p.buildExpression(ts[1:])
+  rhsExpr, rem, err := p.buildEndOfLineExpression(ts[1:])
   if err != nil {
     return nil, nil, err
   }
@@ -850,7 +871,7 @@ func (p *TemplateParser) buildSingleOrNoValueDirective(ts []raw.Token) (*html.Ta
     for i, t := range ts[1:] {
       if raw.IsNL(t) {
         if i > 0 {
-          rhsExpr, rem, err := p.buildExpression(ts[1:])
+          rhsExpr, rem, err := p.buildEndOfLineExpression(ts[1:])
           if err != nil {
             return nil, nil, err
           }
@@ -1016,7 +1037,7 @@ func (p *TemplateParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.
   followedByParens := len(ts) > 1 && raw.IsSymbol(ts[1], patterns.PARENS_START)
 
 	switch {
-    case raw.IsLiteralString(ts[0]) || raw.IsSymbol(ts[0], patterns.DOLLAR) || raw.IsSymbol(ts[0], patterns.PARENS_START):
+    case raw.IsLiteralString(ts[0]) || raw.IsSymbol(ts[0], patterns.DOLLAR) || raw.IsSymbol(ts[0], patterns.PARENS_START) || raw.IsSymbol(ts[0], patterns.BRACES_START) || raw.IsSymbol(ts[0], patterns.BRACKETS_START):
       return p.buildTextTag(indent == -1, ts)
     case indent != -1 && raw.IsAnyWord(ts[0]):
       keyToken, err := raw.AssertWord(ts[0])
@@ -1057,175 +1078,6 @@ func (p *TemplateParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.
       errCtx := ts[0].Context()
       return nil, nil, errCtx.NewError("Error: not a tag")
 	}
-}
-
-func (p *TemplateParser) removeWhitespace(ts []raw.Token) []raw.Token {
-  tsInner := []raw.Token{}
-
-  // filter out the whitespace
-  for _, t := range ts {
-    if !raw.IsWhitespace(t) {
-      tsInner = append(tsInner, t)
-    }
-  }
-
-  return tsInner
-}
-
-func (p *TemplateParser) buildExpressionInternal(ts []raw.Token) (html.Token, error) {
-  ctx := ts[0].Context()
-  tsInner := p.removeWhitespace(ts)
-
-  // dummy FormulaParser for operators
-  fp, err := NewFormulaParser("", ctx)
-	if err != nil {
-		return nil, err
-	}
-
-  tsInner, err = fp.nestGroups(tsInner)
-	if err != nil {
-		return nil, err
-	}
-
-
-	tsInner, err = fp.nestOperators(tsInner)
-	if err != nil {
-		return nil, err
-	}
-
-	tsInner = p.expandTmpGroups(tsInner)
-
-  resExpr, err := p.helper.buildToken(tsInner)
-
-  if err != nil {
-    for _, t := range tsInner {
-      fmt.Println(t.Dump(""))
-    }
-  }
-  return resExpr, err
-}
-
-func (p *TemplateParser) buildExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
-  if len(ts) == 0 {
-    panic("no expression tokens")
-  }
-
-  isExpectsMoreOp := func(t raw.Token) bool {
-    if raw.IsAnySymbol(t) {
-      s, err := raw.AssertAnySymbol(t)
-      if err != nil {
-        panic(err)
-      }
-
-      v := s.Value()
-
-      // only operators, so can't use symbols pattern
-
-      if v == ":" || v == "$" || v == "?" || v == "<" || v == ">" || v == "+" || v == "-" || v == "/" || v == "*" || v == "!=" || v == "==" || v == ":=" || v == "<=" || v == ">=" || v == "!" || v == "===" || v == "&&" || v == "||" || v == "!!" || v == "??" {
-        return true
-      } else {
-        return false
-      }
-    } else {
-      return false
-    }
-  }
-
-  // find the end
-  iStop := 0
-  expectsMore := true
-  groupCount := 0
-  for i, t := range ts {
-    if raw.IsSymbol(t, patterns.BRACES_START) || raw.IsSymbol(t, patterns.PARENS_START) || raw.IsSymbol(t, patterns.BRACKETS_START) {
-      groupCount += 1
-      expectsMore = true
-    } else if raw.IsSymbol(t, patterns.BRACES_STOP) || raw.IsSymbol(t, patterns.PARENS_STOP) || raw.IsSymbol(t, patterns.BRACKETS_STOP) {
-      if groupCount == 0 {
-        errCtx := t.Context()
-        return nil, nil, errCtx.NewError("Error: unmatched closing tag")
-      }
-
-      groupCount -= 1
-
-      if groupCount == 0 {
-        expectsMore = false
-      }
-    } else if isExpectsMoreOp(t) {
-      expectsMore = true
-    } else if raw.IsNL(t) && !expectsMore {
-      iStop = i
-      break
-    } else if groupCount == 0 && !raw.IsWhitespace(t) {
-      expectsMore = false
-    }
-
-    iStop = i+1
-  }
-
-  resExpr, err := p.buildExpressionInternal(ts[0:iStop])
-
-  return resExpr, ts[iStop:], err
-}
-
-func (p *TemplateParser) buildTextTagExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
-  if len(ts) == 0 {
-    panic("no expression tokens")
-  }
-
-  isExpectsMoreOp := func(t raw.Token) bool {
-    if raw.IsAnySymbol(t) {
-      s, err := raw.AssertAnySymbol(t)
-      if err != nil {
-        panic(err)
-      }
-
-      v := s.Value()
-
-      // only operators, so can't use symbols pattern
-      if v == ":" || v == "$" || v == "?" || v == "+" || v == "!=" || v == "==" || v == "!" || v == "===" || v == "&&" || v == "||" || v == "!!" || v == "??" {
-        return true
-      } else {
-        return false
-      }
-    } else {
-      return false
-    }
-  }
-
-  // find the end
-  iStop := 0
-  expectsMore := true
-  groupCount := 0
-  for i, t := range ts {
-    if raw.IsSymbol(t, patterns.BRACES_START) || raw.IsSymbol(t, patterns.PARENS_START) || raw.IsSymbol(t, patterns.BRACKETS_START) {
-      groupCount += 1
-      expectsMore = true
-    } else if raw.IsSymbol(t, patterns.BRACES_STOP) || raw.IsSymbol(t, patterns.PARENS_STOP) || raw.IsSymbol(t, patterns.BRACKETS_STOP) {
-      if groupCount == 0 {
-        errCtx := t.Context()
-        return nil, nil, errCtx.NewError("Error: unmatched closing tag")
-      }
-
-      groupCount -= 1
-
-      if groupCount == 0 {
-        expectsMore = false
-      }
-    } else if isExpectsMoreOp(t) {
-      expectsMore = true
-    } else if (raw.IsNL(t) || raw.IsAnyWord(t) || raw.IsLiteralString(t) || raw.IsSymbol(t, "<")) && !expectsMore  {
-      iStop = i
-      break
-    } else if (raw.IsAnyWord(t) || raw.IsLiteralString(t) || raw.IsSymbol(t, "<")) && groupCount == 0 {
-      expectsMore = false
-    }
-
-    iStop = i+1
-  }
-
-  resExpr, err := p.buildExpressionInternal(ts[0:iStop])
-
-  return resExpr, ts[iStop:], err
 }
 
 // return indent from first non-empty line
