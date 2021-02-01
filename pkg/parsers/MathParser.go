@@ -19,7 +19,7 @@ func tokenizeMathWordsAndLiterals(s string, ctx context.Context) (raw.Token, err
 	case patterns.IsPlainFloat(s):
 		return raw.NewLiteralFloat(s, ctx)
 	// TODO: keyword operators
-	case patterns.IsWord(s):
+	case patterns.IsMathWord(s):
 		return raw.NewWord(s, ctx)
 	default:
 		return nil, ctx.NewError("Syntax Error: unparseable")

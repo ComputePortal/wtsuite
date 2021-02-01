@@ -865,10 +865,12 @@ func (p *Parser) tokenizeFlat() ([]tokens.Token, error) {
 		return nil, err
 	}
 
-	ts, err = p.tokenizeFormulas(ts)
-	if err != nil {
-		return nil, err
-	}
+  if p.settings.formulas.tokenizer != nil {
+    ts, err = p.tokenizeFormulas(ts)
+    if err != nil {
+      return nil, err
+    }
+  }
 
   if p.settings.tokenizeWhitespace {
     ts, err = p.tokenizeWhitespace(ts) 

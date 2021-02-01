@@ -12,10 +12,6 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
-func tokenizeTemplateFormulas(s string, ctx context.Context) ([]raw.Token, error) {
-	return nil, ctx.NewError("Error: can't have backtick formula in ui markup")
-}
-
 func tokenizeTemplateWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {
 	switch {
 	case patterns.IsColor(s):
@@ -77,7 +73,7 @@ var uiParserSettings = ParserSettings{
 		},
 	},
 	formulas: formulasSettings{
-		tokenizer: tokenizeTemplateFormulas,
+		tokenizer: nil,
 	},
 	// same as html
 	wordsAndLiterals: wordsAndLiteralsSettings{

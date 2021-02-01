@@ -62,17 +62,15 @@ const (
 
 // internal names
 const (
-	HTML_DEF_TAG_NAME   = "class"
-	HTML_DUMMY_TAG_NAME = "dummy" // used to be underscore, but that looked ugly in the editor
 	INTERNAL_STYLE_TREE = "__styleTree__"
 )
 
 var (
-	HTML_STRING_OR_COMMENT_REGEXP = compileRegexp(SQ_STRING_START,
+	XML_STRING_OR_COMMENT_REGEXP = compileRegexp(SQ_STRING_START,
 		DQ_STRING_START, SL_COMMENT_START,
 		ML_COMMENT_START, ML_COMMENT_STOP,
 		XML_COMMENT_START, XML_COMMENT_STOP, BT_FORMULA_START)
-	FORMULA_STRING_OR_COMMENT_REGEXP = HTML_STRING_OR_COMMENT_REGEXP
+	FORMULA_STRING_OR_COMMENT_REGEXP = XML_STRING_OR_COMMENT_REGEXP
 	JS_STRING_OR_COMMENT_REGEXP      = compileRegexp(SQ_STRING_START,
 		DQ_STRING_START, SL_COMMENT_START,
 		ML_COMMENT_START, ML_COMMENT_STOP, BT_FORMULA_START)
@@ -119,17 +117,18 @@ var (
 	DUMMY_TAG_NAME_REGEXP  = regexp.MustCompile(`^[\s]*>`)
 
 	NAMESPACE_SEPARATOR_REGEXP = compileRegexp(NAMESPACE_SEPARATOR)
-	HTML_SYMBOLS_REGEXP        = regexp.MustCompile(`[=,{}()[\]]`)
+	XML_SYMBOLS_REGEXP        = regexp.MustCompile(`[=,{}()[\]]`)
 	FORMULA_SYMBOLS_REGEXP     = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?])`)
 	JS_SYMBOLS_REGEXP          = regexp.MustCompile(`([>][>][>][=])|([=!][=][=])|([*][*][=])|([<][<][=])|([>][>][=])|([>][>][>])|([<>=!:+\-*/%&|^][=])|([*][*])|([&][&])|([<][<])|([>=][>])|([|][|])|([+][+])|([:][:])|([\-][\-])|([!<>=:,;{}()[\]+*/\-?%\.&|^~])`)
 	MATH_SYMBOLS_REGEXP        = regexp.MustCompile(`([>][>])|([<][<])|([/][/])|([-=][>])|([!<>=~]?[=])|([{}()[\]+\-<>*/\.^_=,])`)
   GLSL_SYMBOLS_REGEXP        = regexp.MustCompile(`([+][+])|([-][-])|([&][&])|([|][|])|([<>!=*+\-][=])|([#:!<>;{}()[\]/\-\.+*=,])`)
   TEMPLATE_SYMBOLS_REGEXP          = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?$])`)
 
-	HTML_WORD_REGEXP               = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
-  TEMPLATE_WORD_REGEXP                 = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
-	JS_WORD_REGEXP                 = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
-	HTML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%:]*`)
+	XML_WORD_REGEXP               = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
+  MATH_WORD_REGEXP              = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
+  TEMPLATE_WORD_REGEXP          = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
+	JS_WORD_REGEXP                = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
+	XML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!]?[A-Za-z_]+[0-9A-Za-z_\-.:]*`)
 	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-%.]*`)
 	FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP
@@ -233,8 +232,12 @@ func IsBool(s string) bool {
 	return s == BOOL_TRUE || s == BOOL_FALSE
 }
 
-func IsWord(s string) bool {
-	return HTML_WORD_REGEXP.MatchString(s)
+func IsXMLWord(s string) bool {
+	return XML_WORD_REGEXP.MatchString(s)
+}
+
+func IsMathWord(s string) bool {
+	return MATH_WORD_REGEXP.MatchString(s)
 }
 
 func IsTemplateWord(s string) bool {

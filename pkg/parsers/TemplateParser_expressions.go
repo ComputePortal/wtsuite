@@ -9,6 +9,26 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
+var templateFunctionMap = map[string]string{
+  "pre$":   "get",
+	"pre-":   "neg",
+	"pre!":   "not",
+	"bin/":   "div",
+	"bin*":   "mul",
+	"bin-":   "sub",
+	"bin+":   "add",
+	"bin<":   "lt",
+	"bin<=":  "le",
+	"bin>":   "gt",
+	"bin>=":  "ge",
+	"bin!=":  "ne",
+	"bin==":  "eq",
+	"bin===": "issame",
+	"bin||":  "or",
+	"bin&&":  "and",
+	// ":", "?", ":=" and "=" are treated explicitely
+}
+
 func (p *TemplateParser) buildEndOfLineExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
   if len(ts) == 0 {
     panic("no expression tokens")
@@ -146,19 +166,20 @@ func (p *TemplateParser) nestAndBuildExpression(ts []raw.Token) (html.Token, err
 		return nil, err
 	}
 
-	tsInner = p.expandTmpGroups(tsInner)
+	//tsInner = p.expandTmpGroups(tsInner)
 
   return p.buildExpression(tsInner)
 }
 
 func (p *TemplateParser) buildExpression(vs []raw.Token) (html.Token, error) {
-	if len(vs) == 1 {
+  vs = p.expandTmpGroups(vs)
+	/*if len(vs) == 1 {
 		if tmp, ok := vs[0].(*raw.Group); ok {
 			if tmp.IsTmp() {
 				vs = tmp.Fields[0]
 			}
 		}
-	}
+	}*/
 
 	switch len(vs) {
 	case 0:
@@ -334,7 +355,7 @@ func (p *TemplateParser) buildOperatorExpression(v *raw.Operator) (html.Token, e
 		if err != nil {
 			return nil, err
 		}
-		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
+		if fnName, ok := templateFunctionMap[v.Name()]; ok {
 			return html.NewFunction(fnName, []html.Token{a, b}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
@@ -359,7 +380,7 @@ func (p *TemplateParser) buildOperatorExpression(v *raw.Operator) (html.Token, e
 		if err != nil {
 			return nil, err
 		}
-		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
+		if fnName, ok := templateFunctionMap[v.Name()]; ok {
 			return html.NewFunction(fnName, []html.Token{a}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
@@ -370,14 +391,14 @@ func (p *TemplateParser) buildOperatorExpression(v *raw.Operator) (html.Token, e
 		if err != nil {
 			return nil, err
 		}
-		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
+		if fnName, ok := templateFunctionMap[v.Name()]; ok {
 			return html.NewFunction(fnName, []html.Token{a}, v.Context()), nil
 		} else {
 			errCtx := v.Context()
 			return nil, errCtx.NewError("Error: post unary operator '" + strings.TrimLeft(v.Name(), "post") + "' not recognized")
 		}
 	case strings.HasPrefix(v.Name(), "sing"):
-		if fnName, ok := htmlFunctionMap[v.Name()]; ok {
+		if fnName, ok := templateFunctionMap[v.Name()]; ok {
 			return html.NewFunction(fnName, []html.Token{}, v.Context()), nil
 		} else {
 			errCtx := v.Context()

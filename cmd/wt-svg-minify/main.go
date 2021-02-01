@@ -77,7 +77,7 @@ func setUpEnv(cmdArgs CmdArgs) {
 }
 
 func buildSVGFile(path string) (string, error) {
-	p, err := parsers.NewHTMLParser(path)
+	p, err := parsers.NewXMLParser(path)
 	if err != nil {
 		return "", err
 	}
