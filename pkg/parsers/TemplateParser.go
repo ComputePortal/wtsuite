@@ -12,11 +12,11 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/raw"
 )
 
-func tokenizeUIFormulas(s string, ctx context.Context) ([]raw.Token, error) {
+func tokenizeTemplateFormulas(s string, ctx context.Context) ([]raw.Token, error) {
 	return nil, ctx.NewError("Error: can't have backtick formula in ui markup")
 }
 
-func tokenizeUIWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {
+func tokenizeTemplateWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {
 	switch {
 	case patterns.IsColor(s):
 		return raw.NewLiteralColor(s, ctx)
@@ -28,7 +28,7 @@ func tokenizeUIWordsAndLiterals(s string, ctx context.Context) (raw.Token, error
 		return raw.NewLiteralBool(s, ctx)
 	case patterns.IsNull(s):
 		return raw.NewLiteralNull(ctx), nil
-	case patterns.IsUIWord(s):
+	case patterns.IsTemplateWord(s):
 		return raw.NewWord(s, ctx)
 	default:
 		return nil, ctx.NewError("Syntax Error: unparseable")
@@ -37,7 +37,7 @@ func tokenizeUIWordsAndLiterals(s string, ctx context.Context) (raw.Token, error
 
 var uiParserSettings = ParserSettings{
 	quotedGroups: quotedGroupsSettings{
-		pattern: patterns.UI_STRING_OR_COMMENT_REGEXP,
+		pattern: patterns.TEMPLATE_STRING_OR_COMMENT_REGEXP,
 		groups: []quotedGroupSettings{
 			quotedGroupSettings{
 				maskType:        STRING,
@@ -77,18 +77,18 @@ var uiParserSettings = ParserSettings{
 		},
 	},
 	formulas: formulasSettings{
-		tokenizer: tokenizeUIFormulas,
+		tokenizer: tokenizeTemplateFormulas,
 	},
 	// same as html
 	wordsAndLiterals: wordsAndLiteralsSettings{
 		maskType:  WORD_OR_LITERAL,
-		pattern:   patterns.UI_WORD_OR_LITERAL_REGEXP,
-		tokenizer: tokenizeUIWordsAndLiterals,
+		pattern:   patterns.TEMPLATE_WORD_OR_LITERAL_REGEXP,
+		tokenizer: tokenizeTemplateWordsAndLiterals,
 	},
 	// handled by FormulaParser
 	symbols: symbolsSettings{
 		maskType: SYMBOL,
-		pattern:  patterns.UI_SYMBOLS_REGEXP,
+		pattern:  patterns.TEMPLATE_SYMBOLS_REGEXP,
 	},
 	operators:                newOperatorsSettings([]operatorSettings{}), // handled by FormulaParser
 	tmpGroupWords:            true,
@@ -100,12 +100,12 @@ var uiParserSettings = ParserSettings{
   tokenizeWhitespace:       true,
 }
 
-type UIParser struct {
+type TemplateParser struct {
 	helper *HTMLParser
 	Parser
 }
 
-func NewUIParser(path string) (*UIParser, error) {
+func NewTemplateParser(path string) (*TemplateParser, error) {
 	rawBytes, err := ioutil.ReadFile(path)
 	if err != nil {
     return nil, errors.New("Error: problem reading \"" + path + "\" (" + err.Error() + ")")
@@ -115,7 +115,7 @@ func NewUIParser(path string) (*UIParser, error) {
 	src := context.NewSource(raw)
 
 	ctx := context.NewContext(src, path)
-	p := &UIParser{
+	p := &TemplateParser{
 		NewEmptyHTMLParser(context.NewDummyContext()),
 		newParser(raw, uiParserSettings, ctx),
 	}
@@ -127,7 +127,7 @@ func NewUIParser(path string) (*UIParser, error) {
 	return p, nil
 }
 
-func (p *UIParser) BuildTags() ([]*html.Tag, error) {
+func (p *TemplateParser) BuildTags() ([]*html.Tag, error) {
   ts, err := p.tokenizeFlat()
   if err != nil {
     return nil, err
@@ -258,7 +258,7 @@ func (p *UIParser) BuildTags() ([]*html.Tag, error) {
 	return result, nil
 }
 
-func (p *UIParser) buildTextTag(inline bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildTextTag(inline bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
   ctx := ts[0].Context()
 
   var expr_ html.Token
@@ -299,7 +299,7 @@ func (p *UIParser) buildTextTag(inline bool, ts []raw.Token) (*html.Tag, []raw.T
   }
 }
 
-func (p *UIParser) buildImportExportNames(ts []raw.Token) (*html.RawDict, []raw.Token, error) {
+func (p *TemplateParser) buildImportExportNames(ts []raw.Token) (*html.RawDict, []raw.Token, error) {
   ctx := ts[0].Context()
   if r, ok := raw.FindGroupStop(ts, 1, ts[0]); ok {
     groups, err := p.nestGroups(p.removeWhitespace(ts[0:r[1]+1]))
@@ -389,7 +389,7 @@ func (p *UIParser) buildImportExportNames(ts []raw.Token) (*html.RawDict, []raw.
 // export {name1, name2, name3 as alias3}
 // import {name1, name2, name3 as alias3}(parameters) from expression...
 // export {name1, name2, name3 as alias3}(parameters) from expression...
-func (p *UIParser) buildImportExportDirective(dynamic bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildImportExportDirective(dynamic bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
   nameToken, err := raw.AssertWord(ts[0])
   if err != nil {
     return nil, nil, err
@@ -492,7 +492,7 @@ func (p *UIParser) buildImportExportDirective(dynamic bool, ts []raw.Token) (*ht
 
 // everything following the function keyword
 // eat until first closing brace (containerCount == 0
-func (p *UIParser) buildFunctionDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildFunctionDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   ctx := ts[0].Context()
 
   if len(ts) < 3 {
@@ -525,7 +525,7 @@ func (p *UIParser) buildFunctionDirective(ts []raw.Token) (*html.Tag, []raw.Toke
 	return html.NewDirectiveTag("var", varAttr, []*html.Tag{}, ctx), rem, nil
 }
 
-func (p *UIParser) buildVarDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildVarDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   ctx := ts[0].Context()
 
   if len(ts) < 4 {
@@ -560,7 +560,7 @@ func (p *UIParser) buildVarDirective(ts []raw.Token) (*html.Tag, []raw.Token, er
 	return html.NewDirectiveTag("var", attr, []*html.Tag{}, ctx), rem, nil
 }
 
-func (p *UIParser) buildPermissiveDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildPermissiveDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   for ;len(ts) > 0 && raw.IsWhitespace(ts[0]); {
     ts = ts[1:]
   }
@@ -591,7 +591,7 @@ func (p *UIParser) buildPermissiveDirective(ts []raw.Token) (*html.Tag, []raw.To
   }
 }
 
-func (p *UIParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token, error) {
+func (p *TemplateParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token, error) {
   if r, ok := raw.FindGroupStop(ts, 1, ts[0]); ok {
     groups, err := p.nestGroups(p.removeWhitespace(ts[0:r[1]+1]))
     if err != nil {
@@ -698,7 +698,7 @@ func (p *UIParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token, error
   }
 }
 
-func (p *UIParser) buildParametersDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildParametersDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   parens, rem, err := p.buildParens(ts[1:])
   if err != nil {
     return nil, nil, err
@@ -713,7 +713,7 @@ func (p *UIParser) buildParametersDirective(ts []raw.Token) (*html.Tag, []raw.To
   return tag, rem, nil
 }
 
-func (p *UIParser) buildTemplateDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildTemplateDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   if !raw.IsWord(ts[0], "template") {
     errCtx := ts[0].Context()
     return nil, nil, errCtx.NewError("Error: expected template keyword")
@@ -795,7 +795,7 @@ func (p *UIParser) buildTemplateDirective(ts []raw.Token) (*html.Tag, []raw.Toke
 	return html.NewDirectiveTag("template", attr, []*html.Tag{}, ctx), rem, nil
 }
 
-func (p *UIParser) buildForDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildForDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   ctx := ts[0].Context()
   attr := html.NewEmptyRawDict(ctx)
 
@@ -836,7 +836,7 @@ func (p *UIParser) buildForDirective(ts []raw.Token) (*html.Tag, []raw.Token, er
 	return html.NewDirectiveTag("for", attr, []*html.Tag{}, ctx), rem, nil
 }
 
-func (p *UIParser) buildSingleOrNoValueDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildSingleOrNoValueDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   firstToken, err := raw.AssertWord(ts[0])
   if err != nil {
     return nil, nil, err
@@ -875,7 +875,7 @@ func (p *UIParser) buildSingleOrNoValueDirective(ts []raw.Token) (*html.Tag, []r
   }
 }
 
-func (p *UIParser) buildExportedDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildExportedDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   if len(ts) < 2 {
     errCtx := ts[0].Context()
     return nil, nil, errCtx.NewError("Error: expected more tokens")
@@ -929,7 +929,7 @@ func (p *UIParser) buildExportedDirective(ts []raw.Token) (*html.Tag, []raw.Toke
   }
 }
 
-func (p *UIParser) buildGenericTag(inline bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildGenericTag(inline bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
   nameToken, err := raw.AssertWord(ts[0])
   if err != nil {
     return nil, nil, err
@@ -1009,7 +1009,7 @@ func (p *UIParser) buildGenericTag(inline bool, ts []raw.Token) (*html.Tag, []ra
 
 // indent -1 means that we are inlining
 // also returns the remaining tokens
-func (p *UIParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.Token, error) {
   // no more eating needed in here?
 	tagCtx := ts[0].Context()
 
@@ -1059,7 +1059,7 @@ func (p *UIParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.Token,
 	}
 }
 
-func (p *UIParser) removeWhitespace(ts []raw.Token) []raw.Token {
+func (p *TemplateParser) removeWhitespace(ts []raw.Token) []raw.Token {
   tsInner := []raw.Token{}
 
   // filter out the whitespace
@@ -1072,7 +1072,7 @@ func (p *UIParser) removeWhitespace(ts []raw.Token) []raw.Token {
   return tsInner
 }
 
-func (p *UIParser) buildExpressionInternal(ts []raw.Token) (html.Token, error) {
+func (p *TemplateParser) buildExpressionInternal(ts []raw.Token) (html.Token, error) {
   ctx := ts[0].Context()
   tsInner := p.removeWhitespace(ts)
 
@@ -1105,7 +1105,7 @@ func (p *UIParser) buildExpressionInternal(ts []raw.Token) (html.Token, error) {
   return resExpr, err
 }
 
-func (p *UIParser) buildExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
+func (p *TemplateParser) buildExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
   if len(ts) == 0 {
     panic("no expression tokens")
   }
@@ -1167,7 +1167,7 @@ func (p *UIParser) buildExpression(ts []raw.Token) (html.Token, []raw.Token, err
   return resExpr, ts[iStop:], err
 }
 
-func (p *UIParser) buildTextTagExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
+func (p *TemplateParser) buildTextTagExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
   if len(ts) == 0 {
     panic("no expression tokens")
   }
@@ -1229,7 +1229,7 @@ func (p *UIParser) buildTextTagExpression(ts []raw.Token) (html.Token, []raw.Tok
 }
 
 // return indent from first non-empty line
-func (p *UIParser) eatWhitespace(ts []raw.Token) ([]raw.Token, int) {
+func (p *TemplateParser) eatWhitespace(ts []raw.Token) ([]raw.Token, int) {
   for i, t := range ts {
     if !raw.IsWhitespace(t) {
       if i == 0 {
@@ -1253,7 +1253,7 @@ func (p *UIParser) eatWhitespace(ts []raw.Token) ([]raw.Token, int) {
   return []raw.Token{}, 0
 }
 
-func (p *UIParser) DumpTokens() {
+func (p *TemplateParser) DumpTokens() {
 	fmt.Println("\nRaw tokens:")
 	fmt.Println("===========")
 
@@ -1267,7 +1267,7 @@ func (p *UIParser) DumpTokens() {
 		fmt.Println(t.Dump(""))
 	}
 
-	fmt.Println("\nUI tokens:")
+	fmt.Println("\nTemplate tokens:")
 	fmt.Println("===========")
 
 	p.Reset()

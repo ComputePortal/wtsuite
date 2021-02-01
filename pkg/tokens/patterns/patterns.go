@@ -78,7 +78,7 @@ var (
 		ML_COMMENT_START, ML_COMMENT_STOP, BT_FORMULA_START)
   GLSL_STRING_OR_COMMENT_REGEXP    = JS_STRING_OR_COMMENT_REGEXP
 	MATH_STRING_OR_COMMENT_REGEXP = compileRegexp(SL_COMMENT_START, ML_COMMENT_START, ML_COMMENT_STOP)
-	UI_STRING_OR_COMMENT_REGEXP   = compileRegexp(SQ_STRING_START,
+	TEMPLATE_STRING_OR_COMMENT_REGEXP   = compileRegexp(SQ_STRING_START,
 		DQ_STRING_START, SL_COMMENT_START,
 		ML_COMMENT_START, ML_COMMENT_STOP)
 
@@ -124,13 +124,13 @@ var (
 	JS_SYMBOLS_REGEXP          = regexp.MustCompile(`([>][>][>][=])|([=!][=][=])|([*][*][=])|([<][<][=])|([>][>][=])|([>][>][>])|([<>=!:+\-*/%&|^][=])|([*][*])|([&][&])|([<][<])|([>=][>])|([|][|])|([+][+])|([:][:])|([\-][\-])|([!<>=:,;{}()[\]+*/\-?%\.&|^~])`)
 	MATH_SYMBOLS_REGEXP        = regexp.MustCompile(`([>][>])|([<][<])|([/][/])|([-=][>])|([!<>=~]?[=])|([{}()[\]+\-<>*/\.^_=,])`)
   GLSL_SYMBOLS_REGEXP        = regexp.MustCompile(`([+][+])|([-][-])|([&][&])|([|][|])|([<>!=*+\-][=])|([#:!<>;{}()[\]/\-\.+*=,])`)
-  UI_SYMBOLS_REGEXP          = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?$])`)
+  TEMPLATE_SYMBOLS_REGEXP          = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?$])`)
 
 	HTML_WORD_REGEXP               = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
-  UI_WORD_REGEXP                 = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
+  TEMPLATE_WORD_REGEXP                 = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
 	JS_WORD_REGEXP                 = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
 	HTML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%:]*`)
-	UI_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-%.]*`)
+	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-%.]*`)
 	FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP
 
@@ -147,9 +147,9 @@ var (
 
 	JS_UNIVERSAL_CLASS_NAME_REGEXP = regexp.MustCompile(`^[A-Z][a-zA-Z]*$`)
 
-	UI_TEMPLATE_SUPER_REGEXP             = regexp.MustCompile(`\bsuper[\s]*[(]`)
-	UI_TEMPLATE_NAME_REGEXP              = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
-	UI_TEMPLATE_EXTENDS_TO_SUPER_REGEXP  = regexp.MustCompile(`\b(extends[\s]*[=].*)super`)
+	TEMPLATE_SUPER_REGEXP             = regexp.MustCompile(`\bsuper[\s]*[(]`)
+	TEMPLATE_NAME_REGEXP              = regexp.MustCompile(`\b[a-zA-Z_][a-zA-Z0-9_]*\b`)
+	TEMPLATE_EXTENDS_TO_SUPER_REGEXP  = regexp.MustCompile(`\b(extends[\s]*[=].*)super`)
 
 	CSS_PLAIN_CLASS_REGEXP = regexp.MustCompile(`^[\.][a-zA-Z_\-0-9]*$`)
 )
@@ -237,8 +237,8 @@ func IsWord(s string) bool {
 	return HTML_WORD_REGEXP.MatchString(s)
 }
 
-func IsUIWord(s string) bool {
-  return UI_WORD_REGEXP.MatchString(s)
+func IsTemplateWord(s string) bool {
+  return TEMPLATE_WORD_REGEXP.MatchString(s)
 }
 
 func IsJSWord(s string) bool {

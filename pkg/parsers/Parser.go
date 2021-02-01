@@ -23,7 +23,7 @@ const (
 	FORMULA
 	WORD_OR_LITERAL
 	SYMBOL
-  TOKENIZED_WHITESPACE // only parsed whitespace for UIParser
+  TOKENIZED_WHITESPACE // only parsed whitespace for TemplateParser
 )
 
 type Parser struct {

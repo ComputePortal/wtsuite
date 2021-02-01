@@ -51,7 +51,7 @@ func buildSyntaxTree(cmdArgs CmdArgs) {
     panic("path should be absolute")
   }
 
-  p, err := parsers.NewUIParser(path)
+  p, err := parsers.NewTemplateParser(path)
   if err != nil {
     printSyntaxErrorAndExit(err)
   }

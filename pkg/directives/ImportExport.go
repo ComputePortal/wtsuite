@@ -18,7 +18,7 @@ type CachedScope struct {
 }
 
 func parseFile(path string) ([]*tokens.Tag, context.Context, error) {
-  p, err := parsers.NewUIParser(path)
+  p, err := parsers.NewTemplateParser(path)
   if err != nil {
     return nil, context.Context{}, err
   }
