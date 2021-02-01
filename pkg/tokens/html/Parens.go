@@ -305,3 +305,22 @@ func AssertParens(t Token) (*Parens, error) {
 
 	return p, nil
 }
+
+func (t *Parens) ToRawDict() *RawDict {
+  keys := make([]Token, t.Len())
+  values := make([]Token, t.Len())
+
+  for i, v := range t.values {
+    alt := t.alts[i]
+
+    if alt == nil {
+      keys[i] = NewValueInt(i, v.Context())
+      values[i] = v
+    } else {
+      keys[i] = v
+      values[i] = alt
+    }
+  }
+
+  return NewValuesRawDict(keys, values, t.Context())
+}

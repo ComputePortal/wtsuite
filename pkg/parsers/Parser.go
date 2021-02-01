@@ -17,11 +17,13 @@ type RuneMask int
 
 const (
 	NONE RuneMask = iota
-	COMMENT
+	SL_COMMENT
+  ML_COMMENT
 	STRING
 	FORMULA
 	WORD_OR_LITERAL
 	SYMBOL
+  TOKENIZED_WHITESPACE // only parsed whitespace for UIParser
 )
 
 type Parser struct {
@@ -79,12 +81,18 @@ func (p *Parser) isWhiteSpace(i int) bool {
 	return r == 10 || r == 13 || r == 9 || r == 32
 }
 
+func (p *Parser) isComment(i int) bool {
+  m := p.mask[i]
+
+  return m == SL_COMMENT || m == ML_COMMENT
+}
+
 func (p *Parser) isEmpty(start, end int) bool {
 	if p.Len() == 0 {
 		return true
 	} else {
 		for i := start; i < end; i++ {
-			if !(p.mask[i] == COMMENT || p.isWhiteSpace(i)) {
+			if !(p.isComment(i) || p.isWhiteSpace(i)) {
 				return false
 			}
 		}
@@ -159,7 +167,7 @@ func (p *Parser) Write(start, stop int) string {
 	}
 
 	for i := start; i < stop; i++ {
-		if p.mask[i] != COMMENT {
+		if !p.isComment(i) {
 			b.WriteRune(p.raw[i])
 		}
 	}
@@ -175,7 +183,7 @@ func (p *Parser) writeWithoutFormulasAndStrings(start, stop int) string {
 	// remove the comment parts
 	var b strings.Builder
 	for i := start; i < stop; i++ {
-		if p.mask[i] != COMMENT && p.mask[i] != FORMULA && p.mask[i] != STRING {
+		if !p.isComment(i) && p.mask[i] != FORMULA && p.mask[i] != STRING {
 			b.WriteRune(p.raw[i])
 		}
 	}
@@ -337,6 +345,67 @@ func (p *Parser) tokenizeFormulas(ts []tokens.Token) ([]tokens.Token, error) {
 	})
 }
 
+// ML_COMMENT acts as exactly as whitespace
+func (p *Parser) tokenizeWhitespace(ts []tokens.Token) ([]tokens.Token, error) {
+  // NL can span multiple lines
+  indent := 0
+  lastNL := -1
+  emptyLine := true
+
+  for i, r := range p.raw {
+    m := p.mask[i]
+
+    isStringOrFormula := (m == STRING || m == FORMULA)
+
+    if emptyLine {
+      if r == 32 && !isStringOrFormula {
+        indent += 1
+      } else if r == 9 && !isStringOrFormula {
+        indent += 2 // tab is two spaces
+      } else if m == ML_COMMENT {
+        // ml comment acts as whitespace
+        if r == 10 || r == 13 {
+          lastNL = i
+          indent = 0
+        } else {
+          indent += 1
+        }
+      } else if m == SL_COMMENT {
+        // keep resetting until end of line of SL_COMMENT
+        lastNL = i
+        indent = 0
+      } else if !isStringOrFormula && (r == 10 || r == 13) {
+        // reset the indent, don't create a newline token
+        lastNL = i
+        indent = 0
+      } else {
+        ctx := p.NewContext(lastNL+1, i)
+        p.SetMask(lastNL+1, i, TOKENIZED_WHITESPACE)
+        ts = append(ts, tokens.NewIndent(indent, ctx))
+        emptyLine = false
+      }
+    } else {
+      if m != ML_COMMENT && !isStringOrFormula && (r == 10 || r == 13) {
+        iEnd := i + 1
+        if i+1 < len(p.raw) && p.raw[i+1] == 13 {
+          iEnd += 1
+        }
+
+        ctx := p.NewContext(i, iEnd)
+        ts = append(ts, tokens.NewNL(ctx))
+        p.SetMask(i, iEnd, TOKENIZED_WHITESPACE)
+        lastNL = iEnd-1
+        indent = 0
+        emptyLine = true
+      }
+    }
+  }
+
+	p.SeekToStart()
+
+  return ts, nil
+}
+
 func (p *Parser) tokenizeWordsAndLiterals(ts []tokens.Token) ([]tokens.Token, error) {
 	for true {
 		if r, s, ok := p.nextMatch(p.settings.wordsAndLiterals.pattern, false); ok {
@@ -370,6 +439,7 @@ func (p *Parser) tokenizeSymbols(ts []tokens.Token) []tokens.Token {
 
 	return ts
 }
+
 
 func (p *Parser) sortTokens(ts []tokens.Token) {
 	sort.Slice(ts, func(i, j int) bool {
@@ -799,6 +869,13 @@ func (p *Parser) tokenizeFlat() ([]tokens.Token, error) {
 	if err != nil {
 		return nil, err
 	}
+
+  if p.settings.tokenizeWhitespace {
+    ts, err = p.tokenizeWhitespace(ts) 
+    if err != nil {
+      return nil, err
+    }
+  }
 
 	ts, err = p.tokenizeWordsAndLiterals(ts)
 	if err != nil {

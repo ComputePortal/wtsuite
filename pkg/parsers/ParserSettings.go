@@ -75,6 +75,7 @@ type ParserSettings struct {
 	tmpGroupDColons          bool
 	tmpGroupAngled           bool
 	recursivelyNestOperators bool
+  tokenizeWhitespace       bool
 }
 
 func newOperatorsSettings(operators []operatorSettings) operatorsSettings {

@@ -18,6 +18,7 @@ const (
 	COMMA     = ","
 	SEMICOLON = ";"
 	EQUAL     = "="
+  DOLLAR    = "$"
 
 	SPLAT       = "..."
 	DCOLON      = "::"
@@ -123,10 +124,13 @@ var (
 	JS_SYMBOLS_REGEXP          = regexp.MustCompile(`([>][>][>][=])|([=!][=][=])|([*][*][=])|([<][<][=])|([>][>][=])|([>][>][>])|([<>=!:+\-*/%&|^][=])|([*][*])|([&][&])|([<][<])|([>=][>])|([|][|])|([+][+])|([:][:])|([\-][\-])|([!<>=:,;{}()[\]+*/\-?%\.&|^~])`)
 	MATH_SYMBOLS_REGEXP        = regexp.MustCompile(`([>][>])|([<][<])|([/][/])|([-=][>])|([!<>=~]?[=])|([{}()[\]+\-<>*/\.^_=,])`)
   GLSL_SYMBOLS_REGEXP        = regexp.MustCompile(`([+][+])|([-][-])|([&][&])|([|][|])|([<>!=*+\-][=])|([#:!<>;{}()[\]/\-\.+*=,])`)
+  UI_SYMBOLS_REGEXP          = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?$])`)
 
 	HTML_WORD_REGEXP               = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
+  UI_WORD_REGEXP                 = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
 	JS_WORD_REGEXP                 = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
 	HTML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%:]*`)
+	UI_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-%.]*`)
 	FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP
 
@@ -231,6 +235,10 @@ func IsBool(s string) bool {
 
 func IsWord(s string) bool {
 	return HTML_WORD_REGEXP.MatchString(s)
+}
+
+func IsUIWord(s string) bool {
+  return UI_WORD_REGEXP.MatchString(s)
 }
 
 func IsJSWord(s string) bool {

@@ -158,7 +158,16 @@ func MergeContexts(cs ...Context) Context {
 }
 
 func (c *Context) Less(other *Context) bool {
-	return c.ranges[0].start < other.ranges[0].start
+  a := c.ranges[0].start
+  b := other.ranges[0].start
+  if a == b {
+    a = c.ranges[0].stop
+    b = other.ranges[0].stop
+
+    return a < b
+  } else {
+    return a < b 
+  }
 }
 
 func (c *Context) IsAtLineStart() bool {

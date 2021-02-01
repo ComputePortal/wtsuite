@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
-  "unicode"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	"github.com/computeportal/wtsuite/pkg/tokens/html"
@@ -16,6 +14,25 @@ import (
 
 func tokenizeUIFormulas(s string, ctx context.Context) ([]raw.Token, error) {
 	return nil, ctx.NewError("Error: can't have backtick formula in ui markup")
+}
+
+func tokenizeUIWordsAndLiterals(s string, ctx context.Context) (raw.Token, error) {
+	switch {
+	case patterns.IsColor(s):
+		return raw.NewLiteralColor(s, ctx)
+	case patterns.IsInt(s):
+		return raw.NewLiteralInt(s, ctx)
+	case patterns.IsFloat(s):
+		return raw.NewLiteralFloat(s, ctx)
+	case patterns.IsBool(s):
+		return raw.NewLiteralBool(s, ctx)
+	case patterns.IsNull(s):
+		return raw.NewLiteralNull(ctx), nil
+	case patterns.IsUIWord(s):
+		return raw.NewWord(s, ctx)
+	default:
+		return nil, ctx.NewError("Syntax Error: unparseable")
+	}
 }
 
 var uiParserSettings = ParserSettings{
@@ -44,14 +61,14 @@ var uiParserSettings = ParserSettings{
 				trackStarts:     true,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        SL_COMMENT,
 				groupPattern:    patterns.SL_COMMENT_GROUP,
 				assertStopMatch: false,
 				info:            "single-line comment",
 				trackStarts:     false,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        ML_COMMENT,
 				groupPattern:    patterns.ML_COMMENT_GROUP,
 				assertStopMatch: true,
 				info:            "js-style multiline comment",
@@ -65,13 +82,13 @@ var uiParserSettings = ParserSettings{
 	// same as html
 	wordsAndLiterals: wordsAndLiteralsSettings{
 		maskType:  WORD_OR_LITERAL,
-		pattern:   patterns.HTML_WORD_OR_LITERAL_REGEXP,
-		tokenizer: tokenizeHTMLWordsAndLiterals,
+		pattern:   patterns.UI_WORD_OR_LITERAL_REGEXP,
+		tokenizer: tokenizeUIWordsAndLiterals,
 	},
 	// handled by FormulaParser
 	symbols: symbolsSettings{
 		maskType: SYMBOL,
-		pattern:  nil,
+		pattern:  patterns.UI_SYMBOLS_REGEXP,
 	},
 	operators:                newOperatorsSettings([]operatorSettings{}), // handled by FormulaParser
 	tmpGroupWords:            true,
@@ -80,6 +97,7 @@ var uiParserSettings = ParserSettings{
 	tmpGroupDColons:          false,
 	tmpGroupAngled:           false,
 	recursivelyNestOperators: true,
+  tokenizeWhitespace:       true,
 }
 
 type UIParser struct {
@@ -110,7 +128,22 @@ func NewUIParser(path string) (*UIParser, error) {
 }
 
 func (p *UIParser) BuildTags() ([]*html.Tag, error) {
+  ts, err := p.tokenizeFlat()
+  if err != nil {
+    return nil, err
+  }
+
 	result := make([]*html.Tag, 0)
+
+  var tag *html.Tag
+  tag, ts, err = p.buildPermissiveDirective(ts)
+  if err != nil {
+    return nil, err
+  }
+
+  if tag != nil {
+    result = append(result, tag)
+  }
 
 	indents := make([]int, 0)
 	stack := make([]*html.Tag, 0)
@@ -147,7 +180,7 @@ func (p *UIParser) BuildTags() ([]*html.Tag, error) {
 		for i, _ := range stack {
 			if indents[i] >= indent {
 				// dont pop ifelse on same indent
-				if !(inBranch && indents[i] == indent && stack[i].Name() == "ifelse") {
+				if !(inBranch && indents[i] == indent && stack[i].Name() == ".ifelse") {
 					stack = stack[0:i]
 					indents = indents[0:i]
 					break
@@ -155,9 +188,9 @@ func (p *UIParser) BuildTags() ([]*html.Tag, error) {
 			}
 		}
 
-		if t.Name() == "if" && (len(stack) == 0 || stack[len(stack)-1].Name() != "ifelse") {
+		if t.Name() == "if" && (len(stack) == 0 || stack[len(stack)-1].Name() != ".ifelse") {
 			ifElseCtx := t.Context()
-			ifElseTag := html.NewDirectiveTag("ifelse", html.NewEmptyRawDict(ifElseCtx),
+			ifElseTag := html.NewDirectiveTag(".ifelse", html.NewEmptyRawDict(ifElseCtx),
 				[]*html.Tag{}, ifElseCtx)
 
 			if err := appendTagInner(ifElseTag); err != nil {
@@ -193,174 +226,159 @@ func (p *UIParser) BuildTags() ([]*html.Tag, error) {
 	}
 
 	// start at col 0 on an empty line
-	for true {
-		indent, eof := p.eatWhitespace()
-		if eof {
-			break
-		}
+	for len(ts) > 0 {
+    var indent int
+		ts, indent = p.eatWhitespace(ts)
+    if len(ts) > 0 {
+      tag, ts, err = p.buildTag(indent, ts)
+      if err != nil {
+        return nil, err
+      }
 
-		tag, err := p.buildTag(indent)
-		if err != nil {
-			return nil, err
-		}
-
-    if tag.Name() == "parameters" {
-      if len(result) > 0 {
-        if result[0].Name() == "permissive" {
-          if len(result) > 1 {
+      if tag.Name() == "parameters" {
+        if len(result) > 0 {
+          if result[0].Name() == "permissive" {
+            if len(result) > 1 {
+              errCtx := tag.Context()
+              return nil, errCtx.NewError("Error: parameters directive must come first in file (after permissive though)")
+            }
+          } else {
             errCtx := tag.Context()
-            return nil, errCtx.NewError("Error: parameters directive must come first in file (after permissive though)")
+            return nil, errCtx.NewError("Error: parameters directive must come first in file (" + result[0].Name() + " is first)")
           }
-        } else {
-          errCtx := tag.Context()
-          return nil, errCtx.NewError("Error: parameters directive must come first in file (" + result[0].Name() + " is first)")
         }
       }
-    }
 
-		if err := appendTag(tag, indent); err != nil {
-			return nil, err
-		}
+      if err := appendTag(tag, indent); err != nil {
+        return nil, err
+      }
+    }
 	}
 
 	return result, nil
 }
 
-func (p *UIParser) buildTextTag(str string, inline bool, ctx context.Context) (*html.Tag, error) {
-	// literal strings are text tags
-	// they cannot be followed by anything else
-	if !inline && p.eatRestOfLine() {
-		return nil, ctx.NewError("Error: unexpected content after")
-	}
+func (p *UIParser) buildTextTag(inline bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  ctx := ts[0].Context()
 
-	// cut off the quotes
-	str = str[1 : len(str)-1]
-	return html.NewTextTag(str, ctx), nil
-}
-
-func (p *UIParser) buildGenericDirective(name string, ctx context.Context) (*html.Tag, error) {
-	fnPre := func(_ html.Token, ts []raw.Token) []raw.Token {
-		return p.convertWords(ts)
-	}
-
-	attr, err := p.buildDirectiveAttributes(-1, -1, ctx, fnPre)
-	if err != nil {
-		return nil, err
-	}
-
-	// children are appended later
-	return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
-}
-
-func (p *UIParser) buildImportExportNames(ctx context.Context) (*html.RawDict, error) {
-  start := p.pos
-  if r, ok := p.nextGroupStopMatch(patterns.BRACES_GROUP, true); ok {
-    content := p.Write(start, r[0])
-    if content == "" {
-      errCtx := ctx
-      return nil, errCtx.NewError("Error: empty brace")
+  var expr_ html.Token
+  var rem []raw.Token
+  var err error
+  if !inline {
+    expr_, rem, err = p.buildExpression(ts)
+    if err != nil {
+      return nil, nil, err
     }
-
-    parts := strings.Split(content, patterns.COMMA)
-    names := html.NewEmptyRawDict(context.MergeContexts(ctx, p.NewContext(r[0], r[1])))
-
-    iposRel := 0
-
-    for _, part := range parts {
-      partStart := start+iposRel
-      partEnd := partStart + len(part)
-      iposRel += len(part) + 1
-
-      rr := [2]int{partStart, partEnd}
-
-      fnBack := func() {
-        i := rr[1]-1
-        for ;i > rr[0] && unicode.IsSpace(p.raw[i]); i-- {
-        }
-
-        // eat back to first whitespace
-        for ;i > rr[0] && !unicode.IsSpace(p.raw[i]); i-- {
-        }
-
-        rr[1] = i
-      }
-
-      partParts := strings.Fields(part)
-
-      if len(partParts) == 0 {
-        errCtx := ctx
-        return nil, errCtx.NewError("Error: empty brace")
-      }
-
-      newName := partParts[len(partParts)-1]
-      newNameEnd := rr[1]
-      fnBack()
-
-      newNameStart := rr[1]
-
-      if strings.TrimSpace(p.Write(newNameStart, newNameEnd)) != newName {
-        fmt.Println(newNameStart, newNameEnd, unicode.IsSpace(rune('\n')))
-        fmt.Println("\"" + p.Write(newNameStart, newNameEnd) + "\" should be \"" + newName + "\"")
-        panic("algo error")
-      }
-      newNameCtx := p.NewContext(newNameStart, partEnd)
-      if !patterns.IsValidVar(newName) {
-        errCtx := newNameCtx
-        return nil, errCtx.NewError("Error: not a valid var")
-      }
-
-      if len(partParts) == 1 {
-        names.Set(
-          html.NewValueString(newName, newNameCtx), 
-          html.NewValueString(newName, newNameCtx))
-        continue
-      }
-
-      fnBack()
-      asStart := rr[1]
-      asEnd := newNameStart
-      asCtx := p.NewContext(rr[1], newNameStart)
-      if len(partParts) == 2 {
-        errCtx := asCtx
-        if partParts[0] == "as" {
-          return nil, errCtx.NewError("Error: expected more before as") 
-        } else {
-          fmt.Println("HERE", partParts) 
-          return nil, errCtx.NewError("Error: unexpected")
-        }
-      }
-
-      if strings.TrimSpace(p.Write(asStart, asEnd)) != "as" {
-        fmt.Println("\"" + p.Write(asStart, asEnd) + "\" should be \"as\"")
-        panic("algo error")
-      }
-
-      if partParts[len(partParts)-2] != "as" {
-        errCtx := asCtx
-        return nil, errCtx.NewError("Error: expected \"as\"")
-      }
-
-      oldNameTokens, err := p.tokenizePartial(rr[0], asStart, nil)
-      if err != nil {
-        return nil, err
-      }
-
-      oldNameToken, err := p.buildToken(oldNameTokens, true)
-      if err != nil {
-        return nil, err
-      }
-
-      names.Set(oldNameToken, html.NewValueString(newName, newNameCtx))
-    }
-
-    return names, nil
   } else {
-    errCtx := ctx
-    return nil, errCtx.NewError("Error: closing brace not found")
+    expr_, rem, err = p.buildTextTagExpression(ts)
+    if err != nil {
+      return nil, nil, err
+    }
+  }
+
+  if html.IsString(expr_) {
+    expr, err := html.AssertString(expr_)
+    if err != nil {
+      panic(err)
+    }
+
+    str := expr.Value()
+
+    //if len(rem) != len(ts) - 1 {
+
+      //panic("algo error")
+    //}
+
+    return html.NewTextTag(str, ctx), rem, nil
+  } else {
+    // elaborate print tag
+    attr := html.NewEmptyRawDict(ctx)
+    attr.Set(html.NewValueInt(0, ctx), expr_)
+
+    return html.NewDirectiveTag(".print", attr, []*html.Tag{}, ctx), rem, nil
   }
 }
 
-// TODO: completely revamp this to look more like the javascript import/export statements
+func (p *UIParser) buildImportExportNames(ts []raw.Token) (*html.RawDict, []raw.Token, error) {
+  ctx := ts[0].Context()
+  if r, ok := raw.FindGroupStop(ts, 1, ts[0]); ok {
+    groups, err := p.nestGroups(p.removeWhitespace(ts[0:r[1]+1]))
+    if err != nil {
+      return nil, nil, err
+    }
+
+    if len(groups) != 1 {
+      errCtx := raw.MergeContexts(ts...)
+      return nil, nil, errCtx.NewError("Error: unexpected")
+    }
+
+    group, err := raw.AssertBracesGroup(groups[0])
+    if err != nil {
+      return nil, nil, err
+    }
+
+    if len(group.Fields) == 0 {
+      errCtx := group.Context()
+      return nil, nil, errCtx.NewError("Error: empty brace")
+    }
+
+    names := html.NewEmptyRawDict(ctx)
+
+    for _, field := range group.Fields {
+      newName_ := field[len(field)-1]
+
+      newName, err := raw.AssertWord(newName_)
+      if err != nil {
+        return nil, nil, err
+      }
+
+      newNameCtx := newName.Context()
+      if !patterns.IsValidVar(newName.Value()) {
+        errCtx := newNameCtx
+        return nil, nil, errCtx.NewError("Error: not a valid var")
+      }
+
+      if len(field) == 1 {
+        names.Set(
+          html.NewValueString(newName.Value(), newNameCtx), 
+          html.NewValueString(newName.Value(), newNameCtx))
+        continue
+      }
+
+      if len(field) == 2 {
+        errCtx := field[0].Context()
+        if raw.IsWord(field[0], "as") {
+          return nil, nil, errCtx.NewError("Error: expected more before as") 
+        } else {
+          return nil, nil, errCtx.NewError("Error: unexpected")
+        }
+      }
+
+      if !raw.IsWord(field[len(field)-2], "as") {
+        errCtx := field[len(field)-2].Context()
+        return nil, nil, errCtx.NewError("Error: expected \"as\"")
+      }
+
+      oldNameExpr, rem, err := p.buildExpression(field[0:len(field)-2])
+      if err != nil {
+        return nil, nil, err
+      }
+
+      if len(rem) != 0 {
+        errCtx := raw.MergeContexts(rem...)
+        return nil, nil, errCtx.NewError("Error: unexpected tokens")
+      }
+
+      names.Set(oldNameExpr, html.NewValueString(newName.Value(), newNameCtx))
+    }
+
+    return names, ts[r[1]+1:], nil
+  } else {
+    errCtx := ctx
+    return nil, nil, errCtx.NewError("Error: closing brace not found")
+  }
+}
+
 // valid forms:
 // import * as namespace from expression...
 // export * from expression...
@@ -371,690 +389,580 @@ func (p *UIParser) buildImportExportNames(ctx context.Context) (*html.RawDict, e
 // export {name1, name2, name3 as alias3}
 // import {name1, name2, name3 as alias3}(parameters) from expression...
 // export {name1, name2, name3 as alias3}(parameters) from expression...
-func (p *UIParser) buildImportExportDirective(name string, dynamic bool, ctx context.Context) (*html.Tag, error) {
+func (p *UIParser) buildImportExportDirective(dynamic bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  nameToken, err := raw.AssertWord(ts[0])
+  if err != nil {
+    return nil, nil, err
+  }
+  name := nameToken.Value()
+  ctx := ts[0].Context()
+
   attr := html.NewEmptyRawDict(ctx)
 	attr.Set(html.NewValueString(".dynamic", ctx), html.NewValueBool(dynamic, ctx))
 
-  p.eatWhitespace()
-
-  all := false
-  starPos := -1
-  if p.raw[p.pos] == '*' {
-    starPos = p.pos
-    p.eatWhitespace()
-    all = true
-    p.pos+=1
+  if len(ts) < 4 {
+    errCtx := ts[len(ts)-1].Context()
+    return nil, nil, errCtx.NewError("Error: expected more tokens after")
   }
 
-  p.eatWhitespace()
+  ts, _ = p.eatWhitespace(ts[1:])
 
-  r := [2]int{-1, -1}
-  if p.raw[p.pos] != '(' {
-    r, _ = p.eatNonWhitespace()
-  } else {
-    r = [2]int{p.pos+1, p.pos+2}
-  }
-
-  if r[0]==r[1] {
-    return nil, ctx.NewError("Error: bad " + name + " directive (expected word or parens after \"*\")")
-  }
-
-  var names *html.RawDict = nil
-  namesRange := [2]int{-1, -1}
-
-  nextStr := p.Write(r[0], r[1])
-  if strings.HasPrefix(nextStr, "{") {
-    // we went a too far, and must reset the position
-    p.pos = r[0] + 1
-    if all {
-      return nil, ctx.NewError("Error: * can't be combined with named " + name)
-    }
-
-    var err error
-    namesStart := r[0]
-    names, err = p.buildImportExportNames(p.NewContext(r[0], r[0]+1))
-    if err != nil {
-      return nil, err
-    }
-
-    p.eatWhitespaceToEndOfLine()
-    if p.raw[p.pos] != '(' {
-      r, _ = p.eatNonWhitespace()
-    } else if p.raw[p.pos] == '\n' || p.raw[p.pos] == '\r' {
-      r = [2]int{p.pos, p.pos}
-    } else {
-      r = [2]int{p.pos+1, p.pos+2}
-    }
-
-    namesRange = [2]int{namesStart, r[0]-1}
-
-    if r[0] == r[1] {
-      // return immediately
-      if name == "import" {
-        return nil, ctx.NewError("Error: bad " + name + " directive (expected word or parens after \"}\")")
-      } else {
-        return nil, ctx.NewError("Error: export lists haven't yet been implemented")
-
-        //attr.Set(html.NewValueString("names", ctx), names)
-        //return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
+  names := html.NewEmptyRawDict(ts[0].Context())
+  if raw.IsSymbol(ts[0], "*") {
+    starCtx := ts[0].Context()
+    ts, _ = p.eatWhitespace(ts[1:])
+    if raw.IsSymbol(ts[0], patterns.PARENS_START) {
+      // parameters
+      var parameters *html.Parens
+      parameters, ts, err = p.buildParens(ts)
+      if err != nil {
+        return nil, nil, err
       }
-    } 
 
-    nextStr = p.Write(r[0], r[1])
-  } 
+      attr.Set(html.NewValueString("parameters", ts[0].Context()), parameters)
+    }
 
-  if p.raw[r[0]-1] == '(' {
-    // parameters found
-    parameters, err := p.buildParens(r[0] - 1, p.NewContext(r[0], r[0]+1))
+    if raw.IsWord(ts[0], "as") {
+      if name == "export" {
+        errCtx := ts[0].Context()
+        return nil, nil, errCtx.NewError("Error: can't export nested namespace")
+      }
+
+      ts, _ = p.eatWhitespace(ts[1:])
+
+      nameToken, err := raw.AssertWord(ts[0])
+      if err != nil {
+        return nil, nil, err
+      }
+
+      if !patterns.IsValidVar(nameToken.Value()) {
+        errCtx := nameToken.Context()
+        return nil, nil, errCtx.NewError("Error: bad namespace name")
+      }
+
+      names.Set(
+        html.NewValueString("*", starCtx),
+        html.NewValueString(nameToken.Value(), nameToken.Context()))
+
+      ts, _ = p.eatWhitespace(ts[1:])
+    } else {
+      names.Set(
+        html.NewValueString("*", starCtx),
+        html.NewValueString("*", starCtx))
+    }
+  } else if raw.IsSymbol(ts[0], patterns.BRACES_START) {
+    names, ts, err = p.buildImportExportNames(ts)
     if err != nil {
-      return nil, err
+      return nil, nil, err
     }
 
-    attr.Set(html.NewValueString("parameters", p.NewContext(r[0], p.pos)),
-      parameters)
+    if raw.IsSymbol(ts[0], patterns.PARENS_START) {
+      // parameters
+      var parameters *html.Parens
+      parameters, ts, err = p.buildParens(ts)
+      if err != nil {
+        return nil, nil, err
+      }
 
-    p.eatWhitespace()
-    r, _ = p.eatNonWhitespace()
-    if r[0] == r[1] {
-      return nil, ctx.NewError("Error: bad " + name + " directive (expected word after \")\")")
+      attr.Set(html.NewValueString("parameters", ts[0].Context()), parameters)
     }
-
-    nextStr = p.Write(r[0], r[1])
+  } else {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: bad " + name + " directive")
   }
 
-  if nextStr == "as" {
-    if !all {
-      errCtx := p.NewContext(r[0], r[1])
-      return nil, errCtx.NewError("Error: must be preceded by *")
-    }
-
-    if name == "export" {
-      errCtx := p.NewContext(r[0], r[1])
-      return nil, errCtx.NewError("Error: can't export nested namespace")
-    }
-
-    p.eatWhitespace()
-
-    rr, _ := p.eatNonWhitespace()
-    if rr[0] == rr[1] {
-      return nil, ctx.NewError("Error: bad " + name + " directive (expected word after \"as\")")
-    }
-
-    namesRange = [2]int{starPos, rr[1]}
-
-    namespaceWord := p.Write(rr[0], rr[1])
-    if !patterns.IsValidVar(namespaceWord) {
-      errCtx := p.NewContext(rr[0], rr[1])
-      return nil, errCtx.NewError("Error: bad namespace name")
-    }
-
-    names = html.NewEmptyRawDict(ctx)
-    names.Set(
-      html.NewValueString("*", p.NewContext(starPos, starPos+1)), 
-      html.NewValueString(namespaceWord, p.NewContext(rr[0], rr[1])))
-
-    p.eatWhitespace()
-    r, _ = p.eatNonWhitespace()
-    if r[0] == r[1] {
-      return nil, ctx.NewError("Error: bad " + name + " directive (expected word after \"" + namespaceWord + "\")")
-    }
-
-    nextStr = p.Write(r[0], r[1])
+  if !raw.IsWord(ts[0], "from") {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: bad " + name + " directive (expected \"from\")")
   }
 
+  fromCtx := ts[0].Context()
+  ts, _ = p.eatWhitespace(ts[1:])
+
+  srcExpr, rem, err := p.buildExpression(ts)
+  if err != nil {
+    return nil, nil, err
+  }
+
+  attr.Set(html.NewValueString("names", names.Context()), names)
+  attr.Set(html.NewValueString("from", fromCtx), srcExpr)
   
-  if nextStr != "from" {
-    errCtx := p.NewContext(r[0], r[1])
-    return nil, errCtx.NewError("Error: bad " + name + " directive (expected \"from\", got \"" + nextStr + "\")")
-  }
-  fromRange := [2]int{r[0], r[1]}
-
-  // now we should be able to eat the from expression
-  if all && names == nil {
-    names = html.NewEmptyRawDict(ctx)
-    starCtx := p.NewContext(starPos, starPos+1)
-    names.Set(
-      html.NewValueString("*", starCtx),
-      html.NewValueString("*", starCtx))
-  }
-
-
-  srcRange, postRange, err := p.matchNextDirectiveAttribute(-1)
-  if err != nil {
-    return nil, err
-  }
-
-  if postRange[0] != postRange[1] {
-    errCtx := p.NewContext(postRange[0], postRange[1])
-    return nil, errCtx.NewError("Error: unexpected tokens")
-  }
-
-  fromTokens, err := p.tokenizePartial(srcRange[0], srcRange[1], nil)
-  if err != nil {
-    return nil, err
-  }
-
-  if len(fromTokens) == 0 {
-    errCtx := p.NewContext(fromRange[0], fromRange[1])
-    return nil, errCtx.NewError("Error: expected tokens after (on same line)")
-  }
-
-  fromExpr, err := p.buildToken(fromTokens, true)
-  if err != nil {
-    return nil, err
-  }
-
-  attr.Set(html.NewValueString("names", p.NewContext(namesRange[0], namesRange[1])),
-    names)
-  attr.Set(html.NewValueString("from", p.NewContext(r[0], r[1])),
-    fromExpr)
-  
-	return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), nil
-}
-
-func (p *UIParser) matchFunctionDirective(ctx context.Context) ([2]int, error) {
-	containerCount := 0
-
-	firstBrace := -1
-	start := p.pos
-	for ; p.pos < p.Len(); p.pos++ {
-		if p.mask[p.pos] == COMMENT || p.mask[p.pos] == STRING {
-			continue
-		}
-
-		c := p.raw[p.pos]
-
-		if c == '{' {
-			if containerCount == 0 {
-				firstBrace = p.pos
-			}
-			containerCount += 1
-		} else if c == '}' {
-			containerCount -= 1
-			if containerCount < 0 {
-				errCtx := p.NewContext(p.pos, p.pos+1)
-				return [2]int{0, 0}, errCtx.NewError("Error: unmatched container end")
-			} else if containerCount == 0 {
-				p.pos += 1
-				return [2]int{start, p.pos}, nil
-			}
-		}
-	}
-
-	if firstBrace == -1 {
-		return [2]int{0, 0}, ctx.NewError("Error: not function brace group found")
-	} else if containerCount != 0 {
-		errCtx := p.NewContext(firstBrace, firstBrace+1)
-		return [2]int{0, 0}, errCtx.NewError("Error: unmatched start brace")
-	} else {
-		panic("shouldn't be possible")
-	}
+	return html.NewDirectiveTag(name, attr, []*html.Tag{}, ctx), rem, nil
 }
 
 // everything following the function keyword
 // eat until first closing brace (containerCount == 0
-func (p *UIParser) buildFunctionDirective(ctx context.Context) (*html.Tag, error) {
-	r, err := p.matchFunctionDirective(ctx)
+func (p *UIParser) buildFunctionDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  ctx := ts[0].Context()
+
+  if len(ts) < 3 {
+    errCtx := raw.MergeContexts(ts...)
+    return nil, nil, errCtx.NewError("Error: expeced more tokens")
+  }
+
+  nameToken, err := raw.AssertWord(ts[1])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  // act as an expresion
+  keywordToken := raw.NewValueWord("function", ctx)
+
+  ts, _ = p.eatWhitespace(ts[2:])
+
+  ts = append([]raw.Token{keywordToken}, ts...)
+
+	fnValue, rem, err := p.buildExpression(ts)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// s := p.writeWithoutLineContinuation(r[0], r[1])
-	//fmt.Printf("function value from %d to %d: \"%s\"\n", r[0], r[1], s)
-
-	innerCtx := p.NewContext(r[0], r[1])
-
-	ts, err := p.tokenizePartial(r[0], r[1], p.convertWords)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(ts) < 3 {
-		return nil, ctx.NewError("Error: insufficient tokens (expected at least 3)")
-	}
-
-	// first should be a strings
-	nameToken, err := raw.AssertWord(ts[0])
-	if err != nil {
-		return nil, err
-	}
-
-	ts[0] = raw.NewValueWord("function", ctx)
-
-	fnValue, err := p.buildToken(ts, false)
-	if err != nil {
-		return nil, err
-	}
-
-	varAttr := html.NewEmptyRawDict(innerCtx)
+	varAttr := html.NewEmptyRawDict(ctx)
 
 	nameHtmlToken := html.NewValueString(nameToken.Value(), nameToken.Context())
 	varAttr.Set(nameHtmlToken, fnValue)
 
-	return html.NewDirectiveTag("var", varAttr, []*html.Tag{}, ctx), nil
+	return html.NewDirectiveTag("var", varAttr, []*html.Tag{}, ctx), rem, nil
 }
 
-func (p *UIParser) buildVarDirective(ctx context.Context) (*html.Tag, error) {
-	return p.buildGenericDirective("var", ctx)
-}
+func (p *UIParser) buildVarDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  ctx := ts[0].Context()
 
-func (p *UIParser) buildPermissiveDirective(ctx context.Context) (*html.Tag, error) {
-  tag, err := p.buildGenericDirective("permissive", ctx)
+  if len(ts) < 4 {
+    errCtx := raw.MergeContexts(ts...)
+    return nil, nil, errCtx.NewError("Error: expected more tokens for var directive")
+  }
+
+  nameToken, err := raw.AssertWord(ts[1])
   if err != nil {
-    return nil, err
+    return nil, nil, err
   }
 
-  if tag.RawAttributes().Len() != 0 {
-    errCtx := tag.RawAttributes().Context()
-    return nil, errCtx.NewError("Error: unexpected attributes")
+  ts, _ = p.eatWhitespace(ts[2:])
+
+  if !raw.IsSymbol(ts[0], "=") {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: expected =")
   }
 
-  return tag, nil
+  ts, _ = p.eatWhitespace(ts[1:])
+
+  rhsExpr, rem, err := p.buildExpression(ts)
+  if err != nil {
+    return nil, nil, err
+  }
+
+	attr := html.NewEmptyRawDict(nameToken.Context())
+
+	nameHtmlToken := html.NewValueString(nameToken.Value(), nameToken.Context())
+	attr.Set(nameHtmlToken, rhsExpr)
+
+	return html.NewDirectiveTag("var", attr, []*html.Tag{}, ctx), rem, nil
 }
 
-func (p *UIParser) buildParens(start int, ctx context.Context) (*html.Parens, error) {
-  p.pos = start + 1
-  if r, ok := p.nextGroupStopMatch(patterns.PARENS_GROUP, true); ok {
-    ts, err := p.tokenizePartial(start, r[1], nil)
-    if err != nil {
-      return nil, err
+func (p *UIParser) buildPermissiveDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  for ;len(ts) > 0 && raw.IsWhitespace(ts[0]); {
+    ts = ts[1:]
+  }
+
+  if len(ts) == 0 {
+    return nil, ts, nil
+  }
+
+  if raw.IsWord(ts[0], "permissive") {
+    iNext := 1
+    if len(ts) > 1 {
+      if !raw.IsNL(ts[1]) {
+        errCtx := ts[1].Context()
+        return nil, nil, errCtx.NewError("Error: unexpected token")
+      } else {
+        iNext += 1
+      }
     }
 
-    parens_, err := p.buildToken(ts, true)
+    ctx := ts[0].Context()
+    attr := html.NewEmptyRawDict(ctx)
+
+    tag := html.NewDirectiveTag("permissive", attr, []*html.Tag{}, ctx)
+
+    return tag, ts[iNext:], nil
+  } else {
+    return nil, ts, nil
+  }
+}
+
+func (p *UIParser) buildParens(ts []raw.Token) (*html.Parens, []raw.Token, error) {
+  if r, ok := raw.FindGroupStop(ts, 1, ts[0]); ok {
+    groups, err := p.nestGroups(p.removeWhitespace(ts[0:r[1]+1]))
     if err != nil {
-      return nil, err
+      return nil, nil, err
     }
 
-    if parens, err := html.AssertParens(parens_); err != nil {
-      return nil, err
+    if len(groups) != 1 {
+      errCtx := raw.MergeContexts(ts...)
+      return nil, nil, errCtx.NewError("Error: unexpected")
+    }
+
+    group, err := raw.AssertParensGroup(groups[0])
+    if err != nil {
+      return nil, nil, err
+    }
+
+    ctx := group.Context()
+
+    if group.IsSemiColon() {
+      errCtx := group.Context()
+      return nil, nil, errCtx.NewError("Error: expected comma separator, got semicolon")
+    }
+
+    n := len(group.Fields)
+    values := make([]html.Token, n)
+    alts := make([]html.Token, n)
+
+    for i, field := range group.Fields {
+      if len(field) == 1 {
+        valExpr, rem, err := p.buildExpression(field)
+        if err != nil {
+          return nil, nil, err
+        }
+
+        if len(rem) != 0 {
+          errCtx := raw.MergeContexts(rem...)
+          return nil, nil, errCtx.NewError("Error: unexpected tokens")
+        }
+
+        values[i] = valExpr
+        alts[i] = nil
+      } else if len(field) > 2 && raw.IsAnyWord(field[0]) && raw.IsSymbol(field[1], "=") {
+        keyToken, err := raw.AssertWord(field[0])
+        if err != nil {
+          return nil, nil, err
+        }
+
+        values[i] = html.NewValueString(keyToken.Value(), keyToken.Context())
+
+        altExpr, rem, err := p.buildExpression(field[2:])
+        if err != nil {
+          return nil, nil, err
+        }
+
+        if len(rem) != 0 {
+          errCtx := raw.MergeContexts(rem...)
+          return nil, nil, errCtx.NewError("Error: unexpected tokens")
+        }
+
+        alts[i] = altExpr
+      } else if len(field) > 2 && raw.IsAnyWord(field[0]) && raw.IsSymbol(field[1], "!=") {
+        keyToken, err := raw.AssertWord(field[0])
+        if err != nil {
+          return nil, nil, err
+        }
+
+        values[i] = html.NewValueString(keyToken.Value() + "!", keyToken.Context())
+
+        altExpr, rem, err := p.buildExpression(field[2:])
+        if err != nil {
+          return nil, nil, err
+        }
+
+        if len(rem) != 0 {
+          errCtx := raw.MergeContexts(rem...)
+          return nil, nil, errCtx.NewError("Error: unexpected tokens")
+        }
+
+        alts[i] = altExpr
+      } else {
+        valExpr, rem, err := p.buildExpression(field)
+        if err != nil {
+          return nil, nil, err
+        }
+
+        if len(rem) != 0 {
+          errCtx := raw.MergeContexts(rem...)
+          return nil, nil, errCtx.NewError("Error: unexpected tokens")
+        }
+
+        values[i] = valExpr
+        alts[i] = nil
+      }
+    }
+
+    if r[1] + 1 < len(ts) {
+      return html.NewParens(values, alts, ctx), ts[r[1]+1:], nil
     } else {
-      return parens, nil
+      return html.NewParens(values, alts, ctx), []raw.Token{}, nil
     }
   } else {
-    errCtx := ctx
-    return nil, errCtx.NewError("Error: closing parens not found")
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: closing parens not found")
   }
 }
 
-func (p *UIParser) buildParametersDirective(ctx context.Context) (*html.Tag, error) {
-	parensStart, parensFound := p.advanceToOpenParens()
-  if !parensFound {
-    errCtx := ctx
-    return nil, errCtx.NewError("Error: parameters tag must be followed by parens group")
-  }
-
-  startCtx := p.NewContext(p.pos-1, p.pos)
-
-  parens, err := p.buildParens(parensStart, startCtx)
+func (p *UIParser) buildParametersDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  parens, rem, err := p.buildParens(ts[1:])
   if err != nil {
-    return nil, err
+    return nil, nil, err
   }
 
-  attr := html.NewEmptyRawDict(parens.Context())
+  ctx := parens.Context()
+  attr := html.NewEmptyRawDict(ctx)
   attr.Set(html.NewValueString("parameters", ctx), parens)
 
   tag := html.NewTag("parameters", attr, []*html.Tag{}, ctx)
 
-  return tag, nil
+  return tag, rem, nil
 }
 
-func (p *UIParser) buildTagAttributes(ts_ []raw.Token, ctx context.Context) (*html.RawDict, error) {
-
-	if len(ts_) != 1 || !raw.IsParensGroup(ts_[0]) {
-		errCtx := ctx
-		return nil, errCtx.NewError("Error: bad tag attributes")
-	}
-
-	group, err := raw.AssertParensGroup(ts_[0])
-	if err != nil {
-		panic(err)
-	}
-
-  if group.IsSemiColon() {
-    errCtx := group.Context()
-    return nil, errCtx.NewError("Error: expected commas as separators")
+func (p *UIParser) buildTemplateDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  if !raw.IsWord(ts[0], "template") {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: expected template keyword")
   }
 
-	tss := group.Fields
+  ctx := ts[0].Context()
 
-	attr := html.NewEmptyRawDict(ctx)
-
-	if len(tss) == 0 {
-		return attr, nil
-	}
-
-	hadOpts := false
-	posCount := 0
-
-	// positional comes first
-	for _, ts := range tss {
-		switch {
-		case len(ts) == 1 && raw.IsOperator(ts[0], "bin="):
-			hadOpts = true
-
-			op, err := raw.AssertAnyBinaryOperator(ts[0])
-			if err != nil {
-				return nil, err
-			}
-
-			w, err := raw.AssertWord(op.Args()[0])
-			if err != nil {
-				panic(err)
-			}
-
-			posKey := html.NewValueString(w.Value(), w.Context())
-
-			posVal, err := p.buildToken(op.Args()[1:], true)
-			if err != nil {
-				return nil, err
-			}
-
-			attr.Set(posKey, posVal)
-    case len(ts) == 1 && raw.IsOperator(ts[0], "bin!="):
-			hadOpts = true
-
-			op, err := raw.AssertAnyBinaryOperator(ts[0])
-			if err != nil {
-				return nil, err
-			}
-
-			w, err := raw.AssertWord(op.Args()[0])
-			if err != nil {
-				panic(err)
-			}
-
-			posKey := html.NewValueString(w.Value() + "!", w.Context())
-
-			posVal, err := p.buildToken(op.Args()[1:], true)
-			if err != nil {
-				return nil, err
-			}
-
-      // must then be treated specially later
-			attr.Set(posKey, posVal)
-		case len(ts) == 1:
-			if hadOpts {
-				errCtx := ts[0].Context()
-				return nil, errCtx.NewError("Error: positional must come before optional")
-			}
-
-			posVal, err := p.buildToken(ts, true)
-			if err != nil {
-				return nil, err
-			}
-
-			posKey := html.NewValueInt(posCount, ts[0].Context())
-			attr.Set(posKey, posVal)
-			posCount += 1
-		case len(ts) == 0:
-			errCtx := ctx
-			return nil, errCtx.NewError("Error: unexpected empty attr field")
-		default:
-			errCtx := ts[0].Context()
-			return nil, errCtx.NewError("Error: bad tag call field")
-		}
-	}
-
-	return attr, nil
-}
-
-func (p *UIParser) buildTemplateDirective(ctx context.Context) (*html.Tag, error) {
-  p.eatWhitespace() 
-	rName, isString := p.eatNonWhitespace()
-  if rName[0] == rName[1] {
-    errCtx := ctx
-    return nil, errCtx.NewError("Error: couldn't find the template name")
-  } else if isString {
-    errCtx := p.NewContext(rName[0], rName[1])
-    return nil, errCtx.NewError("Error: expected name of template, got literal string instead")
+  nameToken, err := raw.AssertWord(ts[1])
+  if err != nil {
+    return nil, nil, err
   }
-  nameCtx := p.NewContext(rName[0], rName[1])
+
+  nameCtx := nameToken.Context()
 	nameKey := html.NewValueString("name", nameCtx)
-	nameVal := html.NewValueString(p.Write(rName[0], rName[1]), nameCtx)
+	nameVal := html.NewValueString(nameToken.Value(), nameCtx)
 
-	start := p.pos
-
-	// look for the closing super, and get the attributes from that range
-	rSuper, _, superOk := p.nextMatch(patterns.UI_TEMPLATE_SUPER_REGEXP, true)
-	if !superOk {
-		return nil, ctx.NewError("Error: no super keyword found")
-	}
-	p.pos -= 1 // include opening parens for next match
-
-	_, _, superOpenOk := p.nextMatch(patterns.PARENS_OPEN_REGEXP, true)
-	if !superOpenOk {
-		errCtx := p.NewContext(rSuper[0], rSuper[1])
-		return nil, errCtx.NewError("Error: bad format for super")
-	}
-
-	rSuperParens, superCloseOk := p.nextGroupStopMatch(patterns.PARENS_GROUP, true)
-	if !superCloseOk {
-		errCtx := p.NewContext(rSuper[0], rSuper[1])
-		return nil, errCtx.NewError("Error: bad format for super")
-	}
-
-	fnPre := func(key html.Token, ts []raw.Token) []raw.Token {
-		if html.IsInt(key) {
-			iKey, err := html.AssertInt(key)
-			if err != nil {
-				panic(err)
-			}
-
-			if iKey.Value() == 0 {
-				res := make([]raw.Token, 0)
-
-				for i := 0; i < len(ts); i++ {
-          var tNext raw.Token = nil
-          if i < len(ts)-1 {
-            tNext = ts[i+1]
-          }
-          t := p.convertWord(ts[i], tNext)
-          res = append(res, t)
-				}
-
-				return res
-			}
-		}
-
-		return p.convertWords(ts)
-	}
-
-	attr, err := p.buildDirectiveAttributes(start, rSuper[0], ctx, fnPre)
-	if err != nil {
-		return nil, err
-	}
+  attr := html.NewEmptyRawDict(ctx)
 
   // name was eaten before
   attr.Set(nameKey, nameVal);
 
-	// parse the super
-	// positional must come before optional args
-	superCtx := p.NewContext(rSuper[0], rSuper[1])
-	// include the parens themselves
-	ts, err := p.tokenizePartial(rSuper[1]-1, rSuperParens[1], nil)
-	if err != nil {
-		panic(err)
-		return nil, err
-	}
+  ts, _ = p.eatWhitespace(ts[2:])
 
-	superKey := html.NewValueString("super", superCtx)
-	superVal, err := p.buildTagAttributes(ts, superCtx)
-	if err != nil {
-		return nil, err
-	}
+  iSuper := -1
+  for i, t := range ts {
+    if raw.IsWord(t, "super") {
+      iSuper = i
+      break
+    }
+  }
 
-	attr.Set(superKey, superVal)
+  if iSuper == -1 {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: super keyword not found")
+  }
 
-	p.pos = rSuperParens[1]
+  superCtx := ts[iSuper].Context()
+  superParens, rem, err := p.buildParens(ts[iSuper+1:])
+  if err != nil {
+    return nil, nil, err
+  }
 
-	// search for the optional this(...)
-	p.pos += 1
-	rThis, isString := p.eatNonWhitespace()
-	if !isString && rThis[0] != rThis[1] && p.Write(rThis[0], rThis[1]) == "this" {
-		_, _, thisOpenOk := p.nextMatch(patterns.PARENS_OPEN_REGEXP, true)
-		if !thisOpenOk {
-			errCtx := p.NewContext(rThis[0], rThis[1])
-			return nil, errCtx.NewError("Error: bad format for this")
-		}
+  superAttr := superParens.ToRawDict()
 
-		rThisParens, thisCloseOk := p.nextGroupStopMatch(patterns.PARENS_GROUP, true)
-		if !thisCloseOk {
-			errCtx := p.NewContext(rSuper[0], rSuper[1])
-			return nil, errCtx.NewError("Error: bad format for this")
-		}
+  ts = ts[0:iSuper]
+  if raw.IsSymbol(ts[0], patterns.PARENS_START) {
+    // args
+    argParens, argRem, err := p.buildParens(ts)
+    if err != nil {
+      return nil, nil, err
+    }
 
-		thisCtx := p.NewContext(rThis[0], rThis[1])
-		// include the parens themselves
-		ts, err := p.tokenizePartial(rThis[1], rThisParens[1], nil)
-		if err != nil {
-			panic(err)
-			return nil, err
-		}
+    attr.Set(html.NewValueString("args", argParens.Context()), argParens)
 
-		thisKey := html.NewValueString("this", thisCtx)
-		thisVal, err := p.buildTagAttributes(ts, thisCtx)
-		if err != nil {
-			panic(err)
-			return nil, err
-		}
+    ts, _ = p.eatWhitespace(argRem)
+  }
 
-		attr.Set(thisKey, thisVal)
+  if !raw.IsWord(ts[0], "extends") {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: expected extends keyword")
+  }
 
-		p.pos = rThisParens[1]
+  extendsCtx := ts[0].Context()
 
-	} else {
-		p.pos = rSuperParens[1]
-	}
+  extendsExpr, extendsRem, err := p.buildExpression(ts[1:])
+  if err != nil {
+    return nil, nil, err
+  }
 
-	return html.NewDirectiveTag("template", attr, []*html.Tag{}, ctx), nil
+  if len(extendsRem) != 0 {
+    errCtx := raw.MergeContexts(extendsRem...)
+    return nil, nil, errCtx.NewError("Error: unexpected tokens")
+  }
+
+
+  attr.Set(html.NewValueString("extends", extendsCtx), extendsExpr)
+  attr.Set(html.NewValueString("super", superCtx), superAttr)
+
+	return html.NewDirectiveTag("template", attr, []*html.Tag{}, ctx), rem, nil
 }
 
-func (p *UIParser) buildExportedDirective(ctx context.Context) (*html.Tag, error) {
+func (p *UIParser) buildForDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  ctx := ts[0].Context()
+  attr := html.NewEmptyRawDict(ctx)
+
+  vNameToken, err := raw.AssertWord(ts[1])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  if raw.IsSymbol(ts[2], patterns.COMMA) {
+    iNameToken := vNameToken
+
+    attr.Set(html.NewValueString("iname", ts[1].Context()), html.NewValueString(iNameToken.Value(), iNameToken.Context()))
+
+    vNameToken, err = raw.AssertWord(ts[3])
+    if err != nil {
+      return nil, nil, err
+    }
+
+    ts, _ = p.eatWhitespace(ts[4:])
+  } else {
+    ts, _ = p.eatWhitespace(ts[2:])
+  }
+
+  attr.Set(html.NewValueString("vname", vNameToken.Context()), html.NewValueString(vNameToken.Value(), vNameToken.Context()))
+
+  if !raw.IsWord(ts[0], "in") {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: expected \"in\"")
+  }
+
+  rhsExpr, rem, err := p.buildExpression(ts[1:])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  attr.Set(html.NewValueString("in", ts[0].Context()), rhsExpr)
+
+	return html.NewDirectiveTag("for", attr, []*html.Tag{}, ctx), rem, nil
+}
+
+func (p *UIParser) buildSingleOrNoValueDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  firstToken, err := raw.AssertWord(ts[0])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  ctx := firstToken.Context()
+  attr := html.NewEmptyRawDict(ctx)
+
+  if len(ts) > 1 {
+    foundNL := false
+    for i, t := range ts[1:] {
+      if raw.IsNL(t) {
+        if i > 0 {
+          rhsExpr, rem, err := p.buildExpression(ts[1:])
+          if err != nil {
+            return nil, nil, err
+          }
+
+          attr.Set(html.NewValueInt(0, ctx), rhsExpr)
+          return html.NewDirectiveTag(firstToken.Value(), attr, []*html.Tag{}, ctx), rem, nil
+        }
+
+        foundNL = true
+        break
+      }
+    }
+
+    if !foundNL {
+      errCtx := ctx
+      return nil, nil, errCtx.NewError("Error: no terminating nl found")
+    }
+
+    return html.NewDirectiveTag(firstToken.Value(), attr, []*html.Tag{}, ctx), ts[1:], nil
+  } else {
+    return html.NewDirectiveTag(firstToken.Value(), attr, []*html.Tag{}, ctx), []raw.Token{}, nil
+  }
+}
+
+func (p *UIParser) buildExportedDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  if len(ts) < 2 {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: expected more tokens")
+  }
+
 	addExportAttr := func(attr *html.RawDict, exportCtx context.Context) {
 		exportToken := html.NewValueString("export", exportCtx)
 		flagToken := html.NewValueString("", exportCtx)
 		attr.Set(exportToken, flagToken)
 	}
 
-	prevPos := p.pos
-	rName, isString := p.eatNonWhitespace()
-	if isString || rName[0] == rName[1] {
-		// is regular export
-		p.pos = prevPos
-		return p.buildGenericDirective("export", ctx)
-	} else {
-		exportCtx := ctx
-		tagCtx := p.NewContext(rName[0], rName[1])
+  exportCtx := ts[0].Context()
 
-		name := p.Write(rName[0], rName[1])
-		switch name {
-		case "var":
-			tag, err := p.buildVarDirective(tagCtx)
-			if err != nil {
-				return nil, err
-			}
+  switch {
+  case raw.IsWord(ts[1], "var"):
+    tag, rem, err := p.buildVarDirective(ts[1:])
+    if err != nil {
+      return nil, nil, err
+    }
 
-			addExportAttr(tag.RawAttributes(), exportCtx)
+    addExportAttr(tag.RawAttributes(), exportCtx)
 
-			return tag, nil
-		case "template":
-			tag, err := p.buildTemplateDirective(tagCtx)
-			if err != nil {
-				return nil, err
-			}
+    return tag, rem, nil
+  case raw.IsWord(ts[1], "template"):
+    tag, rem, err := p.buildTemplateDirective(ts[1:])
+    if err != nil {
+      return nil, nil, err
+    }
 
-			addExportAttr(tag.RawAttributes(), exportCtx)
+    addExportAttr(tag.RawAttributes(), exportCtx)
 
-			// add export flag to tag
-			//return html.NewTag(name, attr, []*html.Tag{}, tagCtx), nil
-			return tag, nil
-		case "function":
-			tag, err := p.buildFunctionDirective(ctx)
-			if err != nil {
-				return nil, err
-			}
+    // add export flag to tag
+    //return html.NewTag(name, attr, []*html.Tag{}, tagCtx), nil
+    return tag, rem, nil
+  case raw.IsWord(ts[1], "function"):
+    tag, rem, err := p.buildFunctionDirective(ts[1:])
+    if err != nil {
+      return nil, nil, err
+    }
 
-			addExportAttr(tag.RawAttributes(), exportCtx)
+    addExportAttr(tag.RawAttributes(), exportCtx)
 
-			return tag, nil
-		default:
-      if !strings.HasPrefix(name, "[") && !strings.HasPrefix(name, "{") && !strings.HasPrefix(name, "*") {
-        errCtx := exportCtx
-        return nil, errCtx.NewError("Error: invalid export statement")
-      }
+    return tag, rem, nil
+  default:
+    if !raw.IsSymbol(ts[1], patterns.BRACES_START) && !raw.IsSymbol(ts[1], "*") {
+      errCtx := ts[1].Context()
+      return nil, nil, errCtx.NewError("Error: invalid export statement")
+    }
 
-			p.pos = prevPos
-			return p.buildImportExportDirective("export", false, ctx)
-		}
-	}
+    return p.buildImportExportDirective(false, ts)
+  }
 }
 
-func (p *UIParser) advanceToOpenParens() (int, bool) {
-	// find parens on this line!
-	// or none at all
-	parensFound := false
-	parensStart := -1
-	for ; p.pos < p.Len(); p.pos++ {
-		c := p.raw[p.pos]
-		if c == ' ' || c == '\t' {
-			continue
-		}
+func (p *UIParser) buildGenericTag(inline bool, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  nameToken, err := raw.AssertWord(ts[0])
+  if err != nil {
+    return nil, nil, err
+  }
 
-		if c == '(' {
-			parensFound = true
-			parensStart = p.pos
-			p.pos += 1
-		}
-		break
-	}
+  ctx := nameToken.Context()
+  attr := html.NewEmptyRawDict(ctx)
 
-  return parensStart, parensFound
-}
+  ts = ts[1:]
+  if raw.IsSymbol(ts[0], patterns.PARENS_START) {
+    parens, rem, err := p.buildParens(ts[0:])
+    if err != nil {
+      return nil, nil, err
+    }
 
-func (p *UIParser) buildGenericTag(name string, inline bool, ctx context.Context) (*html.Tag, error) {
-	// find parens on this line!
-	// or none at all
-	parensStart, parensFound := p.advanceToOpenParens()
+    attr = parens.ToRawDict()
 
-	var tag *html.Tag = nil
-	if !parensFound {
-		tag = html.NewTag(name, html.NewEmptyRawDict(ctx), []*html.Tag{}, ctx)
-	} else {
-		startCtx := p.NewContext(p.pos-1, p.pos)
+    ts = rem
+  } 
 
-		if r, ok := p.nextGroupStopMatch(patterns.PARENS_GROUP, true); ok {
-			ts, err := p.tokenizePartial(parensStart, r[1], nil)
-			if err != nil {
-				return nil, err
-			}
-
-			attr, err := p.buildTagAttributes(ts, startCtx)
-			if err != nil {
-				return nil, err
-			}
-
-			tag = html.NewTag(name, attr, []*html.Tag{}, ctx)
-		} else {
-			errCtx := startCtx
-			return nil, errCtx.NewError("Error: closing parens not found")
-		}
-	}
+  tag := html.NewTag(nameToken.Value(), attr, []*html.Tag{}, ctx)
 
 	// inline management is done by first none inline parent
 	if inline {
-		return tag, nil
+		return tag, ts, nil
 	}
 
 	// while line is not empty find the children
-
 	lineIsEmpty := func() bool {
-		for ; p.pos < p.Len(); p.pos++ {
-			c := p.raw[p.pos]
-			if c == ' ' || c == '\t' || (p.mask[p.pos] == COMMENT && c != '\n') {
+    for _, t := range ts {
+			if raw.IsIndent(t) {
 				continue
-			}
-
-			if c == '\n' {
+			} else if raw.IsNL(t) {
 				return true
 			} else {
 				return false
@@ -1068,644 +976,301 @@ func (p *UIParser) buildGenericTag(name string, inline bool, ctx context.Context
 	stack[0] = tag
 
 	for !lineIsEmpty() {
-		if p.raw[p.pos] == '<' {
-			p.pos += 1
+		if raw.IsSymbol(ts[0], "<") {
 			// pop the stack
 			if len(stack) == 1 {
-				errCtx := p.NewContext(p.pos-1, p.pos)
-				return nil, errCtx.NewError("Error: cannot decrease inline stack before first child")
+				errCtx := ts[0].Context()
+				return nil, nil, errCtx.NewError("Error: cannot decrease inline stack before first child")
 			} else {
 				stack = stack[0 : len(stack)-1]
+        ts = ts[1:]
 			}
 		} else {
-			inlineTag, err := p.buildTag(-1)
+			inlineTag, rem, err := p.buildTag(-1, ts)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			if err := stack[len(stack)-1].AppendChild(inlineTag); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			// dont append text tags to the stack, this is a nuisance
 			if !inlineTag.IsText() {
 				stack = append(stack, inlineTag)
 			}
+
+      ts = rem
 		}
 	}
 
-	return tag, nil
+	return tag, ts, nil
 }
 
 // indent -1 means that we are inlining
-func (p *UIParser) buildTag(indent int) (*html.Tag, error) {
-	r, isString := p.eatNonWhitespace()
-	tagCtx := p.NewContext(r[0], r[1])
+// also returns the remaining tokens
+func (p *UIParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  // no more eating needed in here?
+	tagCtx := ts[0].Context()
 
-	str := p.Write(r[0], r[1]) // name or literal string
-  followedByParens := (r[1] < len(p.raw)) && (p.raw[r[1]] == '(') // non directive versions of template/var must be followed by parens immediately
+  followedByParens := len(ts) > 1 && raw.IsSymbol(ts[1], patterns.PARENS_START)
 
 	switch {
-	case isString:
-		return p.buildTextTag(str, indent == -1, tagCtx)
-	case indent != -1 && str == "export":
-    // exports can be indented so they can benefit from branching
-		return p.buildExportedDirective(tagCtx)
-  case indent != -1 && str == "permissive":
-    if indent != 0 {
-      return nil, tagCtx.NewError("Error: 'permissive' cannot be indented")
-    } else if r[0] != 0 {
-      return nil, tagCtx.NewError("Error: 'permissive' must be first word, and can't be indented")
+    case raw.IsLiteralString(ts[0]) || raw.IsSymbol(ts[0], patterns.DOLLAR) || raw.IsSymbol(ts[0], patterns.PARENS_START):
+      return p.buildTextTag(indent == -1, ts)
+    case indent != -1 && raw.IsAnyWord(ts[0]):
+      keyToken, err := raw.AssertWord(ts[0])
+      if err != nil {
+        panic(err)
+      }
+
+      key := keyToken.Value()
+      switch {
+        case key == "export":
+          // exports can be indented so they can benefit from branching
+          return p.buildExportedDirective(ts)
+        case key == "permissive":
+          return nil, nil, tagCtx.NewError("Error: 'permissive' must be first word, and can't be indented")
+        case key == "parameters":
+          if indent != 0 {
+            return nil, nil, tagCtx.NewError("Error: 'parameters' cannot be indented")
+          }
+          return p.buildParametersDirective(ts)
+        case key == "import":
+          return p.buildImportExportDirective(indent != 0, ts)
+        case !followedByParens && key == "template":
+          return p.buildTemplateDirective(ts)
+        case !followedByParens && key == "var":
+          return p.buildVarDirective(ts)
+        case key == "function":
+          return p.buildFunctionDirective(ts)
+        case key == "for":
+          return p.buildForDirective(ts)
+        case key == "if" || key == "elseif" || key == "else" || key == "append" || key == "replace" || key == "prepend" || key == "block" || key == "switch" || key == "case" || key == "default":
+          return p.buildSingleOrNoValueDirective(ts)
+        default:
+          return p.buildGenericTag(false, ts)
+      }
+    case indent == -1 && raw.IsAnyWord(ts[0]):
+      return p.buildGenericTag(true, ts)
+    default:
+      errCtx := ts[0].Context()
+      return nil, nil, errCtx.NewError("Error: not a tag")
+	}
+}
+
+func (p *UIParser) removeWhitespace(ts []raw.Token) []raw.Token {
+  tsInner := []raw.Token{}
+
+  // filter out the whitespace
+  for _, t := range ts {
+    if !raw.IsWhitespace(t) {
+      tsInner = append(tsInner, t)
     }
-    return p.buildPermissiveDirective(tagCtx)
-  case indent != -1 && str == "parameters":
-    if indent != 0 {
-      return nil, tagCtx.NewError("Error: 'parameters' cannot be indented")
+  }
+
+  return tsInner
+}
+
+func (p *UIParser) buildExpressionInternal(ts []raw.Token) (html.Token, error) {
+  ctx := ts[0].Context()
+  tsInner := p.removeWhitespace(ts)
+
+  // dummy FormulaParser for operators
+  fp, err := NewFormulaParser("", ctx)
+	if err != nil {
+		return nil, err
+	}
+
+  tsInner, err = fp.nestGroups(tsInner)
+	if err != nil {
+		return nil, err
+	}
+
+
+	tsInner, err = fp.nestOperators(tsInner)
+	if err != nil {
+		return nil, err
+	}
+
+	tsInner = p.expandTmpGroups(tsInner)
+
+  resExpr, err := p.helper.buildToken(tsInner)
+
+  if err != nil {
+    for _, t := range tsInner {
+      fmt.Println(t.Dump(""))
     }
-    return p.buildParametersDirective(tagCtx)
-	case indent != -1 && str == "import":
-		return p.buildImportExportDirective(str, indent != 0, tagCtx)
-	case indent != -1 && !followedByParens && str == "template":
-		return p.buildTemplateDirective(tagCtx)
-	case indent != -1 && !followedByParens && str == "var":
-		return p.buildVarDirective(tagCtx)
-	case indent != -1 && str == "function":
-		return p.buildFunctionDirective(tagCtx)
-	case indent != -1 && (str == "for" || str == "if" || str == "else" || str == "elseif" || str == "switch" || str == "case" || str == "default" || str == "print" || str == "replace" || str == "append" || str == "prepend" || str == "block"):
-		// dummy is like a regular tag!
-		return p.buildGenericDirective(str, tagCtx)
-	default:
-		return p.buildGenericTag(str, indent == -1, tagCtx)
-	}
+  }
+  return resExpr, err
 }
 
-// eat each next token (consequetive non-whitespace)
-func (p *UIParser) buildDirectiveAttributes(start, end int, tagCtx context.Context,
-	fnPre func(html.Token, []raw.Token) []raw.Token) (*html.RawDict, error) {
+func (p *UIParser) buildExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
+  if len(ts) == 0 {
+    panic("no expression tokens")
+  }
 
-	keys := make([]html.Token, 0)
-	values := make([]html.Token, 0)
+  isExpectsMoreOp := func(t raw.Token) bool {
+    if raw.IsAnySymbol(t) {
+      s, err := raw.AssertAnySymbol(t)
+      if err != nil {
+        panic(err)
+      }
 
-	argPos := 0
+      v := s.Value()
 
-	isPos := true
+      // only operators, so can't use symbols pattern
 
-	if start >= 0 {
-		p.pos = start
-	}
+      if v == ":" || v == "$" || v == "?" || v == "<" || v == ">" || v == "+" || v == "-" || v == "/" || v == "*" || v == "!=" || v == "==" || v == ":=" || v == "<=" || v == ">=" || v == "!" || v == "===" || v == "&&" || v == "||" || v == "!!" || v == "??" {
+        return true
+      } else {
+        return false
+      }
+    } else {
+      return false
+    }
+  }
 
-	for true {
-		rVal, rNextKey, err := p.matchNextDirectiveAttribute(end)
-		if err != nil {
-			return nil, err
-		}
+  // find the end
+  iStop := 0
+  expectsMore := true
+  groupCount := 0
+  for i, t := range ts {
+    if raw.IsSymbol(t, patterns.BRACES_START) || raw.IsSymbol(t, patterns.PARENS_START) || raw.IsSymbol(t, patterns.BRACKETS_START) {
+      groupCount += 1
+      expectsMore = true
+    } else if raw.IsSymbol(t, patterns.BRACES_STOP) || raw.IsSymbol(t, patterns.PARENS_STOP) || raw.IsSymbol(t, patterns.BRACKETS_STOP) {
+      if groupCount == 0 {
+        errCtx := t.Context()
+        return nil, nil, errCtx.NewError("Error: unmatched closing tag")
+      }
 
-		if !isPos && rVal[0] == rVal[1] {
-			errCtx := keys[len(keys)-1].Context()
-			return nil, errCtx.NewError("Error: no value found for attr")
-		}
+      groupCount -= 1
 
-		if rVal[0] == rVal[1] && rNextKey[0] == rNextKey[1] {
-			return html.NewValuesRawDict(keys, values, tagCtx), nil
-		}
+      if groupCount == 0 {
+        expectsMore = false
+      }
+    } else if isExpectsMoreOp(t) {
+      expectsMore = true
+    } else if raw.IsNL(t) && !expectsMore {
+      iStop = i
+      break
+    } else if groupCount == 0 && !raw.IsWhitespace(t) {
+      expectsMore = false
+    }
 
-		if rVal[0] != rVal[1] {
-			var key html.Token = nil
-			if isPos { // generate the positional key
-				key = html.NewValueInt(argPos, p.NewContext(rVal[0], rVal[1]))
-				keys = append(keys, key)
-				argPos += 1
-			} else {
-				key = keys[len(keys)-1]
-			}
+    iStop = i+1
+  }
 
-			fnPre_ := func(ts []raw.Token) []raw.Token {
-				return fnPre(key, ts)
-			}
+  resExpr, err := p.buildExpressionInternal(ts[0:iStop])
 
-			val, err := p.buildDirectiveAttributeValue(rVal, fnPre_)
-			if err != nil {
-				return nil, err
-			}
-
-			values = append(values, val)
-
-			// next value might be positional
-			isPos = true
-		}
-
-		if rNextKey[0] != rNextKey[1] {
-			keyStr := p.Write(rNextKey[0], rNextKey[1])
-
-			keyCtx := p.NewContext(rNextKey[0], rNextKey[1])
-			if !patterns.IsValidVar(keyStr) {
-				return nil, keyCtx.NewError("Error: invalid attr name")
-			}
-
-			key := html.NewValueString(keyStr, keyCtx)
-
-			keys = append(keys, key)
-
-			// next value is not positional
-			isPos = false
-		}
-	}
-
-	panic("shouldn't get here")
+  return resExpr, ts[iStop:], err
 }
 
-func (p *UIParser) writeWithoutLineContinuation(start, stop int) string {
-	if stop == -1 {
-		stop = p.Len()
-	}
+func (p *UIParser) buildTextTagExpression(ts []raw.Token) (html.Token, []raw.Token, error) {
+  if len(ts) == 0 {
+    panic("no expression tokens")
+  }
 
-	// remove the comment parts
-	var b strings.Builder
-	for i := start; i < stop; i++ {
-		if p.raw[i] == '\\' || p.mask[i] == COMMENT {
-			b.WriteRune(' ')
-		} else {
-			b.WriteRune(p.raw[i])
-		}
-	}
+  isExpectsMoreOp := func(t raw.Token) bool {
+    if raw.IsAnySymbol(t) {
+      s, err := raw.AssertAnySymbol(t)
+      if err != nil {
+        panic(err)
+      }
 
-	return b.String()
-}
+      v := s.Value()
 
-func (p *UIParser) tokenizePartial(start, end int,
-	fnPre func([]raw.Token) []raw.Token) ([]raw.Token, error) {
-	s := p.writeWithoutLineContinuation(start, end)
-	ctx := p.NewContext(start, end)
+      // only operators, so can't use symbols pattern
+      if v == ":" || v == "$" || v == "?" || v == "+" || v == "!=" || v == "==" || v == "!" || v == "===" || v == "&&" || v == "||" || v == "!!" || v == "??" {
+        return true
+      } else {
+        return false
+      }
+    } else {
+      return false
+    }
+  }
 
-	fp, err := NewFormulaParser(s, ctx)
-	if err != nil {
-		return nil, err
-	}
+  // find the end
+  iStop := 0
+  expectsMore := true
+  groupCount := 0
+  for i, t := range ts {
+    if raw.IsSymbol(t, patterns.BRACES_START) || raw.IsSymbol(t, patterns.PARENS_START) || raw.IsSymbol(t, patterns.BRACKETS_START) {
+      groupCount += 1
+      expectsMore = true
+    } else if raw.IsSymbol(t, patterns.BRACES_STOP) || raw.IsSymbol(t, patterns.PARENS_STOP) || raw.IsSymbol(t, patterns.BRACKETS_STOP) {
+      if groupCount == 0 {
+        errCtx := t.Context()
+        return nil, nil, errCtx.NewError("Error: unmatched closing tag")
+      }
 
-	ts, err := fp.Parser.tokenizeFlat()
-	if err != nil {
-		return nil, err
-	}
+      groupCount -= 1
 
-	if fnPre != nil {
-		ts = fnPre(ts)
-	}
+      if groupCount == 0 {
+        expectsMore = false
+      }
+    } else if isExpectsMoreOp(t) {
+      expectsMore = true
+    } else if (raw.IsNL(t) || raw.IsAnyWord(t) || raw.IsLiteralString(t) || raw.IsSymbol(t, "<")) && !expectsMore  {
+      iStop = i
+      break
+    } else if (raw.IsAnyWord(t) || raw.IsLiteralString(t) || raw.IsSymbol(t, "<")) && groupCount == 0 {
+      expectsMore = false
+    }
 
-	// now nest the groups and the operators
-	ts, err = fp.nestGroups(ts)
-	if err != nil {
-		return nil, err
-	}
+    iStop = i+1
+  }
 
-	ts, err = fp.nestOperators(ts)
-	if err != nil {
-		return nil, err
-	}
+  resExpr, err := p.buildExpressionInternal(ts[0:iStop])
 
-	return p.expandTmpGroups(ts), nil
-}
-
-func (p *UIParser) convertWord(t raw.Token, tNext raw.Token) raw.Token {
-	if raw.IsAnyWord(t) {
-		w, err := raw.AssertWord(t)
-		if err != nil {
-			panic(err)
-		}
-
-		if strings.HasPrefix(w.Value(), "$") {
-			return raw.NewValueWord(w.Value()[1:], w.Context())
-		} else {
-			followedByParens := false
-			if tNext != nil && (raw.IsSymbol(tNext, "(") || raw.IsParensGroup(tNext)) {
-				// use contexts to check if there is no space between
-				thisCtx := t.Context()
-				parensCtx := tNext.Context()
-				followedByParens = thisCtx.IsConsecutive(parensCtx)
-			}
-
-			followedByBrackets := false
-			if tNext != nil && (raw.IsSymbol(tNext, "[") || raw.IsBracketsGroup(tNext)) {
-				thisCtx := t.Context()
-				bracketsCtx := tNext.Context()
-				followedByBrackets = thisCtx.IsConsecutive(bracketsCtx)
-			}
-
-			followedByNew := tNext != nil && raw.IsSymbol(tNext, ":=")
-
-			if !(followedByParens || followedByBrackets || followedByNew) {
-				return raw.NewWordLiteralString(w.Value(), w.Context())
-			} else {
-				return t
-			}
-		}
-	} else {
-		return t
-	}
-}
-
-// tNext is needed to check if word is followed by parens (
-func (p *UIParser) convertWords(ts []raw.Token) []raw.Token {
-
-	res := make([]raw.Token, 0)
-
-	for i := 0; i < len(ts); i++ {
-		var tNext raw.Token = nil
-		if i < len(ts)-1 {
-			tNext = ts[i+1]
-		}
-		t := p.convertWord(ts[i], tNext)
-		res = append(res, t)
-	}
-
-	return res
-}
-
-func (p *UIParser) convertWordsNested(t_ raw.Token, tNext raw.Token) raw.Token {
-	switch t := t_.(type) {
-	case *raw.Operator:
-		args := t.Args()
-		for i, arg := range args {
-			var argNext raw.Token = nil
-			if i < len(args)-1 {
-				argNext = args[i+1]
-			}
-
-			args[i] = p.convertWordsNested(arg, argNext)
-		}
-		return t
-	case *raw.Group:
-		for _, field := range t.Fields {
-			for i, sub := range field {
-				var subNext raw.Token = nil
-				if i < len(field)-1 {
-					subNext = field[i+1]
-				}
-
-				field[i] = p.convertWordsNested(sub, subNext)
-			}
-		}
-		return t
-	default:
-		return p.convertWord(t_, tNext)
-	}
-}
-
-func (p *UIParser) buildToken(ts []raw.Token, convert bool) (html.Token, error) {
-	// do conversion now, or do it before
-	if convert {
-		for i, t := range ts {
-			var tNext raw.Token = nil
-			if i < len(ts)-1 {
-				tNext = ts[i+1]
-			}
-			ts[i] = p.convertWordsNested(t, tNext)
-		}
-	}
-
-	return p.helper.buildToken(ts)
-}
-
-func (p *UIParser) parseRawValue(s string, ctx context.Context) ([]raw.Token, error) {
-	fp, err := NewFormulaParser(s, ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	ts, err := fp.Parser.tokenizeFlat()
-	if err != nil {
-		return nil, err
-	}
-
-	// turn words not beginning with a dollar sign into strings except expects when directly followed by brackets
-	// remove dollar signs from remaining words
-	for i := 0; i < len(ts); i++ {
-		t := ts[i]
-
-		if raw.IsAnyWord(t) {
-			w, err := raw.AssertWord(t)
-			if err != nil {
-				panic(err)
-			}
-
-			str := w.Value()
-			if strings.HasPrefix(str, "$") {
-				ts[i] = raw.NewValueWord(str[1:], w.Context())
-			} else {
-				followedByParens := false
-				if i < len(ts)-1 && raw.IsSymbol(ts[i+1], "(") {
-					// use contexts to check if there is no space between
-					thisCtx := t.Context()
-					parensCtx := ts[i+1].Context()
-					followedByParens = thisCtx.IsConsecutive(parensCtx)
-				}
-
-				if !followedByParens {
-					ts[i] = raw.NewWordLiteralString(str, w.Context())
-				}
-			}
-		}
-	}
-
-	// now nest the groups and the operators
-	ts, err = fp.nestGroups(ts)
-	if err != nil {
-		return nil, err
-	}
-
-	return fp.nestOperators(ts)
-}
-
-func (p *UIParser) buildDirectiveAttributeValue(r [2]int,
-	fnPre func(ts []raw.Token) []raw.Token) (html.Token, error) {
-	//s := p.writeWithoutLineContinuation(r[0], r[1])
-	//fmt.Printf("value from %d to %d: \"%s\"\n", r[0], r[1], s)
-
-	//ctx := p.NewContext(r[0], r[1])
-
-	ts, err := p.tokenizePartial(r[0], r[1], fnPre)
-	if err != nil {
-		return nil, err
-	}
-
-	return p.buildToken(ts, false)
-}
-
-// eat up to next equals sign (preceded by whitespace or word char)
-// return prev value range, and range for next attr key
-// either can be zero, if both are zero then there are no more attributes
-func (p *UIParser) matchNextDirectiveAttribute(end int) ([2]int, [2]int, error) {
-	// all symbols expect more
-	// containers need to be matched
-	// preunary symbols are a difficulty and require an extra check
-	containerCount := 0
-
-	start := -1 // first non-white initializes the start
-	expectsMore := false
-
-	prevC := ' '
-	prevIsNonOp := false
-
-	ignoreNL := true
-	if end < 0 {
-		ignoreNL = false
-		end = p.Len()
-	}
-
-	for ; p.pos < end; p.pos++ {
-		c := p.raw[p.pos]
-
-		// this is ok for comments, but bad for strings
-		if p.mask[p.pos] == COMMENT && !(c == '\n' || c == '\r') {
-			prevC = c
-			continue
-		}
-
-		if ignoreNL && (c == '\n' || c == '\r') {
-			c = ' '
-		}
-
-		if c != ' ' && c != '\t' && c != '\n' && c != '\r' && start == -1 {
-			start = p.pos
-		}
-
-		if p.mask[p.pos] == STRING {
-			prevC = c
-			continue
-		} else if c == '(' || c == '{' || c == '[' {
-			if containerCount == 0 && !expectsMore && !prevIsNonOp && p.pos != start {
-				p.pos -= 1
-				return [2]int{start, p.pos}, [2]int{p.pos, p.pos}, nil
-			}
-			prevIsNonOp = true
-			containerCount += 1
-		} else if c == ')' || c == '}' || c == ']' {
-			prevIsNonOp = true
-			containerCount -= 1
-			if containerCount < 0 {
-				errCtx := p.NewContext(p.pos, p.pos+1)
-				return [2]int{0, 0}, [2]int{0, 0}, errCtx.NewError("Error: unmatched container end")
-			} else {
-				prevC = c
-				continue
-			}
-		} else if containerCount != 0 {
-			prevIsNonOp = false
-			prevC = c
-			continue
-		} else if c == ' ' || c == '\t' || ((c == '\n' || c == '\r') && expectsMore) {
-			if prevIsNonOp {
-				expectsMore = false
-			}
-			prevIsNonOp = false
-			prevC = c
-			continue
-		} else if c == '>' || c == '<' || c == '+' || c == '*' || c == '/' || (c == '=' && (prevC == ':' || prevC == '!' || prevC == '<' || prevC == '>' || prevC == '=')) {
-			prevIsNonOp = false
-			expectsMore = true
-		} else if c == '\\' {
-			prevIsNonOp = false
-			expectsMore = true
-		} else if c == '-' && p.pos < p.Len()-1 {
-			prevIsNonOp = false
-			if p.pos < p.Len()-1 {
-				nextC := p.raw[p.pos+1]
-				if nextC == ' ' || nextC == '\t' || nextC != '\n' {
-					expectsMore = true
-				} else if start != -1 && !expectsMore && (prevC == ' ' || prevC == '\t') {
-					p.pos -= 1
-
-					return [2]int{start, p.pos}, [2]int{p.pos, p.pos}, nil
-				}
-			} else {
-				errCtx := p.NewContext(p.pos, p.pos+1)
-				return [2]int{0, 0}, [2]int{0, 0}, errCtx.NewError("Error: stray negation")
-			}
-		} else if c == '=' {
-			prevIsNonOp = false
-			if p.pos < p.Len()-1 {
-				nextC := p.raw[p.pos+1]
-				if nextC == '=' {
-					prevC = c
-					continue
-				} else {
-					rKey, err := p.eatPrevWord()
-					if err != nil {
-						return [2]int{0, 0}, [2]int{0, 0}, err
-					}
-
-					p.pos += 1
-
-					if start != rKey[0] {
-						errCtx := p.NewContext(start, rKey[1])
-						return [2]int{0, 0}, [2]int{0, 0}, errCtx.NewError("Error: incomplete value")
-					}
-
-					return [2]int{rKey[0], rKey[0]}, rKey, nil
-				}
-			} else {
-				errCtx := p.NewContext(p.pos, p.pos+1)
-				return [2]int{0, 0}, [2]int{0, 0}, errCtx.NewError("Error: stray attribute assignment")
-			}
-		} else if !expectsMore && (c == '\n' || c == '\r') {
-			if start == -1 {
-				start = p.pos
-			}
-			end := p.pos
-			if start == end {
-				p.pos += 1
-				if p.pos < p.Len()-1 && p.raw[p.pos+1] == '\r' {
-					p.pos += 1
-				}
-			}
-			return [2]int{start, end}, [2]int{end, end}, nil
-		} else if c == ',' || c == ';' {
-			prevIsNonOp = false
-		} else {
-			// all other chars are part of variables
-			if !expectsMore && !prevIsNonOp && p.pos != start {
-				p.pos -= 1
-				return [2]int{start, p.pos}, [2]int{p.pos, p.pos}, nil
-			}
-
-			expectsMore = false
-			prevIsNonOp = true
-		}
-
-		prevC = c
-	}
-
-	if start == -1 {
-		start = p.pos
-	}
-
-	return [2]int{start, p.pos}, [2]int{p.pos, p.pos}, nil
-}
-
-func (p *UIParser) eatPrevWord() ([2]int, error) {
-	init := p.pos
-
-	start := -1
-
-	p.pos--
-	for ; p.pos >= 0; p.pos-- {
-		c := p.raw[p.pos]
-
-		if c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\\' {
-			if start != -1 {
-				r := [2]int{p.pos + 1, start}
-				p.pos = init
-				return r, nil
-			} else {
-				continue
-			}
-		} else if c == '+' || c == '*' || c == '/' || c == '!' || c == '=' {
-			errCtx := p.NewContext(p.pos, p.pos+1)
-			return [2]int{0, 0}, errCtx.NewError("Error: unexpected symbol")
-		} else {
-			// alphanum char
-			if start == -1 {
-				start = p.pos + 1
-			}
-		}
-	}
-
-	errCtx := p.NewContext(p.pos, init)
-	return [2]int{0, 0}, errCtx.NewError("Error: unable to find attribute key")
+  return resExpr, ts[iStop:], err
 }
 
 // return indent from first non-empty line
-func (p *UIParser) eatWhitespace() (int, bool) {
-	nlPos := p.pos
+func (p *UIParser) eatWhitespace(ts []raw.Token) ([]raw.Token, int) {
+  for i, t := range ts {
+    if !raw.IsWhitespace(t) {
+      if i == 0 {
+        return ts, 0
+      } else {
+        prev := ts[i-1]
+        if raw.IsIndent(prev) {
+          indent, err := raw.AssertIndent(prev)
+          if err != nil {
+            panic(err)
+          }
 
-	for ; p.pos < p.Len(); p.pos++ {
-		c := p.raw[p.pos]
+          return ts[i:], indent.N()
+        } else {
+          return ts[i:], 0
+        }
+      }
+    }
+  }
 
-		if c == '\n' || c == '\r' {
-			nlPos = p.pos + 1
-		} else if c != ' ' && c != '\t' && p.mask[p.pos] != COMMENT {
-			indent := p.pos - nlPos
-			return indent, false
-		} else {
-			continue
-		}
-	}
-
-	return 0, true
-}
-
-// beware eatNonWhitespace still eat over a newline
-func (p *UIParser) eatWhitespaceToEndOfLine() {
-	for ; p.pos < p.Len(); p.pos++ {
-		c := p.raw[p.pos]
-
-		if c == '\n' || c == '\r' {
-			break
-		} else if c != ' ' && c != '\t' && p.mask[p.pos] != COMMENT {
-      break
-		} else {
-			continue
-		}
-	}
-}
-
-func (p *UIParser) eatNonWhitespace() ([2]int, bool) {
-	start := -1
-	end := -1
-	isString := true
-
-	for ; p.pos < p.Len(); p.pos++ {
-		c := p.raw[p.pos]
-
-		if p.mask[p.pos] != STRING && (c == '\n' || c == '\r' || c == ' ' || c == '\t' || p.mask[p.pos] == COMMENT || c == '(') {
-			if start != -1 {
-				end = p.pos
-				break
-			}
-
-			continue
-		} else {
-			if p.mask[p.pos] != STRING {
-				isString = false
-			}
-
-			if start == -1 {
-				start = p.pos
-			}
-		}
-	}
-
-	if start == -1 {
-		//panic("cant be -1")
-		start = p.pos
-		end = p.pos
-		isString = false
-	}
-
-	return [2]int{start, end}, isString
-}
-
-func (p *UIParser) eatRestOfLine() bool {
-	isNotEmpty := false
-
-	for ; p.pos < p.Len(); p.pos++ {
-		c := p.raw[p.pos]
-
-		if c == '\n' {
-			return isNotEmpty
-		} else if c == '\r' || c == ' ' || c == '\t' || p.mask[p.pos] == COMMENT {
-			continue
-		} else {
-			isNotEmpty = true
-		}
-	}
-
-	return isNotEmpty
+  return []raw.Token{}, 0
 }
 
 func (p *UIParser) DumpTokens() {
+	fmt.Println("\nRaw tokens:")
+	fmt.Println("===========")
+
+  ts, err := p.tokenizeFlat()
+  if err != nil {
+		fmt.Fprintf(os.Stderr, err.Error())
+		os.Exit(1)
+  }
+
+	for _, t := range ts {
+		fmt.Println(t.Dump(""))
+	}
+
 	fmt.Println("\nUI tokens:")
 	fmt.Println("===========")
 
+	p.Reset()
 	tags, err := p.BuildTags()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, err.Error())

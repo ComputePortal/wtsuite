@@ -117,14 +117,14 @@ var jsParserSettings = ParserSettings{
 				trackStarts:     true,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        SL_COMMENT,
 				groupPattern:    patterns.SL_COMMENT_GROUP,
 				assertStopMatch: false,
 				info:            "single-line comment",
 				trackStarts:     false,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        ML_COMMENT,
 				groupPattern:    patterns.ML_COMMENT_GROUP,
 				assertStopMatch: true,
 				info:            "js-style multiline comment",
@@ -202,6 +202,7 @@ var jsParserSettings = ParserSettings{
 	tmpGroupDColons:          true,
 	tmpGroupAngled:           true,
 	recursivelyNestOperators: false,
+  tokenizeWhitespace:       false,
 }
 
 // to avoid circular initialization loop

@@ -95,8 +95,8 @@ syn region Block start='(' end=')' contains=Block, Action, Comment, String, Cons
 syn region Block start='{' end='}' contains=Block, Action, Comment, String, Constant, AsKeyword
 syn region Block start='\[' end='\]' contains=Block, Action, Comment, String, Constant
 
+syn match Action '\zs[\$][a-zA-Z_][a-zA-Z0-9_\.\-]*\ze'
 syn match Action '\zs[\$]\?[a-zA-Z_][a-zA-Z0-9_\.\-]*\ze[(\[]' contained
-syn match Action '\zs[\$][a-zA-Z_][a-zA-Z0-9_\.\-]*\ze' contained
 syn match VarAction '\zs[\$][a-zA-Z_][a-zA-Z0-9_\.\-]*\ze' contained
 
 "syn match Statement '^\zs\(export\|import\)\ze\s\+'

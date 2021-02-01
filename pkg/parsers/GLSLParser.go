@@ -59,14 +59,14 @@ var glslParserSettings = ParserSettings{
 				trackStarts:     true,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        SL_COMMENT,
 				groupPattern:    patterns.SL_COMMENT_GROUP,
 				assertStopMatch: false,
 				info:            "single-line comment",
 				trackStarts:     false,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        ML_COMMENT,
 				groupPattern:    patterns.ML_COMMENT_GROUP,
 				assertStopMatch: true,
 				info:            "js-style multiline comment",
@@ -110,6 +110,7 @@ var glslParserSettings = ParserSettings{
   tmpGroupDColons: false,
   tmpGroupAngled: false,
   recursivelyNestOperators: false,
+  tokenizeWhitespace: false,
 }
 
 type GLSLParser struct {

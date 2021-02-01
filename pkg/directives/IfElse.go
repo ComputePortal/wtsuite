@@ -129,4 +129,4 @@ func IfElse(scope Scope, node Node, tag *tokens.Tag) error {
 	return buildIfElse(subScope, node, tag.Children())
 }
 
-var _ifElseOk = registerDirective("ifelse", IfElse)
+var _ifElseOk = registerDirective(".ifelse", IfElse)

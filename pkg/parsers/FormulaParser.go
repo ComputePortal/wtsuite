@@ -55,21 +55,21 @@ var formulaParserSettings = ParserSettings{
 				trackStarts:     true,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        SL_COMMENT,
 				groupPattern:    patterns.SL_COMMENT_GROUP,
 				assertStopMatch: false,
 				info:            "single-line comment",
 				trackStarts:     false,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        ML_COMMENT,
 				groupPattern:    patterns.ML_COMMENT_GROUP,
 				assertStopMatch: true,
 				info:            "js-style multiline comment",
 				trackStarts:     true,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        ML_COMMENT,
 				groupPattern:    patterns.XML_COMMENT_GROUP,
 				assertStopMatch: true,
 				info:            "xml-style multiline comment",
@@ -90,6 +90,7 @@ var formulaParserSettings = ParserSettings{
 		pattern:  patterns.FORMULA_SYMBOLS_REGEXP,
 	},
 	operators: newOperatorsSettings([]operatorSettings{
+    operatorSettings{17, "$", PRE},
 		operatorSettings{16, "-", PRE},
 		operatorSettings{16, "!", PRE},
 		operatorSettings{14, "/", BIN | L2R},
@@ -118,6 +119,7 @@ var formulaParserSettings = ParserSettings{
 	tmpGroupDColons:          false,
 	tmpGroupAngled:           false,
 	recursivelyNestOperators: true,
+  tokenizeWhitespace:       false,
 }
 
 type FormulaParser struct {

@@ -163,7 +163,7 @@ func (t *Tag) IsEmpty() bool {
 func (t *Tag) AssertEmpty() error {
 	if !t.IsEmpty() {
 		errCtx := t.Context()
-		return errCtx.NewError("Error: unexpected content")
+		return errCtx.NewError("Error: unexpected content of " + t.Name() + " tag")
 	}
 
 	return nil

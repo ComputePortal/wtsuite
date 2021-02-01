@@ -35,21 +35,21 @@ var mathParserSettings = ParserSettings{
 		pattern: patterns.MATH_STRING_OR_COMMENT_REGEXP,
 		groups: []quotedGroupSettings{
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        SL_COMMENT,
 				groupPattern:    patterns.SL_COMMENT_GROUP,
 				assertStopMatch: false,
 				info:            "single-line comment",
 				trackStarts:     false,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        ML_COMMENT,
 				groupPattern:    patterns.ML_COMMENT_GROUP,
 				assertStopMatch: true,
 				info:            "js-style multiline comment",
 				trackStarts:     true,
 			},
 			quotedGroupSettings{
-				maskType:        COMMENT,
+				maskType:        ML_COMMENT,
 				groupPattern:    patterns.XML_COMMENT_GROUP,
 				assertStopMatch: true,
 				info:            "xml-style multiline comment",
@@ -97,6 +97,7 @@ var mathParserSettings = ParserSettings{
 	tmpGroupDColons:          false,
 	tmpGroupAngled:           false,
 	recursivelyNestOperators: true,
+  tokenizeWhitespace:       false,
 }
 
 var mathOperatorMap = map[string]string{

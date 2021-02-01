@@ -30,4 +30,4 @@ func Print(scope Scope, node Node, tag *tokens.Tag) error {
 	return node.AppendChild(tree.NewText(valueToken.Write(), valueToken.Context()))
 }
 
-var _printOk = registerDirective("print", Print)
+var _printOk = registerDirective(".print", Print)

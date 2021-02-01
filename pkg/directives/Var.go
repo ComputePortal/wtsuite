@@ -21,7 +21,7 @@ func AssertValidVar(nameToken *tokens.String) error {
 func AddVar(scope Scope, node Node, tag *tokens.Tag) error {
 	if !tag.IsEmpty() {
 		errCtx := tag.Context()
-		return errCtx.NewError("Error: unexpected content")
+		return errCtx.NewError("Error: unexpected child tags of var directive")
 	}
 
 	subScope := NewSubScope(scope)
