@@ -1,6 +1,9 @@
 package directives
 
 import (
+  //"fmt"
+  //"os"
+
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tree"
@@ -79,7 +82,7 @@ func (n *TemplateNode) AssertAllOperationsDone(ctx context.Context) error {
   for _, op := range n.operations {
     if !op.Popped() {
       if err == nil {
-        err = ctx.NewError("Error: unapplied ops")
+        err = ctx.NewError("Error: unapplied ops (" + op.Target() + ")")
       }
 
       context.AppendContextString(err, "Info: not applied to "+op.Target(), op.Context())
@@ -90,23 +93,29 @@ func (n *TemplateNode) AssertAllOperationsDone(ctx context.Context) error {
 }
 
 func (n *TemplateNode) PopOp(target string) (Operation, error) {
+  if parent, ok := n.parent.(*TemplateNode); ok && n == parent {
+    panic("can't be the same")
+  }
+
 	parentOp, err := n.parent.PopOp(target)
 	if err != nil {
 		return nil, err
 	}
 
+  //nBef := len(n.operations)
+
 	var thisOp Operation = nil
 	thisOk := false
 	for i, op := range n.operations {
 		if op.Target() == target {
-      if !IsUniqueOpTargetName(target) {
+      //if !IsUniqueOpTargetName(target) {
         // shared ops are not removed
         if i < len(n.operations)-1 {
           n.operations = append(n.operations[0:i], n.operations[i+1:]...)
         } else {
           n.operations = n.operations[0:i]
         }
-      }
+      //}
 
       op.SetPopped()
 
@@ -115,6 +124,8 @@ func (n *TemplateNode) PopOp(target string) (Operation, error) {
 			break
 		}
 	}
+
+  //fmt.Fprintf(os.Stdout, "popping %s, %d, %d\n", target, nBef, len(n.operations))
 
 	if thisOk && parentOp != nil {
 		// merge

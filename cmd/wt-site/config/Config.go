@@ -51,6 +51,7 @@ type Config struct {
 
 	cssDst      string // for stylesheet bundling
 	CssUrl      string `json:"css-url"` // for stylesheet link
+  StylePath   string `json:"style"`
 	jsDst       string
 	JsUrl       string `json:"js-url"`
 	PxPerRem    int    `json:"px-per-rem"`    // for px(<X rem>) functin
@@ -293,6 +294,7 @@ func ReadConfigFile(cmdArgs *CmdArgs) (*Config, error) {
 		Files:       make(map[string]string),
 		cssDst:      "",
 		CssUrl:      "",
+    StylePath:   "",
 		jsDst:       "",
 		JsUrl:       "",
 		PxPerRem:    0,
@@ -347,6 +349,14 @@ func ReadConfigFile(cmdArgs *CmdArgs) (*Config, error) {
 	if cfg.CssUrl == "" {
 		return cfg, errors.New("Error: empty css-url in config file")
 	}
+
+  if cfg.StylePath != "" {
+    stylePath := cfg.StylePath
+		cfg.StylePath, err = files.Search(cmdArgs.ConfigFile, stylePath)
+    if err != nil {
+      return cfg, errors.New("Error: style \"" + stylePath + "\" not found")
+    }
+  }
 
 	cfg.cssDst, err = filepath.Abs(filepath.Join(cmdArgs.OutputDir, cfg.CssUrl))
 	if err != nil {

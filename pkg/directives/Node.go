@@ -141,5 +141,14 @@ func (n *NodeData) SearchStyle(scope tokens.Scope, key *tokens.String, ctx conte
 		}
 	}
 
-	return n.parent.SearchStyle(scope, key, ctx)
+  if n.parent == nil {
+    if scope.Permissive() {
+      return tokens.NewNull(ctx), nil
+    } else {
+      errCtx := key.Context()
+      return nil, errCtx.NewError("Error: " + key.Value() + " not found in __pstyle__")
+    }
+  } else {
+    return n.parent.SearchStyle(scope, key, ctx)
+  }
 }

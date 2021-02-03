@@ -1,3 +1,4 @@
+// TODO: instead of transpiling the files, just look at the final files
 package main
 
 import (
@@ -81,7 +82,7 @@ func parseArgs() CmdArgs {
       parsers.NewCLIAppendString("", "include-index", "--include-index <index-group>   Include index group in final search index. Can't be combined with --exclude-index", &(cmdArgs.includeIndices)),
       parsers.NewCLIAppendString("", "exclude-index", "--exclude-index <index-group>   Exclude index group in final search index. Can't be combined with --include-index", &(cmdArgs.excludeIndices)),
       parsers.NewCLIUniqueFlag("l", "latest" , "-l, --latest    Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
-      parsers.NewCLICountFlag("-v", "", "Verbosity", &(cmdArgs.verbosity)),
+      parsers.NewCLICountFlag("v", "", "Verbosity", &(cmdArgs.verbosity)),
     },
     parsers.NewCLIRemaining(&positional),
   )

@@ -1,6 +1,8 @@
 package directives
 
 import (
+  "fmt"
+  "reflect"
 	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/functions"
@@ -124,11 +126,13 @@ func (scope *ScopeData) SyncPackage(dst Scope, keepAutoVars, keepImports, asImpo
 			continue
 		}
 
+    isExported := v.Exported
 		if asImports {
 			v.Imported = true
+      v.Exported = false
 		}
 
-		if v.Exported {
+		if isExported {
       if err := dst.SetVar(prefix+k, v); err != nil {
         return err
       }
@@ -202,8 +206,10 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 			continue
 		}
 
+    isExported := v.Exported
 		if asImports {
 			v.Imported = true
+      v.Exported = false
 		}
 
 		ctxToken, ok, err := filterImport(k)
@@ -212,7 +218,7 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 		}
 
 		if ok {
-			if !v.Exported {
+			if !isExported {
 				errCtx := ctxToken.Context()
         return errCtx.NewError("Error: var \"" + k + "\" not exported")
 			}
@@ -289,7 +295,10 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 func (scope *ScopeData) SetVar(key string, v functions.Var) error {
   if v.Exported && scope.parent != nil { // if scope.parent == nil then this is the FileScope
     errCtx := v.Ctx
-    return errCtx.NewError("Error: can't be exported from this scope")
+    fmt.Println(reflect.TypeOf(scope.parent).String(), scope.parent.Parent() == nil)
+    err := errCtx.NewError("Error: can't be exported from this scope")
+    panic(err)
+    return err
   }
 
 	if key != "_" { // never set dummy vars

@@ -91,7 +91,6 @@ func removeForcedSuffix(attr *tokens.StringDict) (*tokens.StringDict, error) {
 // collectDefaultOps==true in case Template extends this tag
 func buildTree(parent Scope, parentNode Node, nt NodeType,
 	tagToken *tokens.Tag, opName string) error {
-
 	scope := NewSubScope(parent) // the enumNode absorbs intermediate enum declarations
 
 	attr, err := buildAttributes(scope, tagToken, []string{})

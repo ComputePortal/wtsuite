@@ -129,7 +129,7 @@ var (
   TEMPLATE_WORD_REGEXP          = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
 	JS_WORD_REGEXP                = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
 	XML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!]?[A-Za-z_]+[0-9A-Za-z_\-.:]*`)
-	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[#\-]?[0-9A-Za-z_]+[0-9A-Za-z_\-%.]*`)
+	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[#]?[0-9A-Za-z_]+[0-9A-Za-z_\-%.]*`)
 	FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP
 
@@ -142,7 +142,7 @@ var (
 	JS_STRING_TEMPLATE_START_REGEXP = regexp.MustCompile(`([$][{])`)
 	JS_STRING_TEMPLATE_STOP_REGEXP  = regexp.MustCompile(`([}])`)
 	// user variables can't contain namespace separators (i.e. dots)
-	VALID_VAR_NAME_REGEXP = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9\-]*$`)
+	VALID_VAR_NAME_REGEXP = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_\-]*$`)
 
 	JS_UNIVERSAL_CLASS_NAME_REGEXP = regexp.MustCompile(`^[A-Z][a-zA-Z]*$`)
 

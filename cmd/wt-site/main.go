@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime/pprof"
   "sort"
@@ -177,6 +178,8 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
 	for k, v := range cmdArgs.GlobalVars {
 		directives.RegisterDefine(k, v)
 	}
+
+	directives.ForceNewViewFileScriptRegistration(directives.NewFileCache())
 
 	VERBOSITY = cmdArgs.verbosity
 	directives.VERBOSITY = cmdArgs.verbosity
@@ -431,6 +434,25 @@ func buildProject(cmdArgs CmdArgs, cfg *config.Config) error {
 	return nil
 }
 
+var fProf *os.File = nil
+
+func stopProfiling(profFile string) {
+  if fProf != nil {
+		pprof.StopCPUProfile()
+
+    // also write mem profile
+		fMem, err := os.Create(profFile + ".mprof")
+		if err != nil {
+			printMessageAndExit(err.Error())
+		}
+
+		pprof.WriteHeapProfile(fMem)
+		fMem.Close()
+
+    fProf = nil
+  }
+}
+
 func main() {
 	cmdArgs := parseArgs()
 
@@ -445,13 +467,22 @@ func main() {
   }
 
 	if cmdArgs.profFile != "" {
-		fProf, err := os.Create(cmdArgs.profFile)
+		fProf, err = os.Create(cmdArgs.profFile)
 		if err != nil {
 			printMessageAndExit(err.Error())
 		}
 
 		pprof.StartCPUProfile(fProf)
-		defer pprof.StopCPUProfile()
+
+    go func() {
+      sigchan := make(chan os.Signal)
+      signal.Notify(sigchan, os.Interrupt)
+      <-sigchan
+
+      stopProfiling(cmdArgs.profFile)
+
+      os.Exit(1)
+    }()
 	}
 
 	if err := buildProject(cmdArgs, cfg); err != nil {
@@ -459,12 +490,6 @@ func main() {
 	}
 
 	if cmdArgs.profFile != "" {
-		fMem, err := os.Create(cmdArgs.profFile + ".mprof")
-		if err != nil {
-			printMessageAndExit(err.Error())
-		}
-
-		pprof.WriteHeapProfile(fMem)
-		fMem.Close()
+    stopProfiling(cmdArgs.profFile)
 	}
 }
