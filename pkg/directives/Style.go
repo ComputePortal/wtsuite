@@ -1,20 +1,16 @@
 package directives
 
 import (
-	"io/ioutil"
-
-	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
-func buildLinkedStyle(node Node, srcPath string, ctx context.Context) error {
-	if style, err := tree.NewStyleSheetLink(srcPath, ctx); err != nil {
-		return err
-	} else {
-		return node.AppendChild(style)
-	}
+type BuildStyleFunc func(d *tokens.StringDict) (string, error)
+var BuildStyle BuildStyleFunc = nil
+func RegisterBuildStyle(fn BuildStyleFunc) bool {
+  BuildStyle = fn
+  return true
 }
 
 func buildInlineStyle(node Node, attr *tokens.StringDict, content string,
@@ -27,11 +23,9 @@ func buildInlineStyle(node Node, attr *tokens.StringDict, content string,
 }
 
 func Style(scope Scope, node Node, tag *tokens.Tag) error {
-	ctx := tag.Context()
-
 	subScope := NewSubScope(scope)
 
-	attr, err := tag.Attributes([]string{"value"})
+	attr, err := tag.Attributes([]string{})
 	if err != nil {
 		return err
 	}
@@ -41,54 +35,26 @@ func Style(scope Scope, node Node, tag *tokens.Tag) error {
 		return err
 	}
 
-	srcToken_, hasSrc := attr.Get("src")
-	if hasSrc && attr.Len() == 1 {
-		if err := tag.AssertEmpty(); err != nil {
-			context.AppendString(err, "Info: can't have both src and inline content")
-			return err
-		}
+	contentToken, ok := attr.Get(".content")
+  if !ok {
+    errCtx := tag.Context()
+    return errCtx.NewError("Error: style without content")
+  }
 
-		srcToken, err := tokens.AssertString(srcToken_)
-		if err != nil {
-			return err
-		}
+  // build the style
+  d, err := tokens.AssertStringDict(contentToken)
+  if err != nil {
+    return err
+  }
 
-		srcPath, err := files.Search(ctx.Path(), srcToken.Value())
-		if err != nil {
-			errCtx := srcToken.Context()
-			return errCtx.NewError("Error: file " + err.Error())
-		}
+  contentStr, err := BuildStyle(d)
+  if err != nil {
+    return err
+  }
 
-		if tree.INLINE {
-			content, err := ioutil.ReadFile(srcPath)
-			if err != nil {
-				return ctx.NewError(err.Error())
-			}
+  attr.Delete(".content")
 
-			return buildInlineStyle(node, attr, string(content), ctx)
-		} else {
-			return buildLinkedStyle(node, srcPath, attr.Context())
-		}
-	} else {
-		if !tag.IsEmpty() {
-			errCtx := tag.Context()
-			return errCtx.NewError("Error: inline style must use value attribute")
-		}
-
-		valueToken_, hasValue := attr.Get("value")
-		if !hasValue {
-			errCtx := attr.Context()
-			return errCtx.NewError("Error: value attribute not found")
-		}
-
-		str, err := tokens.AssertString(valueToken_)
-		if err != nil {
-			return err
-		}
-
-		attr.Delete("value")
-		return buildInlineStyle(node, attr, str.Value(), tag.Context())
-	}
+  return buildInlineStyle(node, attr, contentStr, tag.Context())
 }
 
 var _styleOk = registerDirective("style", Style)

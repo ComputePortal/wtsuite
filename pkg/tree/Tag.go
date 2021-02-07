@@ -10,7 +10,6 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type Tag interface {
@@ -33,8 +32,9 @@ type Tag interface {
 	RegisterParent(Tag)
 	Parent() Tag
   FinalParent() tokens.FinalTag // exactly the same as Parent(), but just different interface
+  Siblings() []Tag // tags that come after!
 
-	CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.InlineBundle) error
+	CollectScripts(bundle *scripts.InlineBundle) error
 
 	Validate() error
 	Write(indent string, nl, tab string) string
@@ -131,11 +131,11 @@ func (t *tagData) Attributes() *tokens.StringDict {
 	return t.attributes
 }
 
-func (t *tagData) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.InlineBundle) error {
+func (t *tagData) CollectScripts(bundle *scripts.InlineBundle) error {
 	// scripts themselves dont have children, so can easily override this
 	newChildren := make([]Tag, 0)
 	for _, child := range t.children {
-		if err := child.CollectScripts(idMap, classMap, bundle); err != nil {
+		if err := child.CollectScripts(bundle); err != nil {
 			return err
 		}
 
@@ -215,25 +215,22 @@ func (t *tagData) writeAttributes() string {
 		switch {
     case strings.HasSuffix(k, "!"):
       panic(k + " is an invalid attribute key")
-		case k == "__elementCount__" || k == "__elementCountFolded__":
-			return nil
-		case k == "__style__" || k == "style":
-			// in normal cases the "style" is collected into a style sheet
-			// but attr."style" happens in an evalImageURI for example
-			value, err := tokens.AssertStringDict(val)
-			if err != nil {
-				return err
-			}
+		case k == "style" && !tokens.IsString(val):
+      // style can be dict
+      value, err := tokens.AssertStringDict(val)
+      if err != nil {
+        return err
+      }
 
-			// should be on single line
-			vStr, err := styles.DictToString(value)
-			if err != nil {
-				return err
-			}
+      // should be on single line
+      vStr, err := value.ToString("", "")
+      if err != nil {
+        return err
+      }
 
-			b.WriteString(" style=\"")
-			b.WriteString(vStr)
-			b.WriteString("\"")
+      b.WriteString(" style=\"")
+      b.WriteString(vStr)
+      b.WriteString("\"")
 		case tokens.IsTrueBool(val):
 			b.WriteString(" ")
 			b.WriteString(k)
@@ -336,7 +333,7 @@ func (t *tagData) Write(indent string, nl, tab string) string {
 func AssertUniqueID(t Tag, ctx context.Context) (idToken *tokens.String, err error) {
 	if vis, ok := t.(VisibleTag); ok {
 		if vis.GetID() == "" {
-			vis.SetID(styles.NewUniqueID())
+			vis.SetID(NewUniqueID())
 		}
 		return tokens.NewValueString(vis.GetID(), ctx), nil
 	} else {
@@ -346,7 +343,7 @@ func AssertUniqueID(t Tag, ctx context.Context) (idToken *tokens.String, err err
 				return nil, err
 			}
 		} else {
-			idToken = tokens.NewValueString(styles.NewUniqueID(), ctx)
+			idToken = tokens.NewValueString(NewUniqueID(), ctx)
 
 			t.Attributes().Set(tokens.NewValueString("id", ctx), idToken)
 		}
@@ -517,8 +514,31 @@ func (t *tagData) RegisterParent(p Tag) {
 	t.parent = p
 }
 
+func (t *tagData) Validate() error {
+  return nil
+}
+
 func (t *tagData) Parent() Tag {
 	return t.parent
+}
+
+func (t *tagData) Siblings() []Tag {
+  parent := t.parent
+  if parent == nil {
+    panic("parent not yet registered")
+  }
+
+  allSiblings := parent.Children()
+
+  for i, s_ := range allSiblings {
+    if s, ok := s_.(*tagData); ok {
+      if s == t {
+        return allSiblings[i+1:]
+      }
+    }
+  }
+
+  return []Tag{}
 }
 
 func (t *tagData) FinalParent() tokens.FinalTag {

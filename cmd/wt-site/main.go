@@ -22,7 +22,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	"github.com/computeportal/wtsuite/pkg/tree"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
+	"github.com/computeportal/wtsuite/pkg/styles"
 
 	"github.com/computeportal/wtsuite/cmd/wt-site/config"
 )
@@ -190,7 +190,7 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
 	files.VERBOSITY = cmdArgs.verbosity
 	cache.VERBOSITY = cmdArgs.verbosity
 	tree.VERBOSITY = cmdArgs.verbosity
-	styles.VERBOSITY = cmdArgs.verbosity
+	//styles.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
   return files.ResolvePackages(cmdArgs.ConfigFile)
@@ -202,17 +202,12 @@ func buildHTMLFile(c *directives.FileCache, src, url, dst string, control string
 	directives.SetActiveURL(url)
 
 	// must come before AddViewControl
-	r, cssBundleRules, err := directives.NewRoot(c, src, control, cssUrl, jsUrl)
+	r, err := directives.NewRoot(c, src, control, cssUrl, jsUrl)
 
 	directives.UnsetActiveURL()
 
 	if err != nil {
 		return err
-	}
-
-	// update the cache with the cssBundleRules
-	for _, rules := range cssBundleRules {
-		cache.AddCssEntry(rules, src)
 	}
 
 	output := r.Write("", patterns.NL, patterns.TAB)
@@ -287,17 +282,29 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 		cmdArgs.compactOutput, cmdArgs.GlobalVars, cmdArgs.forceBuild)
 
 	if cfg.MathFontUrl != "" {
-		styles.MATH_FONT = "FreeSerifMath"
-		styles.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
-		styles.MATH_FONT_URL = cfg.MathFontUrl
+		directives.MATH_FONT = "FreeSerifMath"
+		directives.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
+		directives.MATH_FONT_URL = cfg.MathFontUrl
 	}
 
-
 	cache.SyncHTMLLastModifiedTimes()
+
+  if cfg.StylePath != "" {
+    // TODO: expand against svg tags?
+    if cache.RequiresUpdate(cfg.StylePath) {
+      if err := styles.BuildFile(cfg.StylePath, cfg.GetCssDst()); err != nil {
+        return err
+      }
+    }
+  }
 
   // sort views for consistent behaviour
 	updatedViews := make([]string, 0)
 	for src, _ := range cfg.GetViews() {
+    if cfg.StylePath != "" {
+      files.AddCacheDependency(src, cfg.StylePath)
+    }
+
 		if cache.RequiresUpdate(src) {
 			updatedViews = append(updatedViews, src)
 		}
@@ -342,12 +349,6 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 
 	if len(updatedViews) > 0 {
 		cache.SaveHTMLCache(cmdArgs.OutputDir) // also cleans
-
-		if VERBOSITY >= 2 {
-			fmt.Println("writing css bundle", cfg.GetCssDst())
-		}
-
-		cache.SaveCSSBundle(cfg.GetCssDst(), cfg.MathFontUrl, cfg.GetMathFontDst())
 	}
 
 	return nil

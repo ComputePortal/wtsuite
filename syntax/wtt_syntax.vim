@@ -42,6 +42,9 @@ syn keyword TemplateKeywords this
 syn keyword VarKeywords contained var 
 syn region Var start='var' end='=[^{]*' oneline contains=VarKeywords,Block,Action,Constant,String, Comment
 
+syn keyword StyleKeywords contained style
+syn region Style start='style\s*[a-zA-Z_]' end='\n' oneline contains=StyleKeywords,Comment,Block,Action,Constant,String
+
 syn keyword FunctionKeywords contained function
 syn region Function_ start='function' end='[^(]*' oneline contains=FunctionKeywords
 
@@ -139,6 +142,7 @@ hi def link VarAction PreProc
 
 hi def link TemplateKeywords Statement
 hi def link VarKeywords Statement
+hi def link StyleKeywords Statement
 hi def link ForKeywords Statement
 hi def link AsKeyword Statement
 hi def link ImportKeywords Statement

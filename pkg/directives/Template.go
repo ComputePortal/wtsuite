@@ -20,13 +20,14 @@ type Template struct {
 	children    []*tokens.Tag
 	imported    bool
 	exported    bool
+  final       bool
 	ctx         context.Context
 }
 
 func newTemplate(name string, extends string, scope Scope, args *tokens.List, argDefaults *tokens.List,
 	superAttr *tokens.RawDict,
 	children []*tokens.Tag,
-	exported bool, ctx context.Context) Template {
+	exported bool, final bool, ctx context.Context) Template {
 
 	// copy the scope, in order to take a snapshot of its state
 	subScope := NewSubScope(scope)
@@ -41,6 +42,7 @@ func newTemplate(name string, extends string, scope Scope, args *tokens.List, ar
 		children,
 		false,
 		exported,
+    final,
 		ctx,
 	}
 }
@@ -170,9 +172,16 @@ func AddTemplate(scope Scope, node Node, tag *tokens.Tag) error {
 
 	extends := extendsToken.Value()
 
+  final := false
+  if finalToken, ok := attr.Get(".final"); ok {
+    if tokens.IsTrueBool(finalToken) {
+      final = true
+    }
+  }
+
   // check that attr has no other args
   // (TODO: also for other directives)
-  if err := attr.AssertOnlyValidKeys([]string{"export", "name", "args", "extends", "super"}); err != nil {
+  if err := attr.AssertOnlyValidKeys([]string{"export", "name", "args", "extends", "super", ".final"}); err != nil {
     return err
   }
 
@@ -185,7 +194,7 @@ func AddTemplate(scope Scope, node Node, tag *tokens.Tag) error {
 		err.AppendContextString("Info: defined here", scope.GetTemplate(key).ctx)
 		return err
 	default:
-    if err := scope.SetTemplate(key, newTemplate(key, extends, scope, args, argDefaults, superAttr, tag.Children(), exported, tag.Context())); err != nil {
+    if err := scope.SetTemplate(key, newTemplate(key, extends, scope, args, argDefaults, superAttr, tag.Children(), exported, final, tag.Context())); err != nil {
       return err
     }
 	}
@@ -351,6 +360,12 @@ func (c Template) instantiate(node *TemplateNode, args *tokens.StringDict,
 	templateCtx := ctx
 
 	if subScope.HasTemplate(c.extends) {
+    // check that extends is not final
+    if subScope.GetTemplate(c.extends).final {
+      errCtx := c.ctx
+      return errCtx.NewError("Error: can't extend " + c.extends + " (is final class)")
+    }
+
     subTag := tokens.NewTag(c.extends, templateSuperAttr, c.children, templateCtx)
 		if err := BuildTemplate(subScope, node, subTag); err != nil {
 			return err

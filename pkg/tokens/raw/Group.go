@@ -31,7 +31,7 @@ const (
 type Group struct {
 	gt       GroupType
 	st       ContentType
-	original []Token // only used for angled
+	original []Token // used by angled for js, and by css
 	Fields   [][]Token
 	TokenData
 }
@@ -322,6 +322,16 @@ func FindFirstParensGroup(ts []Token, istart int) int {
   return -1
 }
 
+func FindFirstBracesGroup(ts []Token, istart int) int {
+  for i, t := range ts {
+    if IsBracesGroup(t) {
+      return i
+    }
+  }
+  
+  return -1
+}
+
 // returns inner, and istop, and success
 func SuggestAngledGroup(ts []Token, istart int, tstart Token) ([]Token, int, bool) {
 	count := 0
@@ -538,4 +548,8 @@ func ExpandParensGroup(t Token) []Token {
 	} else {
 		return []Token{t}
 	}
+}
+
+func (t *Group) ExpandOnce() []Token {
+  return t.original
 }

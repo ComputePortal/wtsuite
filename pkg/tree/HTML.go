@@ -7,7 +7,6 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type HTML struct {
@@ -94,183 +93,27 @@ func (t *HTML) CollectIDs(idMap IDMap) error {
 	return body.CollectIDs(idMap)
 }
 
-func (t *HTML) CollectClasses(classMap ClassMap) error {
-	classes, err := t.collectAttributeClasses()
+func (t *HTML) SetStyleURL(cssUrl string) error {
+	head, _, err := t.getHeadBody()
 	if err != nil {
 		return err
 	}
 
-	if len(t.classes) != 0 && len(classes) != 0 {
-		panic("unexpected")
-	}
+  // if cssUrl == "" then css must be added by caller using the t.IncludeStyle() method
+  if cssUrl != "" {
+    ctx := t.Context()
+    linkTag, err := NewStyleSheetLink(cssUrl, ctx)
+    if err != nil {
+      return err
+    }
 
-	t.classes = classes
+    head.AppendChild(linkTag)
+  }
 
-	// XXX: does this tag need to be appended to the classMap?
-	//for _, cl := range t.classes {
-	//classMap.AppendTag(cl, t)
-	//}
-
-	_, body, err := t.getHeadBody()
-	if err != nil {
-		return err
-	}
-
-	return body.CollectClasses(classMap)
+  return nil
 }
 
-func (t *HTML) collectAllRule(ss styles.Sheet) error {
-	// add the * {margin: 0, padding: 0} rule
-	allStyle := tokens.NewEmptyStringDict(t.Context())
-
-	// add the dict entries
-	marginValue := tokens.NewValueInt(0, t.Context())
-	paddingValue := tokens.NewValueInt(0, t.Context())
-	boxSizingValue := tokens.NewValueString("inherit", t.Context())
-
-	allStyle.Set("margin", marginValue)
-	allStyle.Set("padding", paddingValue)
-	allStyle.Set("box-sizing", boxSizingValue)
-
-	rule, err := styles.NewAllRule(t, allStyle)
-	if err != nil {
-		return err
-	}
-
-	ss.Append(rule)
-
-	return nil
-}
-
-func (t *HTML) collectAutoLinkRule(ss styles.Sheet) error {
-	if !AUTO_LINK {
-		return nil
-	}
-
-	ctx := t.Context()
-	aStyle := tokens.NewEmptyStringDict(ctx)
-
-	textDecoKey, err := tokens.NewString("text-decoration", ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	textDecoVal, err := tokens.NewString("none", ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	displayKey, err := tokens.NewString("display", ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	// flex seems to wrap the tightest
-	displayVal, err := tokens.NewString("inline", ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	aStyle.Set(textDecoKey, textDecoVal)
-	aStyle.Set(displayKey, displayVal)
-
-	// dummy tag
-	aTag, err := NewVisibleTag("a", false, tokens.NewEmptyStringDict(ctx), ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	rule, err := styles.NewTagRule(&aTag, aStyle)
-	if err != nil {
-		return err
-	}
-
-	ss.Append(rule)
-
-	return nil
-}
-
-// return the bundleable css rules
-func (t *HTML) CollectStyles(idMap IDMap, classMap ClassMap, cssUrl string) ([][]string, error) {
-	head, body, err := t.getHeadBody()
-	if err != nil {
-		return nil, err
-	}
-
-	ss := styles.NewDocSheet()
-
-	// * {margin: 0, padding 0}
-	if err := t.collectAllRule(ss); err != nil {
-		return nil, err
-	}
-
-	// a {text-decoration: none; etc...}
-	if err := t.collectAutoLinkRule(ss); err != nil {
-		return nil, err
-	}
-
-	if styleToken_, ok := t.attributes.Get("style"); ok {
-		if !tokens.IsNull(styleToken_) {
-			styleToken, err := tokens.AssertStringDict(styleToken_)
-			if err != nil {
-				context.AppendContextString(err, "Info: needed here", t.Context())
-				return nil, err
-			}
-
-			if !styleToken.IsEmpty() {
-				rule, err := styles.NewTagRule(t, styleToken)
-				if err != nil {
-					return nil, err
-				}
-				ss.Append(rule)
-			}
-			t.attributes.Delete("style") // null isn't printed anyway, so doesnt need to be deletd
-		}
-	}
-
-	if err := body.CollectStyles(ss); err != nil {
-		return nil, err
-	}
-
-	if err := ss.Synchronize(); err != nil {
-		return nil, err
-	}
-
-	if !ss.IsEmpty() {
-		ctx := t.Context()
-
-		// resolve any nested rules
-		ssExpanded, bundleRules, err := ss.ExpandNested()
-		if err != nil {
-			return nil, err
-		}
-
-    // if cssUrl == "" then css must be added by caller using the t.IncludeStyle() method
-		if len(bundleRules) != 0  && cssUrl != "" {
-			bundleLinkTag, err := NewStyleSheetLink(cssUrl, ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			head.AppendChild(bundleLinkTag)
-		}
-
-		if !ssExpanded.IsEmpty() {
-			styleTag, err := NewStyle(tokens.NewEmptyStringDict(ctx), ssExpanded.Write(), ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			head.AppendChild(styleTag)
-		}
-
-		return styles.WriteBundleRules(bundleRules), nil
-	} else {
-		return [][]string{}, nil
-	}
-}
-
-func (t *HTML) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.InlineBundle) error {
+func (t *HTML) CollectScripts(bundle *scripts.InlineBundle) error {
 	// bundle is only used here, but HTML must implement Tag interface (to be a child of Root), so that's why bundle is passed in as an argument
 
 	head, body, err := t.getHeadBody()
@@ -278,11 +121,11 @@ func (t *HTML) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.In
 		return err
 	}
 
-	if err := head.CollectScripts(idMap, classMap, bundle); err != nil {
+	if err := head.CollectScripts(bundle); err != nil {
 		return err
 	}
 
-	if err := body.CollectScripts(idMap, classMap, bundle); err != nil {
+	if err := body.CollectScripts(bundle); err != nil {
 		return err
 	}
 

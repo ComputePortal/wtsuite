@@ -4,7 +4,6 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 // implements Tag interface
@@ -19,7 +18,6 @@ func NewLeafTag(ctx context.Context) LeafTag {
 
 func (t *LeafTag) Name() string {
 	return ""
-	panic("not available")
 }
 
 func (t *LeafTag) GetID() string {
@@ -42,15 +40,7 @@ func (t *LeafTag) CollectIDs(idMap IDMap) error {
 	return nil
 }
 
-func (t *LeafTag) CollectClasses(classMap ClassMap) error {
-	return nil
-}
-
-func (t *LeafTag) CollectStyles(ss styles.DocSheet) error {
-	return nil
-}
-
-func (t *LeafTag) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.InlineBundle) error {
+func (t *LeafTag) CollectScripts(bundle *scripts.InlineBundle) error {
 	return nil
 }
 
@@ -121,6 +111,25 @@ func (t *LeafTag) RegisterParent(p Tag) {
 
 func (t *LeafTag) Parent() Tag {
 	return t.parent
+}
+
+func (t *LeafTag) Siblings() []Tag {
+  parent := t.parent
+  if parent == nil {
+    panic("parent not yet registered")
+  }
+
+  allSiblings := parent.Children()
+
+  for i, s_ := range allSiblings {
+    if s, ok := s_.(*LeafTag); ok {
+      if s == t {
+        return allSiblings[i+1:]
+      }
+    }
+  }
+
+  return []Tag{}
 }
 
 func (t *LeafTag) FinalParent() tokens.FinalTag {

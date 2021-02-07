@@ -138,17 +138,39 @@ func ContainsSymbolThatEndsWith(ts []Token, s string) bool {
 }
 
 // first part includes the symbol
-func SplitByFirstSymbol(ts []Token, s string) ([]Token, []Token, error) {
+func SplitByFirstSymbol(ts []Token, s string) ([]Token, []Token) {
 	for i, t := range ts {
 		if IsSymbol(t, s) {
 			if i == len(ts)-1 {
-				return ts[0 : i+1], []Token{}, nil
+				return ts[0 : i+1], []Token{}
 			} else {
-				return ts[0 : i+1], ts[i+1:], nil
+				return ts[0 : i+1], ts[i+1:]
 			}
 		}
 	}
 
-	errCtx := MergeContexts(ts...)
-	return nil, nil, errCtx.NewError("Error: symbol '" + s + "' not found")
+	return ts, []Token{}
+}
+
+func SplitBySymbol(ts []Token, s string) [][]Token {
+  res := make([][]Token, 0)
+
+  prev := -1
+  for i, t := range ts {
+    if IsSymbol(t, s) {
+      if i < prev + 1 {
+        prev = i
+        continue
+      }
+
+      res = append(res, ts[prev+1:i])
+      prev = i
+    }
+  }
+
+  if prev < len(ts) - 1 {
+    res = append(res, ts[prev+1:])
+  }
+
+  return res
 }

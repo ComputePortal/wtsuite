@@ -79,6 +79,7 @@ var (
 	TEMPLATE_STRING_OR_COMMENT_REGEXP   = compileRegexp(SQ_STRING_START,
 		DQ_STRING_START, SL_COMMENT_START,
 		ML_COMMENT_START, ML_COMMENT_STOP)
+  CSS_STRING_REGEXP = compileRegexp(SQ_STRING_START, DQ_STRING_START)
 
 	BRACES_GROUP       = NewGroup(BRACES_START, BRACES_STOP)
 	BRACKETS_GROUP     = NewGroup(BRACKETS_START, BRACKETS_STOP)
@@ -122,16 +123,20 @@ var (
 	JS_SYMBOLS_REGEXP          = regexp.MustCompile(`([>][>][>][=])|([=!][=][=])|([*][*][=])|([<][<][=])|([>][>][=])|([>][>][>])|([<>=!:+\-*/%&|^][=])|([*][*])|([&][&])|([<][<])|([>=][>])|([|][|])|([+][+])|([:][:])|([\-][\-])|([!<>=:,;{}()[\]+*/\-?%\.&|^~])`)
 	MATH_SYMBOLS_REGEXP        = regexp.MustCompile(`([>][>])|([<][<])|([/][/])|([-=][>])|([!<>=~]?[=])|([{}()[\]+\-<>*/\.^_=,])`)
   GLSL_SYMBOLS_REGEXP        = regexp.MustCompile(`([+][+])|([-][-])|([&][&])|([|][|])|([<>!=*+\-][=])|([#:!<>;{}()[\]/\-\.+*=,])`)
-  TEMPLATE_SYMBOLS_REGEXP          = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?$])`)
+  TEMPLATE_SYMBOLS_REGEXP          = regexp.MustCompile(`([=][=][=])|([|*~<>=!:^][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?$@\.#])`)
+  //CSS_SYMBOLS_REGEXP        = regexp.MustCompile(`([:][:])|([^$][=])|([:+>~()[\]*,=])`)
+  CSS_SYMBOLS_REGEXP        = regexp.MustCompile(`([:][:])|([*|$~^][=])|([:+>~()[\]*,=])`)
 
 	XML_WORD_REGEXP               = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
   MATH_WORD_REGEXP              = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.:]*\b`)
   TEMPLATE_WORD_REGEXP          = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
 	JS_WORD_REGEXP                = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
 	XML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!]?[A-Za-z_]+[0-9A-Za-z_\-.:]*`)
-	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[#]?[0-9A-Za-z_]+[0-9A-Za-z_\-%.]*`)
+	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`([#][0-9a-fA-F]{8})|([#][0-9a-fA-F]{6})|([#][0-9a-fA-F]{4})|([#][0-9a-fA-F]{3})|([0-9A-Za-z_]+[0-9A-Za-z_\-%.]*)`)
 	FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP
+  CSS_WORD_REGEXP                = regexp.MustCompile(`[a-zA-Z0-9\-#\.]+\b`)
+  CSS_WORD_OR_LITERAL_REGEXP     = CSS_WORD_REGEXP
 
 	// must match hex before number (because otherwise the '0' before the 'x' becomes a token by itself)
 	JS_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`([A-Za-z_$]+[0-9A-Za-z_]*)|(0x[0-9a-fA-F]+)|([0-9]+(\.[0-9]+)?(e[\-+]?[0-9]+)?)`)
@@ -234,6 +239,10 @@ func IsBool(s string) bool {
 
 func IsXMLWord(s string) bool {
 	return XML_WORD_REGEXP.MatchString(s)
+}
+
+func IsCSSWord(s string) bool {
+	return CSS_WORD_REGEXP.MatchString(s)
 }
 
 func IsMathWord(s string) bool {

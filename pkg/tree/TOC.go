@@ -6,7 +6,6 @@ import (
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type TOC struct {
@@ -112,14 +111,13 @@ func (t *TOC) EvalLazy() error {
       }
     }
 
-    hID := hTag.GetID()
-    if hID == "" {
-      hID = styles.NewUniqueID()
-      hTag.SetID(hID)
+    hIDToken, err := AssertUniqueID(hTag, t.Context())
+    if err != nil {
+      panic(err)
     }
 
     linkAttr := tokens.NewEmptyStringDict(ctx)
-    linkAttr.Set("href", tokens.NewValueString("#" + hID, ctx))
+    linkAttr.Set("href", tokens.NewValueString("#" + hIDToken.Value(), ctx))
     // XXX: classes can't start with number
     linkAttr.Set("class", tokens.NewValueString("h" + hNumber_, ctx))
 

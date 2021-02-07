@@ -105,35 +105,26 @@ func (t *Root) CollectIDs(idMap IDMap) error {
 	return html.CollectIDs(idMap)
 }
 
-func (t *Root) CollectClasses(classMap ClassMap) error {
+// returns the globally bundleable styles
+func (t *Root) SetStyleURL(cssUrl string) error {
 	_, html, err := t.getDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
 
-	return html.CollectClasses(classMap)
-}
-
-// returns the globally bundleable styles
-func (t *Root) CollectStyles(idMap IDMap, classMap ClassMap, cssUrl string) ([][]string, error) {
-	_, html, err := t.getDocTypeAndHTML()
-	if err != nil {
-		return nil, err
-	}
-
 	// return map of css keys/entries for writing to bundle
-	return html.CollectStyles(idMap, classMap, cssUrl)
+	return html.SetStyleURL(cssUrl)
 }
 
 // dummy is just to respect the interface
-func (t *Root) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.InlineBundle) error {
+func (t *Root) CollectScripts(bundle *scripts.InlineBundle) error {
 	_, html, err := t.getDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
 
 	// bundle is only used in html, but HTML must implement Tag interface (to be a child of Root), so that's why bundle is passed in as an argument
-	return html.CollectScripts(idMap, classMap, bundle)
+	return html.CollectScripts(bundle)
 }
 
 func (t *Root) ApplyControl(control string, jsUrl string) error {

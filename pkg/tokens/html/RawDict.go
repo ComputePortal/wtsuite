@@ -449,6 +449,49 @@ func (a *RawDict) IsSame(other Token) bool {
 	}
 }
 
+func (t *RawDict) Loop(fn func(key Token, value Token, last bool) error) error {
+	count := 0
+	n := len(t.items)
+	for _, item := range t.items {
+		count++
+		if err := fn(item.key, item.value, count == n); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (t *RawDict) ContainsLazy() bool {
+	for _, item := range t.items {
+    if IsLazy(item.key) || IsLazy(item.value) {
+      return true
+    }
+
+    switch {
+      case IsRawDict(item.value):
+        val, err := AssertRawDict(item.value)
+        if err != nil {
+          panic(err)
+        }
+        if val.ContainsLazy() {
+          return true
+        }
+      case IsStringDict(item.value):
+        val, err := AssertStringDict(item.value)
+        if err != nil {
+          panic(err)
+        }
+
+        if val.ContainsLazy() {
+          return true
+        }
+    }
+	}
+
+  return false
+}
+
 func (t *RawDict) LoopValues(fn func(t Token) error) error {
 	for _, item := range t.items {
 		switch v := item.value.(type) {

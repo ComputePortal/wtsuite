@@ -5,7 +5,6 @@ import (
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type Style struct {
@@ -42,14 +41,6 @@ func (t *Style) DeleteAllChildren() error {
 }
 
 func (t *Style) CollectIDs(IDMap) error {
-	return nil
-}
-
-func (t *Style) CollectClasses(ClassMap) error {
-	return nil
-}
-
-func (t *Style) CollectStyles(styles.DocSheet) error {
 	return nil
 }
 

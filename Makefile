@@ -1,5 +1,5 @@
 # lists of all the htmlpp command-line tools 
-cmds = wt-site wt-search-index wt-template wt-template-syntax-tree wt-script wt-script-syntax-tree wt-svg-minify wt-script-refactor wt-script-grapher wt-glsl wt-glsl-syntax-tree wt-pkg-sync
+cmds = wt-site wt-search-index wt-template wt-template-syntax-tree wt-script wt-script-syntax-tree wt-svg-minify wt-script-refactor wt-script-grapher wt-glsl wt-glsl-syntax-tree wt-pkg-sync wt-style
 
 # temporary destination directory of the commands, also used by temporary files from math-font
 export build = $(abspath ./build)

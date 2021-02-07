@@ -210,7 +210,23 @@ func Merge(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (token
 
 	// must deep copy because internal values might change
 	if len(args) < 2 {
-		return nil, ctx.NewError("Error: expected at least 2 arguments")
+    if len(args) ==1 {
+      if tokens.IsDict(args[0]) {
+        return args[0], nil
+      } else if tokens.IsList(args[0]) {
+        argsLst, err := tokens.AssertList(args[0])
+        if err != nil {
+          panic(err)
+        }
+
+        args = argsLst.GetTokens()
+      } else {
+        errCtx := args[0].Context()
+        return nil, errCtx.NewError("Error: expected list or dict as single argument")
+      }
+    } else {
+      return nil, ctx.NewError("Error: expected 1 or 2 arguments")
+    } 
 	}
 
 	var result tokens.Token = nil

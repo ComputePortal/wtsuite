@@ -5,23 +5,19 @@ import (
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
-type CollectStylesTag interface {
-	CollectIDs(IDMap) error
-	CollectClasses(ClassMap) error
-	CollectStyles(styles.DocSheet) error
-}
-
 type VisibleTag interface {
-	styles.StyledTag
+	Name() string
+	GetID() string
+	SetID(string)
+	GetClasses() []string
+	SetClasses([]string)
+
 
 	Context() context.Context
 
-	CollectStylesTag
-
-	//	IDMapTag
+	CollectIDs(IDMap) error
 }
 
 type VisibleTagData struct {
@@ -61,7 +57,7 @@ func (t *VisibleTagData) CollectIDs(idMap IDMap) error {
 
 	for _, child := range t.children {
 		switch c := child.(type) {
-		case CollectStylesTag:
+		case VisibleTag:
 			if err := c.CollectIDs(idMap); err != nil {
 				return err
 			}
@@ -70,74 +66,6 @@ func (t *VisibleTagData) CollectIDs(idMap IDMap) error {
 			return errCtx.NewError("Error: not a visible tag (collecting ids in VisibleTagData)")
 		}
 
-	}
-
-	return nil
-}
-
-func (t *VisibleTagData) CollectClasses(classMap ClassMap) error {
-	classes, err := t.collectAttributeClasses()
-	if err != nil {
-		return err
-	}
-
-	if len(t.classes) != 0 && len(classes) != 0 {
-		panic("unexpected")
-	}
-
-	t.classes = classes
-	for _, cl := range t.classes {
-		classMap.AppendTag(cl, t)
-	}
-
-	for _, child := range t.children {
-		switch c := child.(type) {
-		case CollectStylesTag:
-			if err := c.CollectClasses(classMap); err != nil {
-				return err
-			}
-		default:
-			errCtx := child.Context()
-			return errCtx.NewError("Error: not a visible tag (collecting classes in VisibleTagData)")
-		}
-	}
-
-	return nil
-}
-
-func (t *VisibleTagData) CollectStyles(ss styles.DocSheet) error {
-	if styleToken_, ok := t.attributes.Get("style"); ok {
-		if !tokens.IsNull(styleToken_) {
-			styleToken, err := tokens.AssertStringDict(styleToken_)
-			if err != nil {
-				context.AppendContextString(err, "Info: needed here", t.Context())
-				return err
-			}
-
-			if !styleToken.IsEmpty() {
-				rule, err := styles.NewHashClassRule(t, styleToken)
-				if err != nil {
-					return err
-				}
-
-				ss.Append(rule)
-			}
-		}
-
-		// appending a null could be equivalent to deleting
-		t.attributes.Delete("style")
-	}
-
-	for _, child := range t.Children() {
-		switch c := child.(type) {
-		case CollectStylesTag:
-			if err := c.CollectStyles(ss); err != nil {
-				return err
-			}
-		default:
-			errCtx := child.Context()
-			return errCtx.NewError("Error: not a visible tag (collecting styles in VisibleTagData)")
-		}
 	}
 
 	return nil

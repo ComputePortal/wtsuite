@@ -414,6 +414,7 @@ func (p *Parser) tokenizeWordsAndLiterals(ts []tokens.Token) ([]tokens.Token, er
 				return ts, err
 			}
 			p.SetMask(r[0], r[1], p.settings.wordsAndLiterals.maskType)
+
 			ts = append(ts, t)
 		} else {
 			break
@@ -429,7 +430,8 @@ func (p *Parser) tokenizeSymbols(ts []tokens.Token) []tokens.Token {
 	for true {
 		if r, s, ok := p.nextMatch(p.settings.symbols.pattern, false); ok {
 			p.SetMask(r[0], r[1], p.settings.symbols.maskType)
-			ts = append(ts, tokens.NewSymbol(s, false, p.NewContext(r[0], r[1])))
+      sym := tokens.NewSymbol(s, false, p.NewContext(r[0], r[1]));
+			ts = append(ts, sym)
 		} else {
 			break
 		}

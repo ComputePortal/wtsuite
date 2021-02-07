@@ -78,18 +78,20 @@ func (p *JSParser) buildSwitchStatement(ts []raw.Token) (js.Statement, []raw.Tok
 				}
 			}
 
-			clauseTokens, otherTokens, err := raw.SplitByFirstSymbol(field, patterns.COLON)
-			if err != nil {
-				return nil, nil, err
+			clauseTokens, otherTokens := raw.SplitByFirstSymbol(field, patterns.COLON)
+			if len(otherTokens) == 0 && !raw.ContainsSymbol(field, patterns.COLON) {
+        errCtx := raw.MergeContexts(field...)
+        return nil, nil, errCtx.NewError("Error: \":\" not found")
 			}
 
 			clauseHeaders := [][]raw.Token{clauseTokens}
 
 			// eat the empty clauses that might be in otherTokens
 			for len(otherTokens) > 0 && (raw.IsWord(otherTokens[0], "case") || raw.IsWord(otherTokens[0], "default")) {
-				if clauseTokens_, otherTokens_, err := raw.SplitByFirstSymbol(otherTokens, patterns.COLON); err != nil {
-					return nil, nil, err
-					break
+        clauseTokens_, otherTokens_ := raw.SplitByFirstSymbol(otherTokens, patterns.COLON)
+        if len(otherTokens_) == 0 && !raw.ContainsSymbol(otherTokens, patterns.COLON) {
+          errCtx := raw.MergeContexts(otherTokens...)
+          return nil, nil, errCtx.NewError("Error: \":\" not found")
 				} else {
 					clauseHeaders = append(clauseHeaders, clauseTokens_)
 					otherTokens = otherTokens_

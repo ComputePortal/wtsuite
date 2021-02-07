@@ -360,6 +360,7 @@ func (p *TemplateParser) buildOperatorExpression(v *raw.Operator) (html.Token, e
 		} else {
 			errCtx := v.Context()
 			err := errCtx.NewError("Error: binary operator '" + strings.TrimLeft(v.Name(), "bin") + "' not recognized")
+      panic(err)
 			return nil, err
 		}
   case v.Name() == "pre$":

@@ -19,7 +19,7 @@ func NewScript(attr *tokens.StringDict, content string, ctx context.Context) (Ta
 	return &Script{attr, content, NewLeafTag(ctx)}, nil
 }
 
-func (t *Script) CollectScripts(idMap IDMap, classMap ClassMap, bundle *scripts.InlineBundle) error {
+func (t *Script) CollectScripts(bundle *scripts.InlineBundle) error {
 	srcToken_, hasSrc := t.attributes.Get("src")
 
 	if t.content != "" && hasSrc {

@@ -730,6 +730,59 @@ func (p *TemplateParser) buildParametersDirective(ts []raw.Token) (*html.Tag, []
   return tag, rem, nil
 }
 
+// syntactic sugar for template name extends div super(class!=name)
+func (p *TemplateParser) buildClassDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+  if !raw.IsWord(ts[0], "class") {
+    errCtx := ts[0].Context()
+    return nil, nil, errCtx.NewError("Error: expected class keyword")
+  }
+
+  ctx := ts[0].Context()
+
+  if len(ts) < 4 {
+    errCtx := raw.MergeContexts(ts...)
+    return nil, nil, errCtx.NewError("Error: expected 4 tokens keyword")
+  }
+
+  nameToken, err := raw.AssertWord(ts[1])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  nameCtx := nameToken.Context()
+	nameKey := html.NewValueString("name", nameCtx)
+	nameVal := html.NewValueString(nameToken.Value(), nameCtx)
+
+  attr := html.NewEmptyRawDict(ctx)
+
+  // name was eaten before
+  attr.Set(nameKey, nameVal);
+    
+  ofToken, err := raw.AssertWord(ts[2])
+  if err != nil || ofToken.Value() != "of"{
+    errCtx := ts[2].Context()
+    return nil, nil, errCtx.NewError("Error: expected \"of\"")
+  }
+
+  extendsToken, err := raw.AssertWord(ts[3])
+  if err != nil {
+    return nil, nil, err
+  }
+
+  extendsCtx := extendsToken.Context()
+  extendsVal := html.NewValueString(extendsToken.Value(), extendsCtx)
+  attr.Set(html.NewValueString("extends", extendsCtx), extendsVal)
+
+  superKey := html.NewValueString("class!", nameCtx)
+  superVal := html.NewValueString(nameToken.Value(), nameCtx)
+  superAttr := html.NewValuesRawDict([]html.Token{superKey}, []html.Token{superVal}, ctx)
+
+  attr.Set(html.NewValueString("super", ctx), superAttr)
+  attr.Set(html.NewValueString(".final", ctx), html.NewValueBool(true, ctx))
+
+  return html.NewDirectiveTag("template", attr, []*html.Tag{}, ctx), ts[4:], nil
+}
+
 func (p *TemplateParser) buildTemplateDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
   if !raw.IsWord(ts[0], "template") {
     errCtx := ts[0].Context()
@@ -892,7 +945,7 @@ func (p *TemplateParser) buildSingleOrNoValueDirective(ts []raw.Token) (*html.Ta
   }
 }
 
-func (p *TemplateParser) buildExportedDirective(ts []raw.Token) (*html.Tag, []raw.Token, error) {
+func (p *TemplateParser) buildExportedDirective(indent int, ts []raw.Token) (*html.Tag, []raw.Token, error) {
   if len(ts) < 2 {
     errCtx := ts[0].Context()
     return nil, nil, errCtx.NewError("Error: expected more tokens")
@@ -916,6 +969,15 @@ func (p *TemplateParser) buildExportedDirective(ts []raw.Token) (*html.Tag, []ra
     addExportAttr(tag.RawAttributes(), exportCtx)
 
     return tag, rem, nil
+  case raw.IsWord(ts[1], "class"):
+    tag, rem, err := p.buildClassDirective(ts[1:])
+    if err != nil {
+      return nil, nil, err
+    }
+
+    addExportAttr(tag.RawAttributes(), exportCtx)
+
+    return tag, rem, nil
   case raw.IsWord(ts[1], "template"):
     tag, rem, err := p.buildTemplateDirective(ts[1:])
     if err != nil {
@@ -929,6 +991,15 @@ func (p *TemplateParser) buildExportedDirective(ts []raw.Token) (*html.Tag, []ra
     return tag, rem, nil
   case raw.IsWord(ts[1], "function"):
     tag, rem, err := p.buildFunctionDirective(ts[1:])
+    if err != nil {
+      return nil, nil, err
+    }
+
+    addExportAttr(tag.RawAttributes(), exportCtx)
+
+    return tag, rem, nil
+  case raw.IsWord(ts[1], "style"):
+    tag, rem, err := p.buildStyleDirective(indent, ts[1:])
     if err != nil {
       return nil, nil, err
     }
@@ -1045,7 +1116,7 @@ func (p *TemplateParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.
       switch {
         case key == "export":
           // exports can be indented so they can benefit from branching
-          return p.buildExportedDirective(ts)
+          return p.buildExportedDirective(indent, ts)
         case key == "permissive":
           return nil, nil, tagCtx.NewError("Error: 'permissive' must be first word, and can't be indented")
         case key == "parameters":
@@ -1055,12 +1126,16 @@ func (p *TemplateParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.
           return p.buildParametersDirective(ts)
         case key == "import":
           return p.buildImportExportDirective(indent != 0, ts)
+        case key == "class":
+          return p.buildClassDirective(ts)
         case !followedByParens && key == "template":
           return p.buildTemplateDirective(ts)
         case !followedByParens && key == "var":
           return p.buildVarDirective(ts)
         case key == "function":
           return p.buildFunctionDirective(ts)
+        case key == "style":
+          return p.buildStyleDirective(indent, ts)
         case key == "for":
           return p.buildForDirective(ts)
         case key == "if" || key == "elseif" || key == "else" || key == "append" || key == "replace" || key == "prepend" || key == "block" || key == "switch" || key == "case" || key == "default":
@@ -1076,7 +1151,7 @@ func (p *TemplateParser) buildTag(indent int, ts []raw.Token) (*html.Tag, []raw.
 	}
 }
 
-// return indent from first non-empty line
+// return indent of first non-empty line
 func (p *TemplateParser) eatWhitespace(ts []raw.Token) ([]raw.Token, int) {
   for i, t := range ts {
     if !raw.IsWhitespace(t) {
@@ -1099,6 +1174,17 @@ func (p *TemplateParser) eatWhitespace(ts []raw.Token) ([]raw.Token, int) {
   }
 
   return []raw.Token{}, 0
+}
+
+func (p *TemplateParser) eatLine(ts []raw.Token) []raw.Token {
+  // eat until next NL char
+  for i, t := range ts {
+    if raw.IsNL(t) {
+      return ts[i:] 
+    }
+  }
+
+  return []raw.Token{}
 }
 
 func (p *TemplateParser) DumpTokens() {

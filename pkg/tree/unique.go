@@ -1,11 +1,7 @@
-package styles
+package tree
 
 import (
 	"strconv"
-)
-
-var (
-	VERBOSITY      = 0
 )
 
 var (
@@ -13,21 +9,13 @@ var (
 	_uclass_ = 0
 )
 
-type StyledTag interface {
-	Name() string
-	GetID() string
-	SetID(string)
-	GetClasses() []string
-	SetClasses([]string)
-}
-
 func NewUniqueID() string {
 	res := "_" + strconv.Itoa(_uid_)
 	_uid_++
 	return res
 }
 
-func newUniqueClass() string {
+func NewUniqueClass() string {
 	res := "_" + strconv.Itoa(_uclass_)
 	_uclass_++
 	return res

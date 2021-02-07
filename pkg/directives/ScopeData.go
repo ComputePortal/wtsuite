@@ -104,6 +104,7 @@ func (scope *ScopeData) Sync(dst Scope, keepAutoVars, keepImports, asImports boo
 				c.children,
 				true,
 				c.exported,
+        c.final,
 				c.ctx,
 			}
 		}
@@ -157,6 +158,7 @@ func (scope *ScopeData) SyncPackage(dst Scope, keepAutoVars, keepImports, asImpo
           c.children,
           true,
           false,
+          c.final,
           c.ctx,
         }
       }
@@ -252,6 +254,7 @@ func (scope *ScopeData) SyncFiltered(dst Scope, keepAutoVars, keepImports, asImp
 				c.children,
 				true,
 				false,
+        c.final,
 				c.ctx,
 			}
 		}

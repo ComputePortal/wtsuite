@@ -3,8 +3,10 @@ package html
 import (
 	"reflect"
   "sort"
+  "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 )
 
 type StringDict struct {
@@ -24,7 +26,6 @@ func AssertStringDict(t Token) (*StringDict, error) {
 	} else {
 		errCtx := t.Context()
 		err := errCtx.NewError("Error: expected string dict (got " + reflect.TypeOf(t).String() + ")")
-		panic(err)
 		return nil, err
 	}
 }
@@ -174,7 +175,7 @@ func (t *StringDict) Loop(fn func(key *String, value Token, last bool) error) er
 		count++
 		key, err := AssertString(item.key)
 		if err != nil {
-			panic(err)
+			return err // might be Lazy
 		}
 
 		if err := fn(key, item.value, count == n); err != nil {
@@ -254,4 +255,79 @@ func GolangStringMapToStringDict(m map[string]interface{}, ctx context.Context) 
   }
 
   return res, nil
+}
+
+func dictEntryToStringMapEntry(k *String, v Token, dst map[string]string) error {
+	// null values are ignored in final output
+	if IsNull(v) {
+		return nil
+	}
+
+	if IsList(v) {
+		str, err := ListToString(v)
+		if err != nil {
+			return err
+		}
+
+		dst[k.Value()] = str
+	} else {
+		value, err := AssertPrimitive(v)
+		if err != nil {
+			return err
+		}
+
+		dst[k.Value()] = value.Write()
+	}
+
+	return nil
+}
+
+func (t *StringDict) ToStringMap() (map[string]string, error) {
+	result := make(map[string]string)
+
+	if err := t.Loop(func(key *String, val Token, last bool) error {
+		return dictEntryToStringMapEntry(key, val, result)
+	}); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func StringMapToString(m map[string]string, indent string, nl string) string {
+	var b strings.Builder
+
+	keys := make([]string, 0)
+	for k, _ := range m {
+		keys = append(keys, k)
+	}
+	// sort
+	sort.Strings(keys)
+
+	for i, k := range keys {
+		v := m[k]
+
+		b.WriteString(indent)
+		b.WriteString(k)
+		b.WriteString(":")
+		b.WriteString(v)
+		if i == len(keys)-1 {
+			b.WriteString(patterns.LAST_SEMICOLON)
+		} else {
+			b.WriteString(";")
+		}
+		b.WriteString(nl)
+	}
+
+	return b.String()
+}
+
+func (t *StringDict) ToString(indent string, nl string) (string, error) {
+	m, err := t.ToStringMap()
+	if err != nil {
+		return "", err
+	}
+
+	res := StringMapToString(m, indent, nl)
+	return res, nil
 }

@@ -3,7 +3,7 @@ package functions
 import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
+	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
 func UniqueID(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (tokens.Token, error) {
@@ -16,7 +16,7 @@ func UniqueID(scope tokens.Scope, args_ *tokens.Parens, ctx context.Context) (to
 		return nil, ctx.NewError("Error: expected 0 arguments")
 	}
 
-	id := styles.NewUniqueID()
+	id := tree.NewUniqueID()
 
 	return tokens.NewString(id, ctx)
 }

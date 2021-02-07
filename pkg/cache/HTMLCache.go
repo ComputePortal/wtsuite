@@ -6,12 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/computeportal/wtsuite/pkg/files"
-	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 )
 
 type HTMLCacheEntry struct {
@@ -19,12 +16,6 @@ type HTMLCacheEntry struct {
 	Control      string
 	touched      bool
 	lastModified time.Time
-}
-
-type CSSCacheEntry struct {
-	Files   []string // html files that use this css entry
-	Content []string
-	touched bool
 }
 
 type HTMLCache struct {
@@ -36,7 +27,6 @@ type HTMLCache struct {
 	GlobalVars   map[string]string         // if any of this changes -> rebuild all
 	IndexMap     map[string]string         // abspath -> target abspath
 	Data         map[string]HTMLCacheEntry // abs src path as key
-	CssRules     map[string]CSSCacheEntry
 }
 
 func globalVarsNotEqual(gv1, gv2 map[string]string) bool {
@@ -124,7 +114,6 @@ func LoadHTMLCache(indexMap map[string]string,
 		make(map[string]string),
 		make(map[string]string),
 		make(map[string]HTMLCacheEntry),
-		make(map[string]CSSCacheEntry),
 	}
 
 	if !forceBuild {
@@ -169,7 +158,6 @@ func LoadHTMLCache(indexMap map[string]string,
 						globalVars,
 						indexMap,
 						make(map[string]HTMLCacheEntry),
-						make(map[string]CSSCacheEntry),
 					}
 				} else {
 					// remove any views that are no longer used,
@@ -206,18 +194,6 @@ func (c *HTMLCache) StartUpdate(fname string) {
 }
 
 func (c *HTMLCache) StartRootUpdate(fname string) {
-	// break all css links to this files
-	for k, rule := range c.CssRules {
-		otherFiles := make([]string, 0)
-		for _, f := range rule.Files {
-			if f != fname {
-				otherFiles = append(otherFiles, f)
-			}
-		}
-
-		c.CssRules[k] = CSSCacheEntry{otherFiles, rule.Content, rule.touched}
-	}
-
 	fmt.Println("starting root update of ", fname)
 	c.Data[fname] = HTMLCacheEntry{make([]string, 0), "", true, time.Time{}}
 }
@@ -244,7 +220,8 @@ func RollbackUpdate(fname string) {
 func (c *HTMLCache) AddDependency(fname string, dep string) {
 	entry, ok := c.Data[fname]
 	if !ok {
-		panic(fname + " not found in HTMLCache")
+    c.StartUpdate(fname)
+    entry = c.Data[fname]
 	}
 
 	// only append if not found
@@ -262,8 +239,10 @@ func (c *HTMLCache) AddDependency(fname string, dep string) {
 func (c *HTMLCache) HasUpstreamDependency(thisPath string, upstreamPath string) bool {
 	entry, ok := c.Data[thisPath]
 	if !ok {
-		panic(thisPath + " not found in HTMLCache")
+    c.StartUpdate(thisPath)
+    entry = c.Data[thisPath]
 	}
+
 
 	// only append if not found
 	for _, v := range entry.Deps {
@@ -283,7 +262,8 @@ func SetViewControl(fname string, control string) {
 
 	entry, ok := c.Data[fname]
 	if !ok {
-		panic(fname + " not found in HTMLCache")
+    c.StartUpdate(fname)
+    entry = c.Data[fname]
 	}
 
 	entry.Control = control
@@ -374,43 +354,6 @@ func (c *HTMLCache) RequiresUpdate(fname string) bool {
 	return c.requiresUpdate(fname, targetAge, m)
 }
 
-func (c *HTMLCache) AddCssEntry(rules []string, htmlFile string) {
-	var keyBuilder strings.Builder
-	for _, r := range rules {
-		keyBuilder.WriteString(r)
-	}
-	key := keyBuilder.String() // rely on in-built hasing
-
-	if prev, ok := c.CssRules[key]; ok {
-
-		// append file if not already appended
-		isNewFileLink := true
-		for _, f := range prev.Files {
-			if f == htmlFile {
-				isNewFileLink = false
-			}
-		}
-
-		if isNewFileLink {
-			prev.Files = append(prev.Files, htmlFile)
-		}
-
-		c.CssRules[key] = CSSCacheEntry{prev.Files, prev.Content, true}
-	} else {
-		c.CssRules[key] = CSSCacheEntry{[]string{htmlFile}, rules, true}
-	}
-}
-
-// rules need to be kept together
-func AddCssEntry(rules []string, htmlFile string) {
-	c, ok := _cache.(*HTMLCache)
-	if !ok {
-		panic("unexpected")
-	}
-
-  c.AddCssEntry(rules, htmlFile)
-}
-
 func (c *HTMLCache) touchUpwards(fname string) {
 	entry, ok := c.Data[fname]
 	if !ok {
@@ -449,27 +392,6 @@ func (c *HTMLCache) clean() {
 			delete(c.Data, k)
 		}
 	}
-
-	// remove css FileLinks if they are no longer in Data, and remove css rules if they have only untouched files
-	for k, rule := range c.CssRules {
-		filteredFiles := make([]string, 0)
-		someTouched := false
-		for _, fname := range rule.Files {
-			if d, ok := c.Data[fname]; ok {
-				filteredFiles = append(filteredFiles, fname)
-
-				if d.touched {
-					someTouched = true
-				}
-			}
-		}
-
-		if !someTouched {
-			delete(c.CssRules, k)
-		} else {
-			c.CssRules[k] = CSSCacheEntry{filteredFiles, rule.Content, true}
-		}
-	}
 }
 
 func (c *HTMLCache) Save() []byte {
@@ -490,222 +412,4 @@ func (c *HTMLCache) Save() []byte {
 
 func SaveHTMLCache(targetFile string) {
 	SaveCache(targetFile + " html")
-}
-
-func (c *HTMLCache) WriteCSSBundle(mathFontUrl string) string {
-	var b strings.Builder
-
-	if mathFontUrl != "" {
-		b.WriteString("@font-face{font-family:")
-		b.WriteString(styles.MATH_FONT)
-		b.WriteString(";src:url(")
-		b.WriteString(mathFontUrl)
-		b.WriteString(")}")
-		b.WriteString(patterns.NL)
-  }
-
-	// only write unique lines
-	done := make(map[string]string)
-	for _, rule := range c.CssRules {
-		for _, r := range rule.Content {
-			if _, ok := done[r]; !ok {
-
-				b.WriteString(r)
-				done[r] = r
-			}
-		}
-	}
-
-	compressed := compressCSS(b.String())
-
-  return compressed
-}
-
-func WriteCSSBundle(mathFontUrl string) string {
-	c, ok := _cache.(*HTMLCache)
-	if !ok {
-		panic("unexpected")
-	}
-
-  return c.WriteCSSBundle(mathFontUrl)
-}
-
-func SaveCSSBundle(dst string, mathFontUrl string, mathFontDst string) {
-  compressed := WriteCSSBundle(mathFontUrl)
-
-	if mathFontUrl != "" {
-		if err := styles.SaveMathFont(mathFontDst); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: unable to write math font ("+err.Error()+")")
-			os.Exit(1)
-		}
-	}
-
-	if err := ioutil.WriteFile(dst, []byte(compressed), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: unable to write css bundle ("+err.Error()+")")
-		os.Exit(1)
-	}
-}
-
-func compressCSS(raw string) string {
-	return compressCSSNested(raw, true)
-}
-
-// scan the input string, removing the queries between "@....{....}" and putting those in amap
-func compressCSSNested(raw string, topLevel bool) string {
-	queries := make(map[string]string)
-	plainClasses := make(map[string]string) // not done in top level, comes before other output (inside queries), map key is actually body, map value is comma separated list of classes
-	// plainClasses compression can be turned off by always setting topLevel==true
-
-	var output strings.Builder
-	var key strings.Builder
-	var body strings.Builder
-
-	inQueryKey := false
-	inQueryBody := false
-	inString := false
-
-	inClassKey := false
-	inClassBody := false
-
-	var prevNonWhite byte = '}'
-
-	braceCount := 0
-	for i := 0; i < len(raw); i++ {
-		c := raw[i]
-		if inQueryKey || (!topLevel && inClassKey) {
-			if inQueryKey {
-				if c == '{' {
-					inQueryKey = false
-					inQueryBody = true
-
-					keyStr := key.String()
-					if keyStr == "@font-face" {
-						// not allowed to combine in this case
-						inQueryBody = false
-						output.WriteString(keyStr)
-						output.WriteByte(c)
-						key.Reset()
-					}
-				} else {
-					key.WriteByte(c)
-				}
-			} else { // inClassKey && !topLevel
-				if !inClassKey {
-					panic("algo error")
-				}
-
-				if c == '{' {
-					keyStr := key.String()
-					inClassKey = false
-					if !patterns.CSS_PLAIN_CLASS_REGEXP.MatchString(keyStr) {
-						output.WriteString(keyStr) // first dot should be included in keyStr
-						output.WriteByte(c)
-						key.Reset()
-					} else {
-						inClassBody = true
-					}
-				} else {
-					key.WriteByte(c)
-				}
-			}
-		} else if inQueryBody || (!topLevel && inClassBody) {
-			if inString {
-				if c == '"' || c == '\'' {
-					inString = false
-				}
-			} else {
-				if c == '"' || c == '\'' {
-					inString = true
-				}
-			}
-
-			if !inString {
-				if c == '}' {
-					if braceCount == 0 {
-						// include the next newline(s) too
-						for i < len(raw)-1 && raw[i+1] == '\n' {
-							//body.WriteByte('\n')
-							i++
-						}
-
-						// save the key -> body
-						keyStr := key.String()
-						bodyStr := body.String()
-
-						if inQueryBody {
-							if prevBody, ok := queries[keyStr]; !ok {
-								queries[keyStr] = bodyStr
-							} else {
-								// XXX: is this addition slow?
-								queries[keyStr] = prevBody + bodyStr
-							}
-							inQueryBody = false
-						} else {
-							if !inClassBody {
-								panic("algo error")
-							}
-
-							if prevLst, ok := plainClasses[bodyStr]; ok {
-								plainClasses[bodyStr] = prevLst + "," + keyStr
-							} else {
-								plainClasses[bodyStr] = keyStr
-							}
-							inClassBody = false
-						}
-
-						key.Reset()
-						body.Reset()
-						prevNonWhite = '}'
-					} else if braceCount < 1 {
-						panic("bad brace count")
-					} else {
-						braceCount--
-						body.WriteByte(c)
-					}
-				} else if c == '{' {
-					prevNonWhite = c
-					braceCount++
-					body.WriteByte(c)
-				} else {
-					body.WriteByte(c)
-				}
-			} else {
-				body.WriteByte(c)
-			}
-		} else if c == '@' && prevNonWhite == '}' {
-			inQueryKey = true
-			key.WriteByte(c)
-		} else if c == '.' && prevNonWhite == '}' && !topLevel {
-			inClassKey = true
-			key.WriteByte(c)
-		} else {
-			if !(c == ' ' || c == '\n' || c == '\t') {
-				prevNonWhite = c
-			}
-
-			output.WriteByte(c)
-		}
-	}
-
-	var finalOutput strings.Builder
-
-	for body, key := range plainClasses {
-		finalOutput.WriteString(key)
-		finalOutput.WriteByte('{')
-		finalOutput.WriteString(body)
-		finalOutput.WriteByte('}')
-		finalOutput.WriteString(patterns.NL)
-	}
-
-	finalOutput.WriteString(output.String())
-
-	for k, q := range queries {
-		finalOutput.WriteString(k)
-		finalOutput.WriteByte('{')
-		finalOutput.WriteString(compressCSSNested(q, false)) // set to true to avoid plainClass compression
-		finalOutput.WriteByte('}')
-		finalOutput.WriteString(patterns.NL)
-	}
-
-	return finalOutput.String()
 }

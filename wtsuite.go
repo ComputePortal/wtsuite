@@ -11,7 +11,7 @@ import (
   "github.com/computeportal/wtsuite/pkg/tokens/context"
   tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
   "github.com/computeportal/wtsuite/pkg/tree"
-  "github.com/computeportal/wtsuite/pkg/tree/styles"
+  "github.com/computeportal/wtsuite/pkg/styles"
 )
 
 type Transpiler struct {
@@ -80,21 +80,7 @@ func (t *Transpiler) TranspileTemplate(path string, name string, args_ map[strin
   }
 
   // no control, no cssUrl, no jsUrl
-  _, cssBundleRules, err := directives.FinalizeRoot(node, "", "", "")
-  if err != nil {
-    return nil, err
-  }
-
-  htmlCache := cache.HTMLCache{}
-	// update the cache with the cssBundleRules
-	for _, rules := range cssBundleRules { // added to file later
-		htmlCache.AddCssEntry(rules, path) // path argument is irrelevant
-	}
-
-  cssContent := htmlCache.WriteCSSBundle(t.mathFontURL)
-
-  // add to the Root
-  if err := root.IncludeStyle(cssContent); err != nil {
+  if _, err := directives.FinalizeRoot(node, "", "", ""); err != nil {
     return nil, err
   }
 

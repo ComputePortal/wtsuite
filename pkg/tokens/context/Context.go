@@ -13,6 +13,14 @@ func NewSource(src string) *Source {
 	return &Source{src}
 }
 
+func (s *Source) GetChar(i int) byte {
+  return s.source[i]
+}
+
+func (s *Source) Len() int {
+  return len(s.source)
+}
+
 type Context struct {
 	ranges []struct{ start, stop int }
 	source *Source
@@ -36,7 +44,7 @@ func NewContext(source *Source, path string) Context {
 	if path == "" {
 		panic("use dummycontext instead")
 	}
-	return newContext(0, len(source.source), source, path)
+	return newContext(0, source.Len(), source, path)
 }
 
 func (c *Context) NewContext(relStart, relStop int) Context {
@@ -249,8 +257,8 @@ func (c *Context) SearchReplaceOrig(old, new string) error {
     prev = r.stop
   }
 
-  if prev < len(c.source.source) {
-    b.WriteString((c.source.source)[prev:len(c.source.source)])
+  if prev < c.source.Len() {
+    b.WriteString((c.source.source)[prev:c.source.Len()])
   }
 
   if err := ioutil.WriteFile(c.Path(), []byte(b.String()), 0); err != nil {
@@ -267,4 +275,38 @@ func MergeFill(a Context, b Context) Context {
     ctx.path)
 
   return ctx
+}
+
+// 
+func SimpleFill(a Context, b Context) Context {
+  if a.path != b.path {
+    panic("must be in same file")
+  }
+
+  ctx := newContext(a.ranges[0].start, b.ranges[len(b.ranges)-1].stop, a.source, 
+    a.path)
+
+  return ctx
+}
+
+func (c *Context) IncludeLeftSpace() Context {
+  start := c.ranges[0].start
+  stop := c.ranges[len(c.ranges)-1].stop
+
+  for start > 0 && c.source.GetChar(start-1) == ' ' {
+    start -= 1
+  }
+
+  return newContext(start, stop, c.source, c.path)
+}
+
+func (c *Context) IncludeRightSpace() Context {
+  start := c.ranges[0].start
+  stop := c.ranges[len(c.ranges)-1].stop
+
+  if stop < c.source.Len() - 1 && c.source.GetChar(stop) == ' ' {
+    stop += 1
+  }
+
+  return newContext(start, stop, c.source, c.path)
 }

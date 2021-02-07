@@ -19,7 +19,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tree"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
+	//"github.com/computeportal/wtsuite/pkg/styles"
 
 	"github.com/computeportal/wtsuite/cmd/wt-site/config"
 )
@@ -159,7 +159,7 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
 	files.VERBOSITY = cmdArgs.verbosity
 	cache.VERBOSITY = cmdArgs.verbosity
 	tree.VERBOSITY = cmdArgs.verbosity
-	styles.VERBOSITY = cmdArgs.verbosity
+	//styles.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
   return files.ResolvePackages(cmdArgs.ConfigFile)
@@ -253,9 +253,9 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 		false, cmdArgs.GlobalVars, true)
 
 	if cfg.MathFontUrl != "" {
-		styles.MATH_FONT = "FreeSerifMath"
-		styles.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
-		styles.MATH_FONT_URL = cfg.MathFontUrl
+		directives.MATH_FONT = "FreeSerifMath"
+		directives.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
+		directives.MATH_FONT_URL = cfg.MathFontUrl
 	}
 
 	searchIndex := NewSearchIndex()
@@ -272,7 +272,7 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 
 			directives.SetActiveURL(url)
 
-			r, _, err := directives.NewRoot(c, src, "", cfg.CssUrl, cfg.JsUrl)
+			r, err := directives.NewRoot(c, src, "", cfg.CssUrl, cfg.JsUrl)
 			if err != nil {
 				return nil, err
 			}

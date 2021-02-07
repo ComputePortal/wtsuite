@@ -9,9 +9,12 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tree"
-	"github.com/computeportal/wtsuite/pkg/tree/styles"
 	"github.com/computeportal/wtsuite/pkg/tree/svg"
 )
+
+var MATH_FONT = "FreeSerif"
+var MATH_FONT_FAMILY = "FreeSerif"
+var MATH_FONT_URL = ""
 
 func Math(scope Scope, node Node, tag *tokens.Tag) error {
 	attrScope := NewSubScope(scope)
@@ -89,8 +92,8 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 	// fill the svg attributes
 	svgAttr.Set("overflow", tokens.NewValueString("visible", ctx))
 
-	styleValue := tokens.NewEmptyStringDict(ctx)
-	styleValue.Set("font-family", tokens.NewValueString(styles.MATH_FONT_FAMILY, ctx))
+	//styleValue := tokens.NewEmptyStringDict(ctx)
+	//styleValue.Set("font-family", tokens.NewValueString(MATH_FONT_FAMILY, ctx))
 
 	if !isInSVG {
 		if isInline {
@@ -109,8 +112,8 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 
 			widthVal := tokens.NewValueUnitFloat((totalBB.Width()+paddingLeft+paddingRight)*1.0, "em", ctx)
 
-			styleValue.Set("height", heightVal)
-			styleValue.Set("width", widthVal)
+			svgAttr.Set("height", heightVal)
+			svgAttr.Set("width", widthVal)
 		} else {
 			viewBoxValue := tokens.NewValueString(fmt.Sprintf("%g %g %g %g",
 				totalBB.Left(), totalBB.Top(), totalBB.Width(), totalBB.Height()),
@@ -121,20 +124,20 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 
 			widthVal := tokens.NewValueUnitFloat(totalBB.Width(), "em", ctx)
 
-			styleValue.Set("height", heightVal)
-			styleValue.Set("width", widthVal)
+			svgAttr.Set("height", heightVal)
+			svgAttr.Set("width", widthVal)
 		}
 
 		// search for the color in incoming style
 		// TODO: should math inside svg use the fills directly?
-		colorValue, err := SearchStyle(node, scope, attr, "color", ctx)
-		if err != nil {
-			return err
-		}
+		//colorValue, err := SearchStyle(node, scope, attr, "color", ctx)
+		//if err != nil {
+			//return err
+		//}
 
-		if !tokens.IsNull(colorValue) {
-			styleValue.Set("fill", colorValue)
-		}
+		//if !tokens.IsNull(colorValue) {
+			//styleValue.Set("fill", colorValue)
+		//}
 	} else {
 		viewBoxValue := tokens.NewValueString(fmt.Sprintf("%g %g %g %g",
 			totalBB.Left(), totalBB.Top(), totalBB.Width(), totalBB.Height()),
@@ -253,7 +256,7 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 		}
 	}
 
-	svgAttr.Set("style", styleValue)
+	//svgAttr.Set("style", styleValue)
 
 	// merge using input attributes
 
@@ -346,20 +349,20 @@ func evalMathURI(scope Scope, args_ *tokens.Parens, ctx context.Context) (tokens
 
 	// XXX: data-uri svg's with @font-face styles are not actually supported
   //  so the following doesnt work in any browser (maybe in future ...)
-	if styles.MATH_FONT_URL != "" {
+	if MATH_FONT_URL != "" {
 		// add style child for math font import
 		defs, err := svg.BuildTag("defs", tokens.NewEmptyStringDict(ctx), ctx)
 		if err != nil {
 			panic(err)
 		}
 		importFontStyle, err := tree.NewStyle(tokens.NewEmptyStringDict(ctx),
-			"@font-face{font-family:"+styles.MATH_FONT+";src:url("+styles.MATH_FONT_URL+");}",
+			"@font-face{font-family:"+MATH_FONT+";src:url("+MATH_FONT_URL+");}",
 			ctx)
 		defs.AppendChild(importFontStyle)
 
 		textTag := tag.Children()[0]
 		textAttr := textTag.Attributes()
-		textAttr.Set("font-family", tokens.NewValueString(styles.MATH_FONT_FAMILY, ctx))
+		textAttr.Set("font-family", tokens.NewValueString(MATH_FONT_FAMILY, ctx))
 
 		tag.InsertChild(0, defs)
 	}

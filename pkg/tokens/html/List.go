@@ -351,3 +351,32 @@ func GolangSliceToList(x []interface{}, ctx context.Context) (*List, error) {
 
   return res, nil
 }
+
+func ListToString(t Token) (string, error) {
+	lst, err := AssertList(t)
+	if err != nil {
+		return "", err
+	}
+
+	var b strings.Builder
+
+	// separated by spaces
+	if err := lst.Loop(func(i int, v_ Token, last bool) error {
+		v, err := AssertPrimitive(v_)
+		if err != nil {
+			return err
+		}
+
+		b.WriteString(v.Write())
+
+		if !last {
+			b.WriteString(" ")
+		}
+
+		return nil
+	}); err != nil {
+		return "", nil
+	}
+
+	return b.String(), nil
+}

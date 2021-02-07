@@ -18,11 +18,7 @@ var (
 )
 
 const (
-  UIFILE_EXT = ".wtt"
   JSFILE_EXT = ".wts"
-
-	UIPACKAGE_SUFFIX = "__init__" + UIFILE_EXT
-	JSPACKAGE_SUFFIX = "__init__" + JSFILE_EXT
 )
 
 var StartCacheUpdate func(fname string) = nil
