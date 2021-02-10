@@ -1,6 +1,8 @@
 # lists of all the htmlpp command-line tools 
 cmds = wt-site wt-search-index wt-template wt-template-syntax-tree wt-script wt-script-syntax-tree wt-svg-minify wt-script-refactor wt-script-grapher wt-glsl wt-glsl-syntax-tree wt-pkg-sync wt-style
 
+version = 0.4.0
+
 # temporary destination directory of the commands, also used by temporary files from math-font
 export build = $(abspath ./build)
 
@@ -76,3 +78,11 @@ endif
 
 uninstall:
 	sudo rm -f $(addprefix $(prefix)/,$(cmds))
+
+package: 
+	tar -czf ./build/wtsuite_$(version)-linux_x86_64.tar.gz ./build/wt-*;
+	tar -czf ./build/wtsuite_$(version)-mac_darwin.tar.gz ./build/wt-*;
+	zip ./build/wtsuite_$(version)-ms_windows.zip ./build/wt-*;
+	tar -czf ./build/wtsuite_$(version)-vim_syntax.tar.gz ./syntax/*.vim;
+
+release: all alt package
