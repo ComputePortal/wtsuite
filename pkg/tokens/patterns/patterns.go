@@ -108,7 +108,7 @@ var (
 	HEX_REGEXP   = regexp.MustCompile(`0x[0-9a-fA-F]+$`)
 	FLOAT_REGEXP = regexp.MustCompile(`^[\-]?[0-9]+(\.[0-9]+)?(e[\-+]?[0-9]+)?([a-zA-Z%]*)?$`) // includes units
 	FLOAT_UNITS  = []string{"s", "Q", "%", "cm", "mm", "in", "pc", "pt", "px", "em", "ch",
-		"fr", "lh", "vw", "vh", "rem", "vmin", "vmax"}
+		"fr", "lh", "vw", "vh", "rem", "vmin", "vmax", "n"}
 	PLAIN_FLOAT_REGEXP = regexp.MustCompile(`^[\-]?[0-9]+(\.[0-9]+)?(e[\-+]?[0-9]+)?$`) // doesnt include units
 
 	TAG_START_REGEXP       = compileRegexp(TAG_START)

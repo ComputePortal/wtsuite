@@ -16,6 +16,7 @@ var table = map[string]TagBuilder{
   "article":  gb,
 	"b":        gbInline,
 	"i":        gbInline,
+  "blockquote": gb,
 	"br":       &fnBuilder{NewBr},
 	"button":   gb,
 	"body":     &fnBuilder{NewBody},

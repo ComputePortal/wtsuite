@@ -196,13 +196,13 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
   return files.ResolvePackages(cmdArgs.ConfigFile)
 }
 
-func buildHTMLFile(c *directives.FileCache, src, url, dst string, control string, cssUrl string, jsUrl string) error {
+func buildHTMLFile(c *directives.FileCache, src, url, dst string, control string, cssUrl string, jsUrl string, sheet directives.StyleSheet) error {
 	cache.StartRootUpdate(src)
 
 	directives.SetActiveURL(url)
 
 	// must come before AddViewControl
-	r, err := directives.NewRoot(c, src, control, cssUrl, jsUrl)
+	r, err := directives.NewRoot(c, src, control, cssUrl, jsUrl, sheet)
 
 	directives.UnsetActiveURL()
 
@@ -289,12 +289,17 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 
 	cache.SyncHTMLLastModifiedTimes()
 
+  var sheet styles.Sheet = nil
   if cfg.StylePath != "" {
-    // TODO: expand against svg tags?
-    if cache.RequiresUpdate(cfg.StylePath) {
-      if err := styles.BuildFile(cfg.StylePath, cfg.GetCssDst()); err != nil {
-        return err
-      }
+    var err error
+    sheet, err = styles.Build(cfg.StylePath, context.NewDummyContext())
+    if err != nil {
+      return err
+    }
+
+    // XXX: or should we write after all extensions have been applied?
+    if err = styles.WriteSheetToFile(sheet, cfg.GetCssDst()); err != nil {
+      return err
     }
   }
 
@@ -324,7 +329,7 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 
 		url := dst[len(cmdArgs.OutputDir):]
 
-		err := buildHTMLFile(c, src, url, dst, control, cfg.CssUrl, cfg.JsUrl)
+		err := buildHTMLFile(c, src, url, dst, control, cfg.CssUrl, cfg.JsUrl, sheet)
 		if err != nil {
 			context.AppendString(err, "Info: error encountered in \""+src+"\"")
 

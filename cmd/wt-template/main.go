@@ -133,7 +133,7 @@ func setUpEnv(cmdArgs CmdArgs) error {
 }
 
 func buildHTMLFile(c *directives.FileCache, src string, dst string, control string, compactOutput bool) error {
-  r, err := directives.NewRoot(c, src, "", "", "")
+  r, err := directives.NewRoot(c, src, "", "", "", nil)
   if err != nil {
     return err
   }

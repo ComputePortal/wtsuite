@@ -272,7 +272,7 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchInde
 
 			directives.SetActiveURL(url)
 
-			r, err := directives.NewRoot(c, src, "", cfg.CssUrl, cfg.JsUrl)
+			r, err := directives.NewRoot(c, src, "", cfg.CssUrl, cfg.JsUrl, nil)
 			if err != nil {
 				return nil, err
 			}

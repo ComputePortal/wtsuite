@@ -102,11 +102,7 @@ func (t *LeafTag) Write(indent string, nl, tab string) string {
 }
 
 func (t *LeafTag) RegisterParent(p Tag) {
-	if t.parent != nil {
-		panic("parent already set")
-	}
-
-	t.parent = p
+  t.parent = p
 }
 
 func (t *LeafTag) Parent() Tag {
@@ -114,6 +110,15 @@ func (t *LeafTag) Parent() Tag {
 }
 
 func (t *LeafTag) Siblings() []Tag {
+  parent := t.parent
+  if parent == nil {
+    panic("parent not yet registered")
+  }
+
+  return parent.Children()
+}
+
+func (t *LeafTag) LaterSiblings() []Tag {
   parent := t.parent
   if parent == nil {
     panic("parent not yet registered")

@@ -1,8 +1,6 @@
 package styles
 
 import (
-  "errors"
-  "io/ioutil"
   "strings"
 
 	"github.com/computeportal/wtsuite/pkg/directives"
@@ -87,28 +85,23 @@ func Build(path string, ctx context.Context) (Sheet, error) {
   return BuildDict(d)
 }
 
-func BuildFile(input string, output string) error {
+func BuildFile(input string, outputPath string) error {
   sheet, err := Build(input, context.NewDummyContext())
   if err != nil {
     return err
   }
 
-  content, err := sheet.Write(true, patterns.NL, patterns.TAB)
-  if err != nil {
-    return err
-  }
-
-  if err := ioutil.WriteFile(output, []byte(content), 0644); err != nil {
-    return errors.New("Error: " + err.Error())
-  }
-
-  return nil
+  return WriteSheetToFile(sheet, outputPath)
 }
 
-func BuildDictWriteSheet(d *tokens.StringDict) (string, error) {
+func BuildDictWriteSheet(d *tokens.StringDict, node directives.Node) (string, error) {
   sheet, err := BuildDict(d)
   if err != nil {
     return "", err
+  }
+
+  if node != nil {
+    node.RegisterStyleSheet(sheet)
   }
 
   return sheet.Write(true, patterns.NL, patterns.TAB)

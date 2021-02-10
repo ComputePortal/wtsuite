@@ -107,7 +107,19 @@ func (t *HTML) SetStyleURL(cssUrl string) error {
       return err
     }
 
-    head.AppendChild(linkTag)
+    // must be inserted before any other style tag, but necessarily before any other link tag
+    iInsert := -1
+    for i, childTag := range head.Children() {
+      if childTag.Name() == "style" {
+        iInsert = i
+      }
+    }
+
+    if iInsert < 0 {
+      head.AppendChild(linkTag)
+    } else {
+      head.InsertChild(iInsert, linkTag)
+    }
   }
 
   return nil

@@ -5,16 +5,16 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
-func NewRoot(cache *FileCache, path string, control string, cssUrl string, jsUrl string) (*tree.Root, error) {
+func NewRoot(cache *FileCache, path string, control string, cssUrl string, jsUrl string, sheet StyleSheet) (*tree.Root, error) {
 	_, node, err := BuildFile(cache, path, true, nil)
 	if err != nil {
 		return nil, err
 	}
 
-  return FinalizeRoot(node, control, cssUrl, jsUrl)
+  return FinalizeRoot(node, control, cssUrl, jsUrl, sheet)
 }
 
-func FinalizeRoot(node *RootNode, control string, cssUrl string, jsUrl string) (*tree.Root, error) {
+func FinalizeRoot(node *RootNode, control string, cssUrl string, jsUrl string, sheet StyleSheet) (*tree.Root, error) {
 
 	root_ := node.tag
 	root, ok := root_.(*tree.Root)
@@ -58,6 +58,20 @@ func FinalizeRoot(node *RootNode, control string, cssUrl string, jsUrl string) (
 	if err := root.Validate(); err != nil {
 		return nil, err
 	}
+
+  // also apply any registered stylesheets
+  sheets := node.sheets
+  if sheet != nil {
+    sheets = append([]StyleSheet{sheet}, sheets...)
+  }
+
+  for _, s := range sheets {
+    var err error
+    root, err = s.ApplyExtensions(root)
+    if err != nil {
+      return nil, err
+    }
+  }
 
 	return root, nil
 }

@@ -280,6 +280,10 @@ func (t *RawDict) convertKey(x interface{}) string {
 	case *String:
 		key = x_.Value()
 	default:
+    if x_, ok := x.(Token); ok {
+      hereCtx := x_.Context()
+      panic(hereCtx.NewError("expected string or String, got: " + reflect.TypeOf(x).String()))
+    }
 		panic("expected string or String got " + reflect.TypeOf(x).String())
 	}
 

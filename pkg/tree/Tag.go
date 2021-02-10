@@ -29,10 +29,11 @@ type Tag interface {
 	Children() []Tag
 	Context() context.Context
 
-	RegisterParent(Tag)
+	RegisterParent(Tag) // throws error if already set
 	Parent() Tag
   FinalParent() tokens.FinalTag // exactly the same as Parent(), but just different interface
-  Siblings() []Tag // tags that come after!
+  Siblings() []Tag
+  LaterSiblings() []Tag // tags that come after!
 
 	CollectScripts(bundle *scripts.InlineBundle) error
 
@@ -357,10 +358,14 @@ func (t *tagData) NumChildren() int {
 }
 
 func (t *tagData) AppendChild(child Tag) {
+  child.RegisterParent(t)
+
 	t.children = append(t.children, child)
 }
 
 func (t *tagData) InsertChild(i int, child Tag) error {
+  child.RegisterParent(t)
+
 	if i > len(t.children) {
 		errCtx := context.MergeContexts(child.Context())
 		err := errCtx.NewError("Error: trying to insert child at bad index " + fmt.Sprintf("(i = %d)", i))
@@ -507,10 +512,6 @@ func (t *tagData) Context() context.Context {
 }
 
 func (t *tagData) RegisterParent(p Tag) {
-	if t.parent != nil {
-		panic("parent already set")
-	}
-
 	t.parent = p
 }
 
@@ -523,6 +524,15 @@ func (t *tagData) Parent() Tag {
 }
 
 func (t *tagData) Siblings() []Tag {
+  parent := t.parent
+  if parent == nil {
+    panic("parent not yet registered")
+  }
+
+  return parent.Children()
+}
+
+func (t *tagData) LaterSiblings() []Tag {
   parent := t.parent
   if parent == nil {
     panic("parent not yet registered")

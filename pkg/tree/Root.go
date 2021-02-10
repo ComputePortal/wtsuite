@@ -17,7 +17,7 @@ func NewRoot(ctx context.Context) *Root {
 	return &Root{tagData{"", "", false, nil, nil, make([]Tag, 0), ctx}}
 }
 
-func (t *Root) getDocTypeAndHTML() (*DocType, *HTML, error) {
+func (t *Root) GetDocTypeAndHTML() (*DocType, *HTML, error) {
 	var docType *DocType = nil
 	var html *HTML = nil
 
@@ -65,7 +65,7 @@ func (t *Root) getDocTypeAndHTML() (*DocType, *HTML, error) {
 }
 
 func (t *Root) Validate() error {
-	docType, html, err := t.getDocTypeAndHTML()
+	docType, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (t *Root) Write(indent string, nl string, tab string) string {
 }
 
 func (t *Root) CollectIDs(idMap IDMap) error {
-	_, html, err := t.getDocTypeAndHTML()
+	_, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (t *Root) CollectIDs(idMap IDMap) error {
 
 // returns the globally bundleable styles
 func (t *Root) SetStyleURL(cssUrl string) error {
-	_, html, err := t.getDocTypeAndHTML()
+	_, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (t *Root) SetStyleURL(cssUrl string) error {
 
 // dummy is just to respect the interface
 func (t *Root) CollectScripts(bundle *scripts.InlineBundle) error {
-	_, html, err := t.getDocTypeAndHTML()
+	_, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (t *Root) CollectScripts(bundle *scripts.InlineBundle) error {
 }
 
 func (t *Root) ApplyControl(control string, jsUrl string) error {
-	_, html, err := t.getDocTypeAndHTML()
+	_, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (t *Root) ApplyControl(control string, jsUrl string) error {
 }
 
 func (t *Root) IncludeStyle(styles string) error {
-	_, html, err := t.getDocTypeAndHTML()
+	_, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (t *Root) IncludeStyle(styles string) error {
 }
 
 func (t *Root) IncludeControl(code string) error {
-	_, html, err := t.getDocTypeAndHTML()
+	_, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
 	}

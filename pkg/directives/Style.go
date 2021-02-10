@@ -6,7 +6,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tree"
 )
 
-type BuildStyleFunc func(d *tokens.StringDict) (string, error)
+type BuildStyleFunc func(d *tokens.StringDict, node Node) (string, error)
 var BuildStyle BuildStyleFunc = nil
 func RegisterBuildStyle(fn BuildStyleFunc) bool {
   BuildStyle = fn
@@ -47,7 +47,10 @@ func Style(scope Scope, node Node, tag *tokens.Tag) error {
     return err
   }
 
-  contentStr, err := BuildStyle(d)
+  // save the sheet in a global variable, so that wraps can be applied later?
+  // are append to the node, as interface{}
+
+  contentStr, err := BuildStyle(d, node)
   if err != nil {
     return err
   }

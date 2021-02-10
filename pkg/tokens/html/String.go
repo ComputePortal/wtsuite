@@ -2,6 +2,7 @@ package html
 
 import (
 	"reflect"
+  "strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
@@ -93,4 +94,22 @@ func (a *String) IsSame(other Token) bool {
 	} else {
 		return false
 	}
+}
+
+func (t *String) TrimLeft(prefix string) *String {
+  if strings.HasPrefix(t.value, prefix) {
+
+    newValue := strings.TrimLeft(t.value, prefix)
+
+    ctx := t.Context()
+    /*if ctx.Content() == t.value {
+      // also trim the context
+
+      ctx = ctx.NewContext(len(prefix), 0)
+    }*/
+
+    return NewValueString(newValue, ctx)
+  } else {
+    return t
+  }
 }

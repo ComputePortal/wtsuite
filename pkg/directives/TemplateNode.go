@@ -61,6 +61,10 @@ func (n *TemplateNode) SearchStyle(scope tokens.Scope, key *tokens.String, ctx c
 	return n.parent.SearchStyle(scope, key, ctx)
 }
 
+func (n *TemplateNode) RegisterStyleSheet(sheet StyleSheet) {
+  n.parent.RegisterStyleSheet(sheet)
+}
+
 func (n *TemplateNode) StartDeferral() {
   n.collectDeferred = true
 }

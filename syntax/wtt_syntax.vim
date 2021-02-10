@@ -37,7 +37,9 @@ syn match Statement '^\s*\zsexport\ze\s\+'
 
 syn keyword TemplateKeywords contained template extends blocks super
 syn region Template start='template' end='super' contains=TemplateKeywords,Block,VarAction,Constant,String, Comment keepend
-syn keyword TemplateKeywords this
+
+syn keyword ClassKeywords contained class of
+syn region Class start='class' end='\n' contains=ClassKeywords
 
 syn keyword VarKeywords contained var 
 syn region Var start='var' end='=[^{]*' oneline contains=VarKeywords,Block,Action,Constant,String, Comment
@@ -141,6 +143,7 @@ hi def link Action PreProc
 hi def link VarAction PreProc
 
 hi def link TemplateKeywords Statement
+hi def link ClassKeywords Statement
 hi def link VarKeywords Statement
 hi def link StyleKeywords Statement
 hi def link ForKeywords Statement

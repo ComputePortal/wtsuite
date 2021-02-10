@@ -26,12 +26,26 @@ type VisibleTagData struct {
 }
 
 func NewVisibleTag(name string, selfClosing bool, attr *tokens.StringDict, ctx context.Context) (VisibleTagData, error) {
+  classes := []string{}
+  if classToken_, ok := attr.Get("class"); ok {
+    if !tokens.IsNull(classToken_) {
+      classToken, err := tokens.AssertString(classToken_)
+      if err != nil {
+        return VisibleTagData{}, err
+      }
+
+      classes = strings.Fields(classToken.Value())
+    }
+
+    attr.Delete("class")
+  }
+
 	td, err := newTag(name, selfClosing, attr, ctx)
 	if err != nil {
 		return VisibleTagData{}, err
 	}
 
-	return VisibleTagData{[]string{}, td}, nil
+	return VisibleTagData{classes, td}, nil
 }
 
 func (t *VisibleTagData) GetClasses() []string {

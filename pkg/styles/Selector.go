@@ -253,7 +253,7 @@ func parseNameToken(t raw.Token) (string, string, string, error) {
     }
   }
 
-  return elementName, class, id, nil
+  return strings.TrimSpace(elementName), strings.TrimSpace(class), strings.TrimSpace(id), nil
 }
 
 // use a dummy *SelectorData to return all the vlues
@@ -514,7 +514,7 @@ func (s *SelectorData) match(tag tree.Tag) bool {
     if ok {
       classes := visTag.GetClasses()
       for _, class := range classes {
-        if class == s.class {
+        if strings.TrimSpace(class) == s.class {
           foundClass = true
           break
         }
@@ -542,11 +542,14 @@ func (s *SelectorData) match(tag tree.Tag) bool {
 }
 
 func (s *SelectorData) Match(tag tree.Tag) []tree.Tag {
-  if s.match(tag) {
+  if tag.Name() == "head" {
+    // don't go any deeper
+    return []tree.Tag{}
+  } else if s.match(tag) {
     if s.sibling == nil && s.descendant == nil {
       return []tree.Tag{tag}
     } else if s.sibling != nil {
-      siblings := tag.Siblings()
+      siblings := tag.LaterSiblings()
       if len(siblings) == 0 {
         return []tree.Tag{}
       } else if s.immediate {

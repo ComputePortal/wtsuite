@@ -8,6 +8,7 @@ import (
 
 type RootNode struct {
 	t NodeType
+  sheets []StyleSheet
 	NodeData
 }
 
@@ -16,7 +17,7 @@ func NewRootNode(tag tree.Tag, t NodeType) *RootNode {
 		panic("expected Root or SVGRoot (tags with empty names)")
 	}
 
-	return &RootNode{t, newNodeData(tag, nil)}
+	return &RootNode{t, make([]StyleSheet, 0), newNodeData(tag, nil)}
 }
 
 func (n *RootNode) Type() NodeType {
@@ -44,4 +45,8 @@ func (n *RootNode) GetBlockTarget(block *tokens.Tag) string {
 
 func (n *RootNode) getNode() Node {
   return n
+}
+
+func (n *RootNode) RegisterStyleSheet(sheet StyleSheet) {
+  n.sheets = append(n.sheets, sheet)
 }

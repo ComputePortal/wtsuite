@@ -87,6 +87,32 @@ func (p *TemplateParser) cssTokensToStrFn(ts []raw.Token) (html.Token, error) {
     }
   }
 
+  buildDollar := func(ts_ []raw.Token) error {
+    // insert "str" word token between any dollar and parens
+    ts := make([]raw.Token, 0)
+    for i, t := range ts_ {
+      ts = append(ts, t)
+
+      if i < len(ts_) - 1 && raw.IsSymbol(t, "$") && raw.IsParensGroup(ts_[i+1]) {
+        ts = append(ts, raw.NewValueWord("str", t.Context()))
+      }
+    }
+
+    exprTs, err := p.nestOperators(ts)
+    if err != nil {
+      return err
+    }
+
+    expr, err := p.buildExpression(exprTs)
+    if err != nil {
+      return err
+    }
+
+    parts = append(parts, expr)
+
+    return nil
+  }
+
   // inner function that can be called recursively if nested groups are unpacked
   var fn func([]raw.Token) error 
   fn = func(ts_ []raw.Token) error {
@@ -95,17 +121,9 @@ func (p *TemplateParser) cssTokensToStrFn(ts []raw.Token) (html.Token, error) {
       t := ts_[i]
       if dollarStart != -1 {
         if !(raw.IsParensGroup(t) || raw.IsBracketsGroup(t)) {
-          exprTs, err := p.nestOperators(ts_[dollarStart:i])
-          if err != nil {
+          if err := buildDollar(ts_[dollarStart:i]); err != nil {
             return err
           }
-
-          expr, err := p.buildExpression(exprTs)
-          if err != nil {
-            return err
-          }
-
-          parts = append(parts, expr)
 
           dollarStart = -1
           prev = t
@@ -121,12 +139,12 @@ func (p *TemplateParser) cssTokensToStrFn(ts []raw.Token) (html.Token, error) {
       if raw.IsSymbol(t, "$") {
         if i == len(ts_) - 1 {
           errCtx := t.Context()
-          return errCtx.NewError("Error: expected word after $")
+          return errCtx.NewError("Error: expected word or parens after $")
         }
 
-        if !raw.IsAnyWord(ts_[i+1]) {
+        if !raw.IsAnyWord(ts_[i+1]) && !raw.IsParensGroup(ts_[i+1]) {
           errCtx := t.Context()
-          return errCtx.NewError("Error: expected word after $")
+          return errCtx.NewError("Error: expected word or parens after $")
         }
 
         if !raw.IsSymbol(prev, "$") {
@@ -165,17 +183,9 @@ func (p *TemplateParser) cssTokensToStrFn(ts []raw.Token) (html.Token, error) {
     }
 
     if dollarStart != -1 {
-      exprTs, err := p.nestOperators(ts_[dollarStart:])
-      if err != nil {
+      if err := buildDollar(ts_[dollarStart:]); err != nil {
         return err
       }
-
-      expr, err := p.buildExpression(exprTs)
-      if err != nil {
-        return err
-      }
-
-      parts = append(parts, expr)
 
       dollarStart = -1
     }
@@ -469,7 +479,7 @@ func (p *TemplateParser) buildStyleDirective(indent int, ts []raw.Token) (*html.
     }
 
 
-  } else {
+  } else if raw.IsAnyWord(ts[0]) {
     var err error
     nameToken, err = raw.AssertWord(ts[0])
     if err != nil {
@@ -487,6 +497,8 @@ func (p *TemplateParser) buildStyleDirective(indent int, ts []raw.Token) (*html.
 
       ts = rem
     }
+  } else {
+    attr = html.NewEmptyRawDict(ctx)
   }
 
   dict, rem, err := p.buildStyleContent(indent, ts, ctx)

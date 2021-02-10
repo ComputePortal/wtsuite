@@ -239,6 +239,10 @@ func (c *Context) Content() string {
 	start := c.ranges[0].start
 	stop := c.ranges[len(c.ranges)-1].stop
 
+  //if stop < start {
+    //start, stop = stop, start
+  //}
+
 	return (c.source.source)[start:stop]
 }
 
@@ -283,8 +287,14 @@ func SimpleFill(a Context, b Context) Context {
     panic("must be in same file")
   }
 
-  ctx := newContext(a.ranges[0].start, b.ranges[len(b.ranges)-1].stop, a.source, 
-    a.path)
+  start := a.ranges[0].start
+  stop := b.ranges[len(b.ranges)-1].stop
+
+  if start >= stop {
+    start, stop = stop, start
+  }
+
+  ctx := newContext(start, stop, a.source, a.path)
 
   return ctx
 }

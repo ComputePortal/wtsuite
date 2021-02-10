@@ -32,6 +32,9 @@ type Node interface {
   SetBlockTarget(block *tokens.Tag, target string)
 
 	SearchStyle(scope tokens.Scope, key *tokens.String, ctx context.Context) (tokens.Token, error)
+  // register style sheet, which can be used by 
+  RegisterStyleSheet(sheet StyleSheet) // the wraps of registered style sheets must be 
+  // wraps after the main style sheet
 }
 
 type NodeData struct {
@@ -151,4 +154,9 @@ func (n *NodeData) SearchStyle(scope tokens.Scope, key *tokens.String, ctx conte
   } else {
     return n.parent.SearchStyle(scope, key, ctx)
   }
+}
+
+func (n *NodeData) RegisterStyleSheet(sheet StyleSheet) {
+  // parent can't be nil
+  n.parent.RegisterStyleSheet(sheet)
 }
