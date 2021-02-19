@@ -11,13 +11,16 @@ type Module interface {
 	GetExportedVariable(gs GlobalScope, name string,
 		nameCtx context.Context) (Variable, error)
 
+  SymbolDependencies(allModules map[string]Module, name string) []string // non-unique, not sorted
+  MinimalDependencies(allModules map[string]Module) []string // non-unique, not-sorted
+
 	Context() context.Context
 }
 
 type ImportedVariable struct {
 	old string
   new string
-	dep *LiteralString // abs path to a file (not a directory, or pkg/module path)
+	dep *LiteralString // abs path to a file (not a directory, nor pkg/module path)
   lang files.Lang // we need to remember this so we can tell tree/scripts/NewFileScript exactly what language to transpile
 	v   Variable       // cache it, so we don't need to keep searching for it
   // can also be used during refactoring
@@ -34,8 +37,28 @@ type ExportedVariable struct {
 type ModuleData struct {
 	importedNames    map[string]*ImportedVariable
 	exportedNames    map[string]*ExportedVariable
-	aggregateExports map[string]*ImportedVariable
+	aggregateExports map[string]*ImportedVariable // "*<path>" is used as key for unamed aggregate exports
 	Block
+}
+
+type NotFoundMarker struct {
+}
+
+func NewNotFoundMarker() *NotFoundMarker {
+  return &NotFoundMarker{}
+}
+
+func IsNotFoundError(err_ error) bool {
+  if err, ok := err_.(*context.ContextError); ok {
+    obj := err.GetObject()
+    if obj != nil {
+      if _, okInner := obj.(*NotFoundMarker); okInner {
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 func NewModule(ctx context.Context) *ModuleData {
@@ -110,7 +133,47 @@ func (m *ModuleData) GetExportedVariable(gs GlobalScope, name string,
 			return v, nil
 		}
 	} else {
-		return nil, nameCtx.NewError("Error: '" + name + "' not exported by this module")
+    // look in any unamed aggregate exports
+    var found Variable = nil
+    var foundDep *LiteralString = nil
+    for key, aggregateExport := range m.aggregateExports {
+      if strings.HasPrefix(key, "*") {
+        depModule, err := gs.GetModule(aggregateExport.dep.Value())
+        if err != nil {
+          errCtx := aggregateExport.dep.Context()
+          return nil, errCtx.NewError("Error: module not found")
+        }
+
+        v, err := depModule.GetExportedVariable(gs, name, aggregateExport.dep.Context())
+        if err == nil {
+          if found != nil {
+            errCtx := aggregateExport.dep.Context()
+            err := errCtx.NewError("Error: " + name + " exported twice")
+            err.AppendContextString("Info: also exported by this module", foundDep.Context())
+          }
+
+          found = v
+          foundDep = aggregateExport.dep
+        } else if IsNotFoundError(err) {
+          continue
+        } else {
+          return nil, err
+        }
+      }
+    }
+
+    if found == nil {
+      notFoundError := nameCtx.NewError("Error: '" + name + "' not exported by this module")
+      notFoundError.SetObject(NewNotFoundMarker())
+      return nil, notFoundError
+    } else {
+      // save a copy of the export as an aggregate export in this module too
+      aggregateExport := newImportedVariable(name, name, foundDep, files.SCRIPT, nameCtx)
+      aggregateExport.v = found
+
+      m.aggregateExports[name] = aggregateExport
+      return found, nil
+    }
 	}
 }
 
@@ -176,6 +239,84 @@ func (m *ModuleData) Dependencies() []files.PathLang {
 	return result
 }
 
+func (m *ModuleData) MinimalDependencies(allModules map[string]Module) []string {
+  res := make([]string, 0)
+
+  // in this case ignore the aggregate exports, and just look at the imports
+  for _, iv := range m.importedNames {
+    oldName := iv.old
+    // oldName can also be "*" or ""
+
+    depModule, ok := allModules[iv.dep.Value()]
+    if !ok {
+      panic("all modules should be available at this point")
+    }
+
+    res = append(res, depModule.SymbolDependencies(allModules, oldName)...)
+  }
+
+  return res
+}
+
+func (m *ModuleData) SymbolDependencies(allModules map[string]Module, name string) []string {
+  thisCtx := m.Context()
+  thisPath := thisCtx.Path()
+
+  if name == "" || name == "*" { // include all Dependencies, and self too
+    res_ := m.Dependencies()
+
+    res := []string{thisPath}
+
+    for _, r := range res_ {
+      res = append(res, r.Path)
+    }
+
+    return res
+  } else {
+    if ae, ok := m.aggregateExports[name]; ok {
+      newName := ae.new
+
+      depModule, ok := allModules[ae.dep.Value()]
+      if !ok {
+        panic("all modules should be available")
+      }
+
+      return depModule.SymbolDependencies(allModules, newName)
+    } else if _, ok := m.exportedNames[name]; ok {
+      // this file is definitely needed, and thus also all imports
+      res := []string{thisPath}
+
+      for _, iv := range m.importedNames {
+        depModule, ok := allModules[iv.dep.Value()]
+        if !ok {
+          panic("all modules should be available")
+        }
+
+        res = append(res, depModule.SymbolDependencies(allModules, iv.old)...)
+      }
+
+      return res
+    } else {
+      // look in any of the unamed aggregate exports
+      // no errors are thrown here, if not found simply no dependencies are added
+      res := make([]string, 0)
+
+      for key, ae := range m.aggregateExports {
+        if strings.HasPrefix(key, "*") {
+          depModule, ok := allModules[ae.dep.Value()]
+          if !ok {
+            panic("all modules should be available")
+          }
+          
+          res = append(res, depModule.SymbolDependencies(allModules, name)...)
+        }
+      }
+
+      return res
+    }
+  }
+}
+
 func (m *ModuleData) Write(usage Usage, nl string, tab string) (string, error) {
 	var b strings.Builder
 
@@ -189,6 +330,10 @@ func (m *ModuleData) Write(usage Usage, nl string, tab string) (string, error) {
 	}
 
 	return b.String(), nil
+}
+
+func newImportedVariable(oldName, newName string, pathLiteral *LiteralString, lang files.Lang, ctx context.Context) *ImportedVariable {
+  return &ImportedVariable{oldName, newName, pathLiteral, lang, nil, ctx}
 }
 
 func NewImportedVariable(oldName, newName string, pathLiteral *LiteralString, lang files.Lang, ctx context.Context) (*ImportedVariable, error) {
@@ -217,7 +362,7 @@ func NewImportedVariable(oldName, newName string, pathLiteral *LiteralString, la
 
   pathLiteral = NewLiteralString(absPath, pathLiteral.Context())
 
-  return &ImportedVariable{oldName, newName, pathLiteral, lang, nil, ctx}, nil
+  return newImportedVariable(oldName, newName, pathLiteral, lang, ctx), nil
 }
 
 func (m *ModuleData) AddImportedName(newName, oldName string, pathLiteral *LiteralString, lang files.Lang, ctx context.Context) error {
@@ -244,7 +389,8 @@ func (m *ModuleData) AddImportedName(newName, oldName string, pathLiteral *Liter
 }
 
 func (m *ModuleData) AddExportedName(outerName, innerName string, v Variable, ctx context.Context) error {
-	if other, ok := m.exportedNames[outerName]; ok {
+  // exportName might've been added during parsing (to be able to do initial tree shaking), and again during resolve names to have the exact variable
+	if other, ok := m.exportedNames[outerName]; ok && !ctx.Same(&other.ctx) {
 		err := ctx.NewError("Error: exported variable name already used")
 		err.AppendContextString("Info: exported here", other.ctx)
 		return err
@@ -303,11 +449,12 @@ func (m *ModuleData) ResolveNames(gs GlobalScope) error {
 		m.importedNames[name] = imported
 	}*/
 
-	// get all aggregate exports, so they are ready in case of EvalAsEntryPoint
 	for name, ae := range m.aggregateExports {
-		if _, err := m.GetExportedVariable(gs, name, ae.ctx); err != nil {
-			return err
-		}
+    if !strings.HasPrefix(name, "*") {
+      if _, err := m.GetExportedVariable(gs, name, ae.ctx); err != nil {
+        return err
+      }
+    } // unamed aggregate export are handled on name by name basis, as needed by entry points
 	}
 
 	return m.Block.HoistAndResolveStatementNames(ms)

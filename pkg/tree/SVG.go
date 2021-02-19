@@ -112,3 +112,20 @@ func (t *SVG) Write(indent string, nl, tab string) string {
 
 	return t.VisibleTagData.WriteWrappedAutoHref(indent, nl, tab)
 }
+
+// don't collect ids of the children, because pattern ids aren't necessarily unique
+func (t *SVG) CollectIDs(idMap IDMap) error {
+	if t.id != "" {
+		if idMap.Has(t.id) {
+			other := idMap.Get(t.id)
+			errCtx := t.Context()
+			err := errCtx.NewError("Error: id " + t.id + " already defined")
+			context.PrependContextString(err, "Info: defined here", other.Context())
+			return err
+		} else {
+			idMap.Set(t.id, t)
+		}
+	}
+
+  return nil
+}

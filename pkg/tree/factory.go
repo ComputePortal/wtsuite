@@ -13,6 +13,7 @@ var ncb TagBuilder = &NoChildrenBuilder{} // children can still be appended with
 var table = map[string]TagBuilder{
 	"!DOCTYPE": &fnBuilder{NewDocType},
 	"a":        gbInline,
+  "address":  gbInline,
   "article":  gb,
 	"b":        gbInline,
 	"i":        gbInline,

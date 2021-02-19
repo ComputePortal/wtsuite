@@ -360,13 +360,15 @@ func (c *HTMLCache) touchUpwards(fname string) {
 		panic("all deps should be in cache data")
 	}
 
-	entry.touched = true
+  if !entry.touched { // avoid infinite loop in circular situations
+    entry.touched = true
 
-	c.Data[fname] = entry
+    c.Data[fname] = entry
 
-	for _, dep := range entry.Deps {
-		c.touchUpwards(dep)
-	}
+    for _, dep := range entry.Deps {
+      c.touchUpwards(dep)
+    }
+  }
 }
 
 func (c *HTMLCache) clean() {

@@ -274,7 +274,6 @@ func (p *JSParser) buildExportVarStatement(ts []raw.Token,
 
 	variables := statement.GetVariables()
 
-  // export, but not default
   for k, v := range variables {
     if err := p.module.AddExportedName(k, k, v, v.Context()); err != nil {
       return nil, err
@@ -388,6 +387,11 @@ func (p *JSParser) buildExportList(ts []raw.Token) ([]raw.Token, error) {
 
     p.module.AddStatement(st)
 
+    // add export temporarily to be able to do initial tree shaking
+    if err := p.module.AddExportedName(newName, oldName, nil, ctx); err != nil {
+      return err
+    }
+
     return nil
   }
 
@@ -448,6 +452,12 @@ func (p *JSParser) buildExportStatement(ts []raw.Token) ([]raw.Token, error) {
     }
 
 		switch {
+    case raw.IsSymbol(ts[1], "*"):
+      if err := p.module.AddAggregateExport("*" + pathLiteral.Value(), "*", pathLiteral, files.SCRIPT, raw.MergeContexts(ts[0:3]...)); err != nil {
+        return nil, err
+      }
+
+      return remaining, nil
 		case raw.IsBracesGroup(ts[1]):
 			if err := p.buildImportOrAggregateExport(ts[1], pathLiteral, files.SCRIPT,
 				p.module.AddAggregateExport, "Error: bad aggregate export"); err != nil {

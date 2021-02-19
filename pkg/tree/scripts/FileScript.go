@@ -18,10 +18,12 @@ type FileScript interface {
   Walk(fn func(p string, obj interface{}) error) error
 	Module() js.Module
 	Path() string
+  Hide() 
 }
 
 type FileScriptData struct {
 	path   string
+  hidden bool
 	module *js.ModuleData
 }
 
@@ -47,7 +49,7 @@ func newFileScriptData(absPath string) (FileScriptData, error) {
 		return FileScriptData{}, err
 	}
 
-	return FileScriptData{absPath, m}, nil
+	return FileScriptData{absPath, false, m}, nil
 }
 
 func NewFileScript(absPath string, lang files.Lang) (FileScript, error) {
@@ -68,6 +70,10 @@ func NewFileScript(absPath string, lang files.Lang) (FileScript, error) {
 	}
 }
 
+func (s *FileScriptData) Hide() {
+  s.hidden = true
+}
+
 func (s *FileScriptData) Hash() string {
 	return js.HashControl(s.path)
 }
@@ -77,19 +83,35 @@ func (s *FileScriptData) Dependencies() []files.PathLang {
 }
 
 func (s *FileScriptData) Write() (string, error) {
-	return s.module.Write(nil, patterns.NL, patterns.TAB)
+  if s.hidden {
+    return "", nil
+  } else {
+    return s.module.Write(nil, patterns.NL, patterns.TAB)
+  }
 }
 
 func (s *FileScriptData) ResolveNames(scope js.GlobalScope) error {
-	return s.module.ResolveNames(scope)
+  if s.hidden {
+    return nil
+  } else {
+    return s.module.ResolveNames(scope)
+  }
 }
 
 func (s *FileScriptData) EvalTypes() error {
-	return s.module.EvalTypes()
+  if s.hidden {
+    return nil
+  } else {
+    return s.module.EvalTypes()
+  }
 }
 
 func (s *FileScriptData) ResolveActivity(usage js.Usage) error {
-	return s.module.ResolveActivity(usage)
+  if s.hidden {
+    return nil
+  } else {
+    return s.module.ResolveActivity(usage)
+  }
 }
 
 func (s *FileScriptData) UniqueEntryPointNames(ns js.Namespace) error {
@@ -97,11 +119,21 @@ func (s *FileScriptData) UniqueEntryPointNames(ns js.Namespace) error {
 }
 
 func (s *FileScriptData) UniversalNames(ns js.Namespace) error {
-	return s.module.UniversalNames(ns)
+  if s.hidden {
+    // XXX: could this proceed anyway (i.e. not throw errors due to lack of ResolveNames)
+    return nil
+  } else {
+    return s.module.UniversalNames(ns)
+  }
 }
 
 func (s *FileScriptData) UniqueNames(ns js.Namespace) error {
-	return s.module.UniqueNames(ns)
+  if s.hidden {
+    // XXX: could this proceed anyway (i.e. not throw errors due to lack of ResolveNames)
+    return nil
+  } else {
+    return s.module.UniqueNames(ns)
+  }
 }
 
 func (s *FileScriptData) Walk(fn func(scriptPath string, obj interface{}) error) error {

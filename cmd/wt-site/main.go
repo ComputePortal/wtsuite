@@ -285,6 +285,8 @@ func buildProjectViews(cfg *config.Config, cmdArgs CmdArgs) error {
 		directives.MATH_FONT = "FreeSerifMath"
 		directives.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
 		directives.MATH_FONT_URL = cfg.MathFontUrl
+
+    styles.SaveMathFont(cfg.GetMathFontDst())
 	}
 
 	cache.SyncHTMLLastModifiedTimes()

@@ -164,7 +164,13 @@ func GenerateSegments(pcs []PathCommand, ctx context.Context) ([]PathSegment, er
 	return result, nil
 }
 
-func ShortenEnds(pcs []PathCommand, dStart, dEnd float64, ctx context.Context) ([]PathCommand, error) {
+func ShortenStart(pcs []PathCommand, dStart float64, ctx context.Context) ([]PathCommand, error) {
+  if dStart < 0.0 {
+		panic("implicit lengthening not yet supported")
+  } else if dStart == 0.0 {
+    return pcs, nil
+  }
+
 	result := make([]PathCommand, 0)
 
 	ss, err := GenerateSegments(pcs, ctx)
@@ -172,173 +178,182 @@ func ShortenEnds(pcs []PathCommand, dStart, dEnd float64, ctx context.Context) (
 		return nil, err
 	}
 
-	if dStart < 0.0 || dEnd < 0.0 {
+  var x, y float64
+  var x0, y0 float64
+
+  switch curve := ss[0].(type) {
+  case *Line:
+    l := curve.Length()
+
+    f := dStart / l
+    if f > 1.0 {
+      errCtx := context.MergeContexts(curve.Context(), curve.stop.Context())
+      return nil, errCtx.NewError("Error: segment not long enough to shorten")
+    }
+
+    x0, y0 = curve.Position(0.0)
+    x, y = curve.Position(f)
+
+  case *Arc:
+    l := curve.Length()
+
+    f := dStart / l
+    if f > 1.0 {
+      errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
+      return nil, errCtx.NewError("Error: segment not long enough to shorten")
+    }
+
+    x0, y0 = curve.Position(0.0)
+    x, y = curve.Position(f)
+  case *Quadratic:
+    l := curve.Length()
+
+    f := dStart / l
+
+    if f > 1.0 {
+      errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
+      return nil, errCtx.NewError("Error: segment not long enough to shorten")
+    }
+
+    x0, y0 = curve.Position(0.0)
+    x, y = curve.Position(f)
+  default:
+    errCtx := ss[0].Context()
+    return nil, errCtx.NewError("Error: not supported for shortening (" + reflect.TypeOf(ss[0]).String() + ")")
+  }
+
+  switch move := pcs[0].(type) {
+  case *MoveTo:
+    result = append(result, NewMoveTo(x, y, move.Context()))
+  case *MoveBy:
+    result = append(result, NewMoveTo(x, y, move.Context()))
+  default:
+    errCtx := ss[0].Context()
+    return nil, errCtx.NewError("Error: expected M or m")
+  }
+
+  replaceSecond := false
+  switch second := pcs[1].(type) {
+  case *HorBy:
+    result = append(result, NewHorBy(second.dx-(x-x0), second.Context()))
+    replaceSecond = true
+  case *VerBy:
+    result = append(result, NewVerBy(second.dy-(y-y0), second.Context()))
+    replaceSecond = true
+  case *LineBy:
+    result = append(result, NewLineBy(second.dx-(x-x0),
+      second.dy-(y-y0), second.Context()))
+    replaceSecond = true
+  case *ArcBy:
+    result = append(result, NewArcBy(second.dx-(x-x0), second.dy-(y-y0),
+      second.rx, second.ry, second.xAxisRot, second.largeArc, second.positiveSweep, second.Context()))
+    replaceSecond = true
+  }
+
+  if replaceSecond {
+    if len(pcs) > 2 {
+      result = append(result, pcs[2:]...)
+    }
+  } else {
+    result = append(result, pcs[1:]...)
+  }
+
+  return result, nil
+}
+
+func ShortenEnd(pcs []PathCommand, dEnd float64, ctx context.Context) ([]PathCommand, error) {
+  if dEnd < 0.0 {
 		panic("implicit lengthening not yet supported")
+  } else if dEnd == 0.0 {
+    return pcs, nil
+  }
+
+	result := make([]PathCommand, 0)
+
+	ss, err := GenerateSegments(pcs, ctx)
+	if err != nil {
+		return nil, err
 	}
 
-	if dStart > 0.0 {
-		var x, y float64
-		var x0, y0 float64
+  var x, y float64
+  var dx, dy float64
+  var xa, ya float64
+  var dxa, dya float64
+  switch curve := ss[len(ss)-1].(type) {
+  case *Line:
+    l := curve.Length()
 
-		switch curve := ss[0].(type) {
-		case *Line:
-			l := curve.Length()
+    f := (1.0 - dEnd/l)
+    if f < 0.0 {
+      errCtx := context.MergeContexts(curve.Context(), curve.stop.Context())
+      return nil, errCtx.NewError("Error: segment not long enough to shorten")
+    }
 
-			f := dStart / l
-			if f > 1.0 {
-				errCtx := context.MergeContexts(curve.Context(), curve.stop.Context())
-				return nil, errCtx.NewError("Error: segment not long enough to shorten")
-			}
+    x, y = curve.Position(f)
+    dx, dy = x-curve.x0, y-curve.y0
+  case *Arc:
+    l := curve.Length()
 
-			x0, y0 = curve.Position(0.0)
-			x, y = curve.Position(f)
+    f := (1.0 - dEnd/l)
+    if f < 0.0 {
+      errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
+      return nil, errCtx.NewError("Error: segment not long enough to shorten")
+    }
 
-		case *Arc:
-			l := curve.Length()
+    x, y = curve.Position(f)
+    dx, dy = x-curve.x0, y-curve.y0
+  case *Quadratic:
+    l := curve.Length()
 
-			f := dStart / l
-			if f > 1.0 {
-				errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
-				return nil, errCtx.NewError("Error: segment not long enough to shorten")
-			}
+    f := (1.0 - dEnd/l)
+    if f < 0.0 {
+      errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
+      return nil, errCtx.NewError("Error: segment not long enough to shorten")
+    }
 
-			x0, y0 = curve.Position(0.0)
-			x, y = curve.Position(f)
-		case *Quadratic:
-			l := curve.Length()
+    x, y = curve.Position(f)
 
-			f := dStart / l
+    tx, ty := curve.Tangent(f)
+    t0x, t0y := curve.Tangent(0.0)
+    // intersect these two tangents to determine the new control point
+    xa, ya = intersect(x, y, x+tx, y+ty, curve.x0, curve.y0, curve.x0+t0x, curve.y0+t0y)
 
-			if f > 1.0 {
-				errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
-				return nil, errCtx.NewError("Error: segment not long enough to shorten")
-			}
+    dxa, dya = xa-curve.x0, ya-curve.y0
+    dx, dy = x-curve.x0, y-curve.y0
+  default:
+    errCtx := ss[len(ss)-1].Context()
+    return nil, errCtx.NewError("Error: not supported for shortening (" + reflect.TypeOf(ss[len(ss)-1]).String() + ")")
+  }
 
-			x0, y0 = curve.Position(0.0)
-			x, y = curve.Position(f)
-		default:
-			errCtx := ss[0].Context()
-			return nil, errCtx.NewError("Error: not supported for shortening (" + reflect.TypeOf(ss[0]).String() + ")")
-		}
+  result = append(result, pcs[0:len(pcs)-1]...)
 
-		switch move := pcs[0].(type) {
-		case *MoveTo:
-			result = append(result, NewMoveTo(x, y, move.Context()))
-		case *MoveBy:
-			result = append(result, NewMoveTo(x, y, move.Context()))
-		default:
-			errCtx := ss[0].Context()
-			return nil, errCtx.NewError("Error: expected M or m")
-		}
-
-		replaceSecond := false
-		switch second := pcs[1].(type) {
-		case *HorBy:
-			result = append(result, NewHorBy(second.dx-(x-x0), second.Context()))
-			replaceSecond = true
-		case *VerBy:
-			result = append(result, NewVerBy(second.dy-(y-y0), second.Context()))
-			replaceSecond = true
-		case *LineBy:
-			result = append(result, NewLineBy(second.dx-(x-x0),
-				second.dy-(y-y0), second.Context()))
-			replaceSecond = true
-		case *ArcBy:
-			result = append(result, NewArcBy(second.dx-(x-x0), second.dy-(y-y0),
-				second.rx, second.ry, second.xAxisRot, second.largeArc, second.positiveSweep, second.Context()))
-			replaceSecond = true
-		}
-
-		if replaceSecond {
-			result = append(result, pcs[2:len(pcs)-1]...)
-		} else {
-			result = append(result, pcs[1:len(pcs)-1]...)
-		}
-	} else {
-		result = append(result, pcs[0:len(pcs)-1]...)
-	}
-
-	if dEnd > 0.0 {
-		var x, y float64
-		var dx, dy float64
-		var xa, ya float64
-		var dxa, dya float64
-		switch curve := ss[len(ss)-1].(type) {
-		case *Line:
-			l := curve.Length()
-
-			f := (1.0 - dEnd/l)
-			if f < 0.0 {
-				errCtx := context.MergeContexts(curve.Context(), curve.stop.Context())
-				return nil, errCtx.NewError("Error: segment not long enough to shorten")
-			}
-
-			x, y = curve.Position(f)
-			dx, dy = x-curve.x0, y-curve.y0
-		case *Arc:
-			l := curve.Length()
-
-			f := (1.0 - dEnd/l)
-			if f < 0.0 {
-				errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
-				return nil, errCtx.NewError("Error: segment not long enough to shorten")
-			}
-
-			x, y = curve.Position(f)
-			dx, dy = x-curve.x0, y-curve.y0
-		case *Quadratic:
-			l := curve.Length()
-
-			f := (1.0 - dEnd/l)
-			if f < 0.0 {
-				errCtx := context.MergeContexts(curve.start.Context(), curve.stop.Context())
-				return nil, errCtx.NewError("Error: segment not long enough to shorten")
-			}
-
-			x, y = curve.Position(f)
-
-			tx, ty := curve.Tangent(f)
-			t0x, t0y := curve.Tangent(0.0)
-			// intersect these two tangents to determine the new control point
-			xa, ya = intersect(x, y, x+tx, y+ty, curve.x0, curve.y0, curve.x0+t0x, curve.y0+t0y)
-
-			dxa, dya = xa-curve.x0, ya-curve.y0
-			dx, dy = x-curve.x0, y-curve.y0
-		default:
-			errCtx := ss[len(ss)-1].Context()
-			return nil, errCtx.NewError("Error: not supported for shortening (" + reflect.TypeOf(ss[len(ss)-1]).String() + ")")
-		}
-
-		switch ec := pcs[len(pcs)-1].(type) {
-		case *LineTo:
-			result = append(result, NewLineTo(x, y, ec.Context()))
-		case *LineBy:
-			result = append(result, NewLineBy(dx, dy, ec.Context()))
-		case *HorTo:
-			result = append(result, NewHorTo(x, ec.Context()))
-		case *HorBy:
-			result = append(result, NewHorBy(dx, ec.Context()))
-		case *VerTo:
-			result = append(result, NewVerTo(y, ec.Context()))
-		case *VerBy:
-			result = append(result, NewVerBy(dy, ec.Context()))
-		case *ArcTo:
-			result = append(result, NewArcTo(x, y, ec.rx, ec.ry, ec.xAxisRot,
-				ec.largeArc, ec.positiveSweep, ec.Context()))
-		case *ArcBy:
-			result = append(result, NewArcBy(dx, dy, ec.rx, ec.ry, ec.xAxisRot,
-				ec.largeArc, ec.positiveSweep, ec.Context()))
-		case *QuadraticTo:
-			result = append(result, NewQuadraticTo(xa, ya, x, y, ec.Context()))
-		case *QuadraticBy:
-			result = append(result, NewQuadraticBy(dxa, dya, dx, dy, ec.Context()))
-		default:
-			errCtx := ss[len(ss)-1].Context()
-			return nil, errCtx.NewError("Error: expected line or arc")
-		}
-	} else {
-		result = append(result, pcs[len(pcs)-1])
-	}
+  switch ec := pcs[len(pcs)-1].(type) {
+  case *LineTo:
+    result = append(result, NewLineTo(x, y, ec.Context()))
+  case *LineBy:
+    result = append(result, NewLineBy(dx, dy, ec.Context()))
+  case *HorTo:
+    result = append(result, NewHorTo(x, ec.Context()))
+  case *HorBy:
+    result = append(result, NewHorBy(dx, ec.Context()))
+  case *VerTo:
+    result = append(result, NewVerTo(y, ec.Context()))
+  case *VerBy:
+    result = append(result, NewVerBy(dy, ec.Context()))
+  case *ArcTo:
+    result = append(result, NewArcTo(x, y, ec.rx, ec.ry, ec.xAxisRot,
+      ec.largeArc, ec.positiveSweep, ec.Context()))
+  case *ArcBy:
+    result = append(result, NewArcBy(dx, dy, ec.rx, ec.ry, ec.xAxisRot,
+      ec.largeArc, ec.positiveSweep, ec.Context()))
+  case *QuadraticTo:
+    result = append(result, NewQuadraticTo(xa, ya, x, y, ec.Context()))
+  case *QuadraticBy:
+    result = append(result, NewQuadraticBy(dxa, dya, dx, dy, ec.Context()))
+  default:
+    errCtx := ss[len(ss)-1].Context()
+    return nil, errCtx.NewError("Error: expected line or arc")
+  }
 
 	return result, nil
 }

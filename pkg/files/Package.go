@@ -314,7 +314,9 @@ func SearchPackage(caller string, pkgPath string, lang Lang) (string, error) {
   }
 
   if filepath.IsAbs(pkgPath) {
-    return "", errors.New("Error: package path can't be absolute (" + pkgPath + ")\n")
+    err := errors.New("Error: package path can't be absolute (" + pkgPath + ")\n")
+    panic(err)
+    return "", err
   }
 
   // first try getting module from currentPkg

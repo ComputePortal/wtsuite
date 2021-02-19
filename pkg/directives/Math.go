@@ -54,43 +54,87 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 	ctx := tag.Context()
 
 	isInSVG := node.Type() == SVG
+
+  var x *tokens.Float = nil
+  var y *tokens.Float = nil
+  if x_, ok := attr.Get("x"); ok {
+    x, err = tokens.AssertIntOrFloat(x_)
+    if err != nil {
+      return err
+    }
+
+    attr.Delete("x")
+  }
+
+  if y_, ok := attr.Get("y"); ok {
+    y, err = tokens.AssertIntOrFloat(y_)
+    if err != nil {
+      return err
+    }
+
+    attr.Delete("y")
+  }
+
+  if isInSVG {
+    if duplicate_, ok := attr.Get("duplicate"); ok && !tokens.IsNull(duplicate_) {
+      if err := tokens.AssertFlag(duplicate_); err != nil {
+        return err
+      }
+
+      attr.Delete("duplicate")
+
+      svgTag, err := buildMathSVGTag(node, valueToken, attrScope, attr, x, y, isInSVG, isInline, ctx)
+      if err != nil {
+        return err
+      }
+
+      if err := node.AppendChild(svgTag); err != nil {
+        return nil
+      }
+
+      svgTag.Attributes().Set("class", tokens.NewValueString("math duplicate", ctx))
+    }
+  }
+
+  svgTag, err := buildMathSVGTag(node, valueToken, attrScope, attr, x, y, isInSVG, isInline, ctx)
+  if err != nil {
+    return err
+  }
+
+	if err := node.AppendChild(svgTag); err != nil {
+		return err
+	}
+
+  return nil
+}
+
+func buildMathSVGTag(parentNode Node, valueToken *tokens.String, attrScope Scope, attr *tokens.StringDict, x, y *tokens.Float, isInSVG bool, isInline bool, ctx context.Context) (tree.Tag, error) {
 	svgAttr := tokens.NewEmptyStringDict(ctx) // filled later, depends on BB
 	svgTag, err := tree.BuildTag("svg", svgAttr, ctx)
 	if err != nil {
-		return err
-	}
-	if err := node.AppendChild(svgTag); err != nil {
-		return nil
+		return nil, err
 	}
 
 	mathParser, err := parsers.NewMathParser(valueToken.Value(), valueToken.InnerContext())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	mt, err := mathParser.Build()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var mStyle *tokens.StringDict = nil
-	if styleToken_, ok := attr.Get("style"); ok {
-		styleToken, err := tokens.AssertStringDict(styleToken_)
-		if err != nil {
-			return err
-		}
-
-		mStyle = styleToken
-	}
-	mNode := NewMathNode(svgTag, node, mStyle)
+	mNode := NewMathNode(svgTag, parentNode)
 
 	totalBB, err := mt.GenerateTags(mNode, 0.0, 0.0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// fill the svg attributes
 	svgAttr.Set("overflow", tokens.NewValueString("visible", ctx))
+	svgAttr.Set("class", tokens.NewValueString("math", ctx))
 
 	//styleValue := tokens.NewEmptyStringDict(ctx)
 	//styleValue.Set("font-family", tokens.NewValueString(MATH_FONT_FAMILY, ctx))
@@ -127,17 +171,6 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 			svgAttr.Set("height", heightVal)
 			svgAttr.Set("width", widthVal)
 		}
-
-		// search for the color in incoming style
-		// TODO: should math inside svg use the fills directly?
-		//colorValue, err := SearchStyle(node, scope, attr, "color", ctx)
-		//if err != nil {
-			//return err
-		//}
-
-		//if !tokens.IsNull(colorValue) {
-			//styleValue.Set("fill", colorValue)
-		//}
 	} else {
 		viewBoxValue := tokens.NewValueString(fmt.Sprintf("%g %g %g %g",
 			totalBB.Left(), totalBB.Top(), totalBB.Width(), totalBB.Height()),
@@ -153,7 +186,7 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 		if !hasHeight && !hasWidth {
 			if !hasFontSize {
 				errCtx := attr.Context()
-				return errCtx.NewError("Error: must specifiy either height or width or font-size when including math in an svg")
+				return nil, errCtx.NewError("Error: must specifiy either height or width or font-size when including math in an svg")
 			}
 		} else if hasFontSize {
 			warningCtx := attr.Context()
@@ -163,40 +196,40 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 		if hasHeight {
 			h, err := tokens.AssertIntOrFloat(heightToken_)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			inputHeight = h.Value()
 			if inputHeight <= 0.0 {
 				errCtx := h.Context()
-				return errCtx.NewError("Error: non-positive input height")
+				return nil, errCtx.NewError("Error: non-positive input height")
 			}
 		}
 
 		if hasWidth {
 			w, err := tokens.AssertIntOrFloat(widthToken_)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			inputWidth = w.Value()
 
 			if inputWidth <= 0.0 {
 				errCtx := w.Context()
-				return errCtx.NewError("Error: non-positive input width")
+				return nil, errCtx.NewError("Error: non-positive input width")
 			}
 		}
 
 		if hasFontSize {
 			fs, err := tokens.AssertIntOrFloat(fontSizeToken_)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			inputHeight = fs.Value() * totalBB.Height()
 			if inputHeight <= 0 {
 				errCtx := fs.Context()
-				return errCtx.NewError("Error: non-positive input font-size")
+				return nil, errCtx.NewError("Error: non-positive input font-size")
 			}
 		}
 
@@ -222,49 +255,39 @@ func Math(scope Scope, node Node, tag *tokens.Tag) error {
 		// anchors are only relevant in an svg
 		horAnchor, verAnchor, anchorOffset, err := parseMathAnchors(attr)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if x_, ok := attr.Get("x"); ok {
-			x, err := tokens.AssertIntOrFloat(x_)
-			if err != nil {
-				return err
-			}
+		if x != nil {
+      x = tokens.NewValueFloat(
+        x.Value()-
+          0.5*resultWidth*float64(1-horAnchor)+
+          float64(horAnchor)*anchorOffset,
+        x.Context(),
+      )
 
-			x = tokens.NewValueFloat(
-				x.Value()-
-					0.5*resultWidth*float64(1-horAnchor)+
-					float64(horAnchor)*anchorOffset,
-				x.Context(),
-			)
-			attr.Set("x", x)
+			svgAttr.Set("x", x)
 		}
 
-		if y_, ok := attr.Get("y"); ok {
-			y, err := tokens.AssertIntOrFloat(y_)
-			if err != nil {
-				return err
-			}
+		if y != nil {
+      y = tokens.NewValueFloat(
+        y.Value()-
+          0.5*resultHeight*float64(1-verAnchor)+
+          float64(verAnchor)*anchorOffset,
+        y.Context(),
+      )
 
-			y = tokens.NewValueFloat(
-				y.Value()-
-					0.5*resultHeight*float64(1-verAnchor)+
-					float64(verAnchor)*anchorOffset,
-				y.Context(),
-			)
-			attr.Set("y", y)
+			svgAttr.Set("y", y)
 		}
 	}
-
-	//svgAttr.Set("style", styleValue)
 
 	// merge using input attributes
 
 	if err := functions.MergeStringDictsInplace(attrScope, svgAttr, attr, ctx); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return svgTag, nil
 }
 
 // returned anchorOffset is one leg (hor or ver) of manhatten distance, not euclidean distance

@@ -86,6 +86,7 @@ func modifyList(a tokens.Token, b tokens.Token, ctx context.Context) (tokens.Tok
 	return tokens.NewValuesList(values, ctx), nil
 }
 
+// new isnt mutated
 func MergeStringDictsInplace(scope tokens.Scope, res *tokens.StringDict, new *tokens.StringDict, ctx context.Context) error {
 	if err := new.Loop(func(key *tokens.String, value tokens.Token, last bool) error {
 		oldValue, ok := res.Get(key)

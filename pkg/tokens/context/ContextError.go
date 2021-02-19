@@ -7,6 +7,7 @@ import (
 )
 
 type ContextError struct {
+  obj interface{} // ContextError can transmit additional case-specific info this way
 	err string
 }
 
@@ -34,8 +35,16 @@ func (ce *ContextError) Error() string {
 	return ce.err
 }
 
+func (ce *ContextError) GetObject() interface{} {
+  return ce.obj
+}
+
+func (ce *ContextError) SetObject(obj interface{}) {
+  ce.obj = obj
+}
+
 func (c *Context) NewError(msg string) *ContextError {
-	ce := &ContextError{""}
+	ce := &ContextError{nil, ""}
 	ce.AppendContextString(msg, *c)
 
 	return ce

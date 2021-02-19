@@ -66,7 +66,7 @@ func (b *FileBundle) Write() (string, error) {
 	return sb.String(), nil
 }
 
-// for jspp library functionality
+// TODO: dont import all aggregate exports of all libraries
 func (b *FileBundle) resolveDependencies(s FileScript, deps *map[string]FileScript) error {
 	callerCtx := s.Module().Context()
 	callerPath := callerCtx.Path()
@@ -214,6 +214,10 @@ func (b *FileBundle) ResolveDependencies() error {
 		b.scripts = append(b.scripts, s)
 	}
 
+  if err := b.InitialTreeShake(scripts); err != nil {
+    return err
+  }
+
   if (VERBOSITY >= 2) {
     for _, s := range b.scripts {
       fmt.Printf("dep: %s\n", files.Abbreviate(s.Path()))
@@ -221,6 +225,44 @@ func (b *FileBundle) ResolveDependencies() error {
   }
 
 	return nil
+}
+
+func (b *FileBundle) InitialTreeShake(entryPoints []FileScript) error {
+  // scope not yet initialized, so collect all the modules into a map
+  modules := make(map[string]js.Module)
+  for _, s := range b.scripts {
+    modules[s.Path()] = s.Module()
+  }
+
+  // hide collected b.scripts that are not needed as minimal deps
+  minimal := make([]string, 0)
+  for _, entryPoint := range entryPoints {
+    entryModule := entryPoint.Module()
+    minimal = append(minimal, entryPoint.Path())
+    minimal = append(minimal, entryModule.MinimalDependencies(modules)...)
+  }
+
+  sort.Strings(minimal)
+
+  // remove the duplicates
+  uniqueMinimal := make([]string, 0)
+  for i, m := range minimal {
+    if i > 0 && m == minimal[i-1] {
+      continue
+    }
+
+    uniqueMinimal = append(uniqueMinimal, m)
+  }
+
+  n := len(uniqueMinimal)
+  for _, s := range b.scripts {
+    i := sort.SearchStrings(uniqueMinimal, s.Path())
+    if i < 0 || i >= n || uniqueMinimal[i] != s.Path() {
+      s.Hide()
+    }
+  }
+
+  return nil
 }
 
 func (b *FileBundle) ResolveNames() error {
@@ -300,7 +342,6 @@ func (b *FileBundle) UniqueNames() error {
 
 func (b *FileBundle) Walk(fn func(scriptPath string, obj interface{}) error) error {
   for _, s := range b.scripts {
-    fmt.Println(s.Path())
     if err := s.Walk(fn); err != nil {
       return err
     }

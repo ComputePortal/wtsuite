@@ -227,10 +227,19 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 		tags = append(tags, stopArrowFilled)
 	}
 
-	pcs, err = svg.ShortenEnds(pcs, startLen, stopLen, d.Context())
-	if err != nil {
-		return err
-	}
+  if startLen > 0 {
+    pcs, err = svg.ShortenStart(pcs, startLen, d.Context())
+    if err != nil {
+      return err
+    }
+  }
+
+  if stopLen > 0 {
+    pcs, err = svg.ShortenEnd(pcs, stopLen, d.Context())
+    if err != nil {
+      return err
+    }
+  }
 
 	pathAttr_, err := attr.Copy(ctx)
 	if err != nil {

@@ -12,12 +12,10 @@ import (
 )
 
 type MathNode struct {
-	style *tokens.StringDict
 	NodeData
 }
 
-// style can be nil
-func NewMathNode(parentTag tree.Tag, parentNode Node, style *tokens.StringDict) *MathNode {
+func NewMathNode(parentTag tree.Tag, parentNode Node) *MathNode {
 	ctx := parentTag.Context()
 	gattr := tokens.NewEmptyStringDict(ctx)
 	gtag, err := svg.BuildTag("g", gattr, ctx)
@@ -27,7 +25,7 @@ func NewMathNode(parentTag tree.Tag, parentNode Node, style *tokens.StringDict) 
 
 	parentTag.AppendChild(gtag)
 
-	return &MathNode{style, newNodeData(gtag, parentNode)}
+	return &MathNode{newNodeData(gtag, parentNode)}
 }
 
 func (n *MathNode) Transform(x, y, sx, sy float64) {
@@ -55,11 +53,6 @@ func (n *MathNode) buildScaledMathText(x float64, y float64, fontSize float64, c
 
 	fontSizeToken := tokens.NewValueFloat(fontSize, ctx)
 	attr.Set("font-size", fontSizeToken)
-
-	if n.style != nil && !n.style.IsEmpty() {
-		styleKeyToken := tokens.NewValueString("style", ctx)
-		attr.Set(styleKeyToken, n.style)
-	}
 
 	tag, err := svg.BuildTag("text", attr, ctx)
 	if err != nil {
@@ -115,16 +108,11 @@ func (n *MathNode) BuildMathPath(d string, ctx context.Context) error {
 	dToken := tokens.NewValueString(d, ctx)
 	attr.Set("d", dToken)
 
-	if n.style != nil && !n.style.IsEmpty() {
-		styleKeyToken := tokens.NewValueString("style", ctx)
-		attr.Set(styleKeyToken, n.style)
-	}
-
 	return buildSVGPathInternal(n, attr, ctx)
 }
 
 func (n *MathNode) NewSubScope() math.SubScope {
-	return NewMathNode(n.tag, n, n.style)
+	return NewMathNode(n.tag, n)
 }
 
 func (n *MathNode) getNode() Node {

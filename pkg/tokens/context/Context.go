@@ -178,6 +178,19 @@ func (c *Context) Less(other *Context) bool {
   }
 }
 
+func (c *Context) Same(other *Context) bool {
+  a := c.ranges[0].start
+  b := other.ranges[0].start
+  if a == b {
+    a = c.ranges[0].stop
+    b = other.ranges[0].stop
+
+    return a == b
+  } else {
+    return false
+  }
+}
+
 func (c *Context) IsAtLineStart() bool {
   i := c.ranges[0].start
 

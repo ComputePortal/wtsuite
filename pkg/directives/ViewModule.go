@@ -29,6 +29,7 @@ type ViewModule struct {
 }
 
 type ViewFileScript struct {
+  hidden bool
 	module *ViewModule
 }
 
@@ -88,15 +89,23 @@ func NewViewFileScript(cache *FileCache, absPath string) (scripts.FileScript, er
 			return nil, err
 		}
 
-		return &ViewFileScript{&ViewModule{fileScope, make(map[string]ViewVariable), absPath, rootNode.Context()}}, nil
+		return &ViewFileScript{false, &ViewModule{fileScope, make(map[string]ViewVariable), absPath, rootNode.Context()}}, nil
 	} else {
 		// returns allnull on every request
-		return &ViewFileScript{&ViewModule{nil, make(map[string]ViewVariable), absPath, context.NewDummyContext()}}, nil
+		return &ViewFileScript{false, &ViewModule{nil, make(map[string]ViewVariable), absPath, context.NewDummyContext()}}, nil
 	}
 }
 
 func (m *ViewModule) isDummy() bool {
 	return m.scope == nil
+}
+
+func (m *ViewModule) MinimalDependencies(allModules map[string]js.Module) []string {
+  return []string{}
+}
+
+func (m *ViewModule) SymbolDependencies(allModules map[string]js.Module, name string) []string {
+  return []string{}
 }
 
 func (m *ViewModule) tokenToViewVariable(t tokens.Token, name string, ctx context.Context) (ViewVariable, error) {
@@ -184,7 +193,7 @@ func (m *ViewModule) Context() context.Context {
 }
 
 func (s *ViewFileScript) Write() (string, error) {
-	if s.module.isDummy() {
+	if s.module.isDummy() || s.hidden {
 		return "", nil
 	}
 
@@ -242,6 +251,10 @@ func (s *ViewFileScript) Module() js.Module {
 
 func (s *ViewFileScript) Path() string {
 	return s.module.path
+}
+
+func (s *ViewFileScript) Hide() {
+  //s.hidden = true
 }
 
 func (s *ViewFileScript) Walk(fn func(p string, obj interface{}) error) error {
