@@ -45,13 +45,13 @@ func (t *Style) CollectIDs(IDMap) error {
 }
 
 func (t *Style) Validate() error {
-	if t.content == "" {
-		errCtx := t.Context()
-		err := errCtx.NewError("Error: expected inline content")
+	//if t.content == "" {
+		//errCtx := t.Context()
+		//err := errCtx.NewError("Error: expected inline content")
 
-		panic(err)
-		return err
-	}
+		//panic(err)
+		//return err
+	//}
 
 	return nil
 }

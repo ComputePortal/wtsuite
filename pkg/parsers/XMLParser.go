@@ -26,6 +26,7 @@ func tokenizeXMLFormulas(s string, ctx context.Context) ([]raw.Token, error) {
 	return nil, ctx.NewError("Error: can't have backtick formula in xml markup")
 }
 
+// this is a bad approach, we better just base ourselves on <>
 var xmlParserSettings = ParserSettings{
 	quotedGroups: quotedGroupsSettings{
 		pattern: patterns.XML_STRING_OR_COMMENT_REGEXP,

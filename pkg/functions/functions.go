@@ -52,13 +52,9 @@ var preEval = map[string]BuiltinFunction{
 	"lower":             Lower,
 	"lt":                LT,
 	"max":               Max,
-	"max-screen-width":  MaxScreenWidth,  // produces string key for media query
-	"min-screen-width":  MinScreenWidth,  // produces string key for media query
-	"max-screen-height": MaxScreenHeight, // produces string key for media query
-	"min-screen-height": MinScreenHeight, // produces string key for media query
-	"mix":               Mix,
 	"merge":             Merge,
 	"min":               Min,
+	"mix":               Mix,
 	"mod":               Mod,
 	"mul":               Mul,
 	"ne":                NE,

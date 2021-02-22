@@ -15,13 +15,12 @@ import (
 	"github.com/computeportal/wtsuite/pkg/directives"
 	"github.com/computeportal/wtsuite/pkg/files"
 	"github.com/computeportal/wtsuite/pkg/parsers"
+	"github.com/computeportal/wtsuite/pkg/styles"
+	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tree"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
-	//"github.com/computeportal/wtsuite/pkg/styles"
-
-	"github.com/computeportal/wtsuite/cmd/wt-site/config"
 )
 
 var (
@@ -30,20 +29,23 @@ var (
 )
 
 type CmdArgs struct {
-	config.CmdArgs
-
+  root string // can be a url
+  configFile string // defaults to search.json in pwd
 	searchIndexOutput string
-	includeIndices    []string
-	excludeIndices    []string
-
-	noAliasing bool
-	autoLink   bool
 
 	verbosity int
 }
 
+type SearchConfig struct {
+	TitleQuery     string `json:"title-query"`
+	titleQuery     styles.Selector
+	ContentQuery   string `json:"content-query"`
+	contentQueries []styles.Selector
+	Ignore         []string `json:"ignore"`
+}
+
 func printMessageAndExit(msg string) {
-	config.PrintMessage(msg)
+	fmt.Fprintf(os.Stderr, "\u001b[1m"+msg+"\u001b[0m\n\n")
   os.Exit(1)
 }
 
@@ -55,14 +57,9 @@ func printSyntaxErrorAndExit(err error) {
 func parseArgs() CmdArgs {
 	// default args
 	cmdArgs := CmdArgs{
-		CmdArgs: config.NewDefaultCmdArgs(),
-
-		searchIndexOutput: "",
-		includeIndices:    make([]string, 0),
-		excludeIndices:    make([]string, 0),
-
-		noAliasing: false,
-		autoLink:   false,
+		root: "",
+    configFile: "search-config.json",
+		searchIndexOutput: "search-index.json",
 
 		verbosity: 0,
 	}
@@ -70,18 +67,11 @@ func parseArgs() CmdArgs {
 	var positional []string = nil
 
   cmdParser = parsers.NewCLIParser(
-    fmt.Sprintf("Usage: %s [options] <config-file> <search-index-output-file>\n", os.Args[0]),
+    fmt.Sprintf("Usage: %s [options] <root>\n", os.Args[0]),
     "",
     []parsers.CLIOption{
-      parsers.NewCLIUniqueFlag("", "auto-link", "--auto-link Convert tags to <a> automatically if the have the 'href' attribute", &(cmdArgs.autoLink)),
-      parsers.NewCLIUniqueFlag("", "no-aliasing", "--no-aliasing Don't allow standard html tag to be aliased", &(cmdArgs.noAliasing)),
-      parsers.NewCLIUniqueKeyValue("D", "-D<name> <value> Define a global variable with a value", cmdArgs.GlobalVars),
-      parsers.NewCLIUniqueKey("B", "-B<name> Define a global flag (its value will be empty string though)", cmdArgs.GlobalVars),
-      parsers.NewCLIAppendString("i", "include-view", "-i, --include-view <view-group>|<view-file>   Can't be combined with -x", &(cmdArgs.IncludeViews)),
-      parsers.NewCLIAppendString("x", "exclude-view", "-x, --exclude-view <view-group>|<view-file>   Can't be combined with -i", &(cmdArgs.ExcludeViews)),
-      parsers.NewCLIAppendString("", "include-index", "--include-index <index-group>   Include index group in final search index. Can't be combined with --exclude-index", &(cmdArgs.includeIndices)),
-      parsers.NewCLIAppendString("", "exclude-index", "--exclude-index <index-group>   Exclude index group in final search index. Can't be combined with --include-index", &(cmdArgs.excludeIndices)),
-      parsers.NewCLIUniqueFlag("l", "latest" , "-l, --latest    Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
+      parsers.NewCLIString("c", "config", "-c, --config <config-file>   Defaults to ./search-config.json", &(cmdArgs.configFile)),
+      parsers.NewCLIString("o", "output", "-o, --output <output-file>   Defaults to ./search-index.json", &(cmdArgs.searchIndexOutput)),
       parsers.NewCLICountFlag("v", "", "Verbosity", &(cmdArgs.verbosity)),
     },
     parsers.NewCLIRemaining(&positional),
@@ -91,35 +81,30 @@ func parseArgs() CmdArgs {
     printMessageAndExit(err.Error())
   }
 
-  if len(cmdArgs.IncludeViews) != 0 && len(cmdArgs.ExcludeViews) != 0 {
-    printMessageAndExit("Error: --include-views can't be combined with --exclude-view")
-  }
-
-  if len(cmdArgs.includeIndices) != 0 && len(cmdArgs.excludeIndices) != 0 {
-    printMessageAndExit("Error: --include-indices can't be combined with --exclude-indices")
-  }
-
-	if len(positional) != 2 {
-		printMessageAndExit("Error: expected 2 positional arguments")
+	if len(positional) != 1 {
+		printMessageAndExit("Error: expected 1 positional arguments")
 	}
 
-	if !files.IsFile(positional[0]) {
-		printMessageAndExit("Error: first argument is not a file")
-	}
-
-	cmdArgs.ConfigFile = positional[0]
-	cmdArgs.OutputDir = "/tmp/wt-site"
-	cmdArgs.searchIndexOutput = positional[1]
-
-	if err := files.AssertFile(cmdArgs.ConfigFile); err != nil {
-		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error())
-	}
-
-	configFile, err := filepath.Abs(cmdArgs.ConfigFile)
-	if err != nil {
-		printMessageAndExit("Error: configFile '"+cmdArgs.ConfigFile+"' "+err.Error())
+	if !files.IsDir(positional[0]) {
+    // TODO: might be url
+		printMessageAndExit("Error: first argument is not a directory")
 	} else {
-		cmdArgs.ConfigFile = configFile
+    var err error
+    cmdArgs.root, err = filepath.Abs(positional[0])
+    if err != nil {
+      printMessageAndExit("Error: root '"+positional[0]+"' "+err.Error())
+    }
+  }
+
+	if err := files.AssertFile(cmdArgs.configFile); err != nil {
+		printMessageAndExit("Error: configFile '"+cmdArgs.configFile+"' "+err.Error())
+	}
+
+	configFile, err := filepath.Abs(cmdArgs.configFile)
+	if err != nil {
+		printMessageAndExit("Error: configFile '"+cmdArgs.configFile+"' "+err.Error())
+	} else {
+		cmdArgs.configFile = configFile
 	}
 
 	absSearchIndexOutput, err := filepath.Abs(cmdArgs.searchIndexOutput)
@@ -132,25 +117,7 @@ func parseArgs() CmdArgs {
 	return cmdArgs
 }
 
-func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
-	if cmdArgs.noAliasing {
-		directives.NO_ALIASING = true
-	}
-
-	if cmdArgs.autoLink {
-		tree.AUTO_LINK = true
-	}
-
-	// TODO: disable math parsing
-
-	if cfg.PxPerRem != 0 {
-		tokens.PX_PER_REM = cfg.PxPerRem
-	}
-
-	for k, v := range cmdArgs.GlobalVars {
-		directives.RegisterDefine(k, v)
-	}
-
+func setUpEnv(cmdArgs CmdArgs, cfg *SearchConfig) error {
 	VERBOSITY = cmdArgs.verbosity
 	directives.VERBOSITY = cmdArgs.verbosity
 	tokens.VERBOSITY = cmdArgs.verbosity
@@ -162,7 +129,7 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
 	//styles.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
-  return files.ResolvePackages(cmdArgs.ConfigFile)
+  return files.ResolvePackages(cmdArgs.configFile)
 }
 
 type SearchIndexPage struct {
@@ -201,126 +168,96 @@ func findRootParagraph(xpath []tree.Tag) tree.Tag {
 	return nil
 }
 
-func indexConfigKeyIncluded(cmdArgs CmdArgs, key string) bool {
-	for _, included := range cmdArgs.includeIndices {
-		if included == key {
-			return true
-		}
-	}
+func extractTagText(tags []tree.Tag) []string {
+  str := make([]string, 0)
 
-	if len(cmdArgs.includeIndices) > 0 {
-		return false
-	}
+  for _, t := range tags {
+    if err := tree.WalkText(t, []tree.Tag{}, func(_ []tree.Tag, s string) error {
+      str = append(str, s)
 
-	for _, excluded := range cmdArgs.excludeIndices {
-		if excluded == key {
-			return false
-		}
-	}
+      return nil
+    }); err != nil {
+      panic("unexpected")
+    }
+  }
 
-	return true
+  return str
 }
 
-func registerSearchableContent(cmdArgs CmdArgs, cfg *config.Config) (*SearchIndex, error) {
-	viewControls := make(map[string]string)
-	for view, _ := range cfg.GetViews() {
-		viewControls[view] = "" // no controls
+func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIndex) error {
+  url := path[len(cmdArgs.root):]
+
+  p, err := parsers.NewXMLParser(path)
+  if err != nil {
+    return err
+  }
+
+	rawTags, err := p.BuildTags()
+	if err != nil {
+		return err
 	}
 
-	viewSearchIndicesConfig := make(map[string]*config.SearchIndexConfig)
-	for view, _ := range cfg.GetViews() {
-		viewSearchIndicesConfig[view] = nil // no search strategy by default
-	}
+	root := tree.NewRoot(p.NewContext(0, 1))
+	node := directives.NewRootNode(root, directives.HTML)
+  // the source isn't really used, because the html file doesnt contain import statements
+	fileScope := directives.NewFileScope(false, directives.NewFileCache())
 
-	for key, indexConfig := range cfg.Search.Indices {
-		if indexConfigKeyIncluded(cmdArgs, key) {
-			for _, view := range indexConfig.Pages {
-				if prev, ok := viewSearchIndicesConfig[view]; ok && prev != nil {
-					return nil, errors.New("Error: " + view + " has more than one search strategy")
-				} else if !ok {
-					//fmt.Println(cfg.GetViews())
-					//fmt.Println(viewSearchStrategies)
-					//panic("unexpected")
-				}
-
-				viewSearchIndicesConfig[view] = &indexConfig
-			}
+	for _, tag := range rawTags {
+		if err := directives.BuildTag(fileScope, node, tag); err != nil {
+			return err
 		}
 	}
 
-	cache.LoadHTMLCache(cfg.GetViews(), viewControls,
-		cfg.CssUrl, cfg.JsUrl, cfg.PxPerRem, cmdArgs.OutputDir, "",
-		false, cmdArgs.GlobalVars, true)
+  tree.RegisterParents(root)
+  if err := root.Validate(); err != nil {
+    return err
+  }
 
-	if cfg.MathFontUrl != "" {
-		directives.MATH_FONT = "FreeSerifMath"
-		directives.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup
-		directives.MATH_FONT_URL = cfg.MathFontUrl
-	}
+  // now we can apply the search queries
+  titleTags := cfg.titleQuery.Match(root)
+  if len(titleTags) > 1 {
+    return errors.New("Error: multiple titles found in " + path)
+  }
 
+  titleParts := extractTagText(titleTags)
+  title := strings.Join(titleParts, " ")
+
+  contentTags := make([]tree.Tag, 0)
+
+  for _, sel := range cfg.contentQueries {
+    contentTags = append(contentTags, sel.Match(root)...)
+  }
+
+  content := extractTagText(contentTags)
+
+  fmt.Println("indexing ", url, "(title=", title, ")")
+  si.AddPage(url, title, content)
+
+  return nil
+}
+
+func registerSearchableContent(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex, error) {
 	searchIndex := NewSearchIndex()
 
-  c := directives.NewFileCache()
+  if err := filepath.Walk(cmdArgs.root, func(path string, info os.FileInfo, err error) error {
+    if err != nil {
+      return err
+    }
 
-	for src, dst := range cfg.GetViews() {
-		// TODO: do something with strategy
-		if indexConfig, ok := viewSearchIndicesConfig[src]; ok && indexConfig != nil {
-			// TODO: only the views that are mentioned in the config file
-			url := dst[len(cmdArgs.OutputDir):]
+    // only look at html files
+    if filepath.Ext(path) != ".html" {
+      return nil
+    }
 
-			cache.StartRootUpdate(src) // XXX: is this really needed?
+    // now read the html file
+    if err := parseHTMLFile(cmdArgs, cfg, path, searchIndex); err != nil {
+      return err
+    }
 
-			directives.SetActiveURL(url)
-
-			r, err := directives.NewRoot(c, src, "", cfg.CssUrl, cfg.JsUrl, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			directives.UnsetActiveURL()
-
-			var activeParagraph tree.Tag = nil
-
-			title := ""
-			content := []string{}
-			if err := tree.WalkText(r, []tree.Tag{}, func(xpath []tree.Tag, s string) error {
-				// TODO: track active paragraph
-
-				if indexConfig.TitleMatch(xpath) {
-					if title != "" {
-						return errors.New("Error: non-unique title match in " + src)
-					}
-					title = s
-				} else if indexConfig.ContentMatch(xpath) {
-					rootParagraph := findRootParagraph(xpath)
-
-					if rootParagraph != nil {
-						if rootParagraph == activeParagraph {
-							// append to last content entry
-							content[len(content)-1] += s
-						} else {
-							activeParagraph = rootParagraph
-							content = append(content, s)
-						}
-					} else {
-						content = append(content, s)
-					}
-				}
-
-				return nil
-			}); err != nil {
-				panic("unexpected")
-			}
-
-			// no title is not permitted
-			if title == "" {
-				return nil, errors.New("Error: no title found for " + src)
-			}
-
-			// no content is plausible in some cases though
-			searchIndex.AddPage(url, title, content)
-		}
-	}
+    return nil
+  }); err != nil {
+    return nil, err
+  }
 
 	return searchIndex, nil
 }
@@ -376,17 +313,17 @@ func (si *SearchIndex) IndexWord(pageID int, f string) error {
 	return nil
 }
 
-func isIgnoredWord(cfg *config.Config, w string) bool {
-	i := sort.SearchStrings(cfg.Search.Ignore, w)
+func isIgnoredWord(cfg *SearchConfig, w string) bool {
+	i := sort.SearchStrings(cfg.Ignore, w)
 
-	if i > -1 && i < len(cfg.Search.Ignore) {
-		return cfg.Search.Ignore[i] == w
+	if i > -1 && i < len(cfg.Ignore) {
+		return cfg.Ignore[i] == w
 	} else {
 		return false
 	}
 }
 
-func indexSentence(cfg *config.Config, si *SearchIndex, pageID int, sentence string) error {
+func indexSentence(cfg *SearchConfig, si *SearchIndex, pageID int, sentence string) error {
 	fields := strings.FieldsFunc(strings.Trim(sentence, "."), func(r rune) bool {
 		return r < 46 || // keep period as decimal separator
 			r == 47 || // forward slash
@@ -411,7 +348,7 @@ func indexSentence(cfg *config.Config, si *SearchIndex, pageID int, sentence str
 }
 
 // actually fill the index/partial nested trees
-func buildSearchIndex(cfg *config.Config, searchIndex *SearchIndex) error {
+func buildSearchIndex(cfg *SearchConfig, searchIndex *SearchIndex) error {
 	// loop each word of each page
 	for i, page := range searchIndex.Pages {
 		if err := indexSentence(cfg, searchIndex, i, page.Title); err != nil {
@@ -425,18 +362,56 @@ func buildSearchIndex(cfg *config.Config, searchIndex *SearchIndex) error {
 	}
 
 	// add the ignored values
-	for _, w := range cfg.Search.Ignore {
+	for _, w := range cfg.Ignore {
 		searchIndex.Ignore[w] = w
 	}
 
 	return nil
 }
 
+func ReadConfigFile(cmdArgs *CmdArgs) (*SearchConfig, error) {
+  cfg := &SearchConfig{
+    TitleQuery: "",
+    titleQuery: nil,
+    ContentQuery: "",
+    contentQueries: []styles.Selector{},
+    Ignore:         []string{},
+  }
+
+	b, err := ioutil.ReadFile(cmdArgs.configFile)
+	if err != nil {
+		return cfg, errors.New("Error: problem reading the config file")
+	}
+
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return cfg, errors.New("Error: bad config file syntax (" + err.Error() + ")")
+	}
+
+  // parse
+  titleQueries, err := styles.ParseSelectorList(tokens.NewValueString(cfg.TitleQuery, context.NewContext(context.NewSource(cfg.TitleQuery), cmdArgs.configFile)))
+  if err != nil {
+    return nil, err
+  }
+
+  if len(titleQueries) != 1 {
+    return cfg, errors.New("Error: expected only one title query")
+  }
+
+  cfg.titleQuery = titleQueries[0]
+
+  cfg.contentQueries, err = styles.ParseSelectorList(tokens.NewValueString(cfg.ContentQuery, context.NewContext(context.NewSource(cfg.ContentQuery), cmdArgs.configFile)))
+  if err != nil {
+    return nil, err
+  }
+
+  return cfg, nil
+}
+
 func main() {
 	cmdArgs := parseArgs()
 
 	// age of the configFile doesn't matter
-	cfg, err := config.ReadConfigFile(&(cmdArgs.CmdArgs))
+	cfg, err := ReadConfigFile(&(cmdArgs))
 	if err != nil {
 		printMessageAndExit(err.Error()+"\n")
 	}

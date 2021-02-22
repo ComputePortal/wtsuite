@@ -37,8 +37,9 @@ func Style(scope Scope, node Node, tag *tokens.Tag) error {
 
 	contentToken, ok := attr.Get(".content")
   if !ok {
-    errCtx := tag.Context()
-    return errCtx.NewError("Error: style without content")
+    return buildInlineStyle(node, attr, "", tag.Context())
+    //errCtx := tag.Context()
+    //return errCtx.NewError("Error: style without content")
   }
 
   // build the style
