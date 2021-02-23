@@ -109,8 +109,16 @@ func assertBool(fs []string, i int, prevError error, ctx context.Context) (bool,
 	case "1":
 		return true, i + 1, nil
 	default:
-		errCtx := ctx
-		return false, i, errCtx.NewError("Error: expected 0 or 1, got " + fs[i])
+    if strings.HasPrefix(fs[i], "0") {
+      fs[i] = fs[i][1:]
+      return false, i, nil
+    } else if strings.HasPrefix(fs[i], "1") {
+      fs[i] = fs[i][1:]
+      return true, i, nil
+    } else {
+      errCtx := ctx
+      return false, i, errCtx.NewError("Error: expected 0 or 1, got " + fs[i])
+    }
 	}
 }
 

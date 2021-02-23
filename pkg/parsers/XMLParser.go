@@ -1,5 +1,7 @@
 package parsers
 
+// TODO: change this parser so that style and script tags can contain any crap
+
 import (
 	"fmt"
 	"io/ioutil"
@@ -29,7 +31,7 @@ func tokenizeXMLFormulas(s string, ctx context.Context) ([]raw.Token, error) {
 // this is a bad approach, we better just base ourselves on <>
 var xmlParserSettings = ParserSettings{
 	quotedGroups: quotedGroupsSettings{
-		pattern: patterns.XML_STRING_OR_COMMENT_REGEXP,
+		pattern: patterns.XML_STRING_REGEXP,
 		groups: []quotedGroupSettings{
 			quotedGroupSettings{
 				maskType:        STRING,
@@ -43,13 +45,6 @@ var xmlParserSettings = ParserSettings{
 				groupPattern:    patterns.DQ_STRING_GROUP,
 				assertStopMatch: false,
 				info:            "double quotes",
-				trackStarts:     true,
-			},
-			quotedGroupSettings{
-				maskType:        ML_COMMENT,
-				groupPattern:    patterns.XML_COMMENT_GROUP,
-				assertStopMatch: true,
-				info:            "xml-style multiline comment",
 				trackStarts:     true,
 			},
 		},
@@ -80,27 +75,31 @@ type XMLParser struct {
 	Parser
 }
 
-func NewXMLParser(path string) (*XMLParser, error) {
-	if !filepath.IsAbs(path) {
-		panic("path should be absolute")
-	}
+func NewXMLParserFromBytes(rawBytes []byte, path string) (*XMLParser, error) {
+  raw := string(rawBytes)
 
-	rawBytes, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	raw := string(rawBytes)
 	src := context.NewSource(raw)
 
 	ctx := context.NewContext(src, path)
 	p := &XMLParser{newParser(raw, xmlParserSettings, ctx)}
 
-	if err := p.maskQuoted(); err != nil {
-		return nil, err
-	}
+  // dont mask anything yet, because style/script/text tags can contain anything
 
 	return p, nil
+}
+
+// can be a url, in which case it is fetched
+func NewXMLParser(path string) (*XMLParser, error) {
+  if !filepath.IsAbs(path) {
+    panic("path should be absolute")
+  }
+
+  rawBytes, err := ioutil.ReadFile(path)
+  if err != nil {
+    return nil, err
+  }
+
+  return NewXMLParserFromBytes(rawBytes, path)
 }
 
 func NewEmptyXMLParser(ctx context.Context) *XMLParser {
@@ -111,6 +110,7 @@ func (p *XMLParser) Refine(start, stop int) *XMLParser {
 	return &XMLParser{p.refine(start, stop)}
 }
 
+// used only for attributes
 func (p *XMLParser) tokenize() ([]raw.Token, error) {
 	ts, err := p.Parser.tokenize()
 	if err != nil {
@@ -131,9 +131,19 @@ func (p *XMLParser) parseAttributes(ctx context.Context) (*html.RawDict, error) 
 	result := html.NewEmptyRawDict(ctx)
 
 	appendKeyVal := func(k *raw.Word, v html.Token) error {
-		if other, _, ok := result.GetKeyValue(k.Value()); ok {
-			errCtx := context.MergeContexts(k.Context(), other.Context())
-			return errCtx.NewError("Error: duplicate")
+		if other, otherValue_, ok := result.GetKeyValue(k.Value()); ok {
+      // duplicate is not a problem, just extend
+
+      if otherValue, ok := otherValue_.(*html.String); ok {
+        if vStr, okV := v.(*html.String); okV  {
+          s, _ := html.NewString(k.Value(), k.Context())
+          result.Set(s, html.NewValueString(otherValue.Value() + " " + vStr.Value(), otherValue.Context()))
+          return nil
+        } 
+      }
+
+      errCtx := context.MergeContexts(k.Context(), other.Context())
+      return errCtx.NewError("Error: duplicate (" + k.Value() + ")")
 		} else {
 			s, _ := html.NewString(k.Value(), k.Context())
 			result.Set(s, v)
@@ -224,6 +234,39 @@ func (p *XMLParser) parseAttributes(ctx context.Context) (*html.RawDict, error) 
 	return result, nil
 }
 
+// returns string of end
+func (p *XMLParser) findTagEnd() ([2]int, string, bool) {
+  inSingleQuotes := false
+  inDoubleQuotes := false
+
+  pos := p.pos
+  for ;pos < p.Len(); pos++ {
+    c := p.raw[pos]
+    if inDoubleQuotes {
+      if c == '"' {
+        inDoubleQuotes = false
+      }
+    } else if inSingleQuotes {
+      if c == '\'' {
+        inSingleQuotes = false
+      }
+    } else if c == '"' {
+      inDoubleQuotes = true
+    } else if c == '\'' {
+      inSingleQuotes = true
+    } else if c == '>' {
+
+      if p.raw[pos-1] == '/' {
+        return [2]int{pos-1, pos+1}, "/>", true
+      } else {
+        return [2]int{pos, pos+1}, ">", true
+      }
+    }
+  }
+
+  return [2]int{0, 0,}, "", false
+}
+
 func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
 	rprev := [2]int{0, 0}
 
@@ -251,15 +294,26 @@ func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
 			rprev = r
 
 			if rname, name, ok := p.nextMatch(patterns.TAG_NAME_REGEXP, false); ok {
-				stopRegexp := patterns.TAG_STOP_REGEXP
+				/*stopRegexp := patterns.TAG_STOP_REGEXP
 				if name == "?xml" {
 					stopRegexp = patterns.XML_HEADER_STOP_REGEXP
-				}
+				} else if name == "!--" {
+          stopRegexp = patterns.XML_COMMENT_STOP_REGEXP
+        }*/
 
-				if rr, s, ok := p.nextMatch(stopRegexp, false); ok {
+				if rr, s, ok := p.findTagEnd(); ok {
+          if name == "!--" {
+            rprev = rr
+            continue
+          } 
+
 					ctx := context.MergeContexts(p.NewContext(r[0], rname[1]), p.NewContext(rr[0], rr[1]))
 
 					attrParser := p.Refine(rname[1], rr[0])
+          if err := attrParser.maskQuoted(); err != nil {
+            return nil, err
+          }
+
 					attr, err := attrParser.parseAttributes(ctx) // this is where the magic happens
 					if err != nil {
 						return nil, err
@@ -267,29 +321,46 @@ func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
 
 					rprev = rr
 
-					var subParser *XMLParser = nil
-					if patterns.IsSelfClosing(name, s) {
-						subParser = p.Refine(rr[1], rr[1])
-					} else {
-						if rrr, ok := p.nextGroupStopMatch(patterns.NewTagGroup(name), true); ok {
-							ctx = context.MergeContexts(ctx, p.NewContext(rrr[0], rrr[1]))
-							subParser = p.Refine(rr[1], rrr[0])
-							rprev = rrr
-						} else {
-							return nil, ctx.NewError("Syntax Error: unmatched tag")
-						}
-					}
+					if name == "script" || name == "style" {
+            // single and double quotes need to be matched, during search for stops
+            // it is unlikely that the comments comment out the tags
+            // the ScriptTagGroup keeps track of the quotes
+            if rrr, ok := p.nextGroupStopMatch(patterns.NewScriptTagGroup(name), true); ok {
 
-					if name == "math" || name == "script" || name == "style" {
-						appendTag(html.NewScriptTag(name, attr, subParser.Write(0, -1),
-							subParser.NewContext(0, -1), ctx))
-					} else {
-						subTags, err := subParser.BuildTags()
-						if err != nil {
-							return nil, err
-						}
+              ctx = context.MergeContexts(ctx, p.NewContext(rrr[0], rrr[1]))
+              subParser := p.Refine(rr[1], rrr[0])
+              rprev = rrr
+              subTag := html.NewScriptTag(strings.ToLower(name), attr, subParser.Write(0, -1),
+                subParser.NewContext(0, -1), ctx)
+              appendTag(subTag)
+            } else {
+              return nil, ctx.NewError("Syntax Error: unmatched script/style tag (" + name + ")")
+            }
+          } else {
+            var subParser *XMLParser = nil
+            if patterns.IsSelfClosing(name, s) {
+              subParser = p.Refine(rr[1], rr[1])
+            } else {
+              if name == "!--" {
+                panic("shouldn't get here")
+              }
 
-						appendTag(html.NewTag(name, attr, subTags, ctx))
+              if rrr, ok := p.nextGroupStopMatch(patterns.NewTagGroup(name), true); ok {
+                ctx = context.MergeContexts(ctx, p.NewContext(rrr[0], rrr[1]))
+                subParser = p.Refine(rr[1], rrr[0])
+                rprev = rrr
+              } else {
+                return nil, ctx.NewError("Syntax Error: unmatched tag (" + name + ")")
+              }
+            }
+
+            subTags, err := subParser.BuildTags()
+            if err != nil {
+              return nil, err
+            }
+
+            subTag := html.NewTag(strings.ToLower(name), attr, subTags, ctx)
+            appendTag(subTag)
 					}
 				} else {
 					return nil, p.NewError(r[0], rname[1], "Syntax Error: tag not closed")

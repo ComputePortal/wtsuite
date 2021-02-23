@@ -49,6 +49,7 @@ var table = map[string]TagBuilder{
 	"sodipodi:namedview": &fnBuilder{NewSodiPodiNamedView},
 	"svg":                gb,
 	"text":               gb, // not the same as Text!
+  "title":              gb,
 }
 
 func IsTag(key string) bool {

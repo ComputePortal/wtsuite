@@ -82,8 +82,7 @@ func (t *Tag) IsText() bool {
 }
 
 func (t *Tag) IsScript() bool {
-	// XXX: this is a bad place to check all of this
-	return t.attr != nil && (t.children == nil || len(t.children) == 0) && t.Name() == "script"
+	return t.attr != nil && t.children == nil
 }
 
 func (t *Tag) Name() string {

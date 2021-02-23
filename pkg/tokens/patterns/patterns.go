@@ -70,6 +70,7 @@ var (
 		DQ_STRING_START, SL_COMMENT_START,
 		ML_COMMENT_START, ML_COMMENT_STOP,
 		XML_COMMENT_START, XML_COMMENT_STOP, BT_FORMULA_START)
+	XML_STRING_REGEXP = compileRegexp(SQ_STRING_START, DQ_STRING_START)
 	FORMULA_STRING_OR_COMMENT_REGEXP = XML_STRING_OR_COMMENT_REGEXP
 	JS_STRING_OR_COMMENT_REGEXP      = compileRegexp(SQ_STRING_START,
 		DQ_STRING_START, SL_COMMENT_START,
@@ -112,9 +113,10 @@ var (
 	PLAIN_FLOAT_REGEXP = regexp.MustCompile(`^[\-]?[0-9]+(\.[0-9]+)?(e[\-+]?[0-9]+)?$`) // doesnt include units
 
 	TAG_START_REGEXP       = compileRegexp(TAG_START)
-	TAG_NAME_REGEXP        = regexp.MustCompile(`[!?]?[#_a-zA-Z][:0-9A-Za-z_\-.]*\b`)
+	TAG_NAME_REGEXP        = regexp.MustCompile(`[!?]?[#_a-zA-Z\-][0-9A-Za-z_\-\.]*`)
 	TAG_STOP_REGEXP        = regexp.MustCompile(`[/]?>`)
 	XML_HEADER_STOP_REGEXP = regexp.MustCompile(`[?]>`)
+	XML_COMMENT_STOP_REGEXP  = regexp.MustCompile(`-->`)
 	DUMMY_TAG_NAME_REGEXP  = regexp.MustCompile(`^[\s]*>`)
 
 	NAMESPACE_SEPARATOR_REGEXP = compileRegexp(NAMESPACE_SEPARATOR)
@@ -178,7 +180,7 @@ func compileRegexp(x ...string) *regexp.Regexp {
 }
 
 func IsCompactSelfClosing(name string) bool {
-	return name == "br" || name == "!DOCTYPE" || name == "img" || name == "meta" || name == "input" || name == "?xml"
+  return name == "br" || name == "hr" || name == "!DOCTYPE" || name == "img" || name == "meta" || name == "input" || name == "?xml" || name == "link" || name == "base" || name == "col" || name == "param" || name == "source" || name == "track" || name == "wbr"
 }
 
 func IsSelfClosing(name string, close string) bool {

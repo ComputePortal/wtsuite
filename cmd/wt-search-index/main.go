@@ -1,4 +1,3 @@
-// TODO: instead of transpiling the files, just look at the final files
 package main
 
 import (
@@ -6,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+  "net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,6 +21,10 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tree"
 	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+)
+
+const (
+  CONTENT_LIMIT = 100 // number of chars
 )
 
 var (
@@ -39,6 +43,7 @@ type CmdArgs struct {
 type SearchConfig struct {
 	TitleQuery     string `json:"title-query"`
 	titleQuery     styles.Selector
+  IncludeDescription bool `json:"description"`
 	ContentQuery   string `json:"content-query"`
 	contentQueries []styles.Selector
 	Ignore         []string `json:"ignore"`
@@ -68,7 +73,7 @@ func parseArgs() CmdArgs {
 
   cmdParser = parsers.NewCLIParser(
     fmt.Sprintf("Usage: %s [options] <root>\n", os.Args[0]),
-    "",
+    "<root> may be an URL (i.e. start with <scheme>://)",
     []parsers.CLIOption{
       parsers.NewCLIString("c", "config", "-c, --config <config-file>   Defaults to ./search-config.json", &(cmdArgs.configFile)),
       parsers.NewCLIString("o", "output", "-o, --output <output-file>   Defaults to ./search-index.json", &(cmdArgs.searchIndexOutput)),
@@ -85,9 +90,11 @@ func parseArgs() CmdArgs {
 		printMessageAndExit("Error: expected 1 positional arguments")
 	}
 
-	if !files.IsDir(positional[0]) {
+  if files.IsURL(positional[0]) {
+    cmdArgs.root = strings.TrimRight(positional[0], "/")
+  } else if !files.IsDir(positional[0]) {
     // TODO: might be url
-		printMessageAndExit("Error: first argument is not a directory")
+		printMessageAndExit("Error: first argument is not a directory or an url")
 	} else {
     var err error
     cmdArgs.root, err = filepath.Abs(positional[0])
@@ -135,7 +142,7 @@ func setUpEnv(cmdArgs CmdArgs, cfg *SearchConfig) error {
 type SearchIndexPage struct {
 	Url     string   `json:"url"`     // used as key
 	Title   string   `json:"title"`   // should be unique for each indexed page
-	Content []string `json:"content"` // each string is a paragraph
+	Content []string `json:"content"` // each string is a paragraph, but this quickly bloats the index file, so better just put description here
 }
 
 type SearchIndex struct {
@@ -184,10 +191,96 @@ func extractTagText(tags []tree.Tag) []string {
   return str
 }
 
-func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIndex) error {
+type CrawlStatePage struct {
+  url string
+  done bool
+  pending bool
+}
+
+func (c *CrawlStatePage) SetDone() {
+  c.done = true
+  c.pending = false
+}
+
+func (c *CrawlStatePage) IsPending() bool {
+  return c.pending
+}
+
+func NewCrawlStatePage(url string) *CrawlStatePage {
+  return &CrawlStatePage{url, false, true}
+}
+
+type CrawlState struct {
+  pages map[string]*CrawlStatePage
+}
+
+func NewCrawlState() *CrawlState {
+  return &CrawlState{make(map[string]*CrawlStatePage)}
+}
+
+func (cs *CrawlState) HasPending() bool {
+  for _, p := range cs.pages {
+    if p.IsPending() {
+      return true
+    }
+  }
+
+  return false
+}
+
+func (cs *CrawlState) GetFirstPending() string {
+  for url, p := range cs.pages {
+    if p.IsPending() {
+      return url
+    }
+  }
+
+  panic("nothing pending")
+}
+
+func (cs *CrawlState) AddPending(url string) {
+  if _, ok := cs.pages[url]; !ok {
+    cs.pages[url] = NewCrawlStatePage(url)
+  }
+}
+
+func (cs *CrawlState) SetDone(url string) {
+  cs.pages[url].SetDone()
+}
+
+// this function can only add pending
+func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIndex, cs *CrawlState) error {
   url := path[len(cmdArgs.root):]
 
-  p, err := parsers.NewXMLParser(path)
+  var rawBytes []byte = nil
+  if files.IsURL(path) {
+    resp, err := http.Get(path)
+    if err != nil {
+      return err
+    }
+
+    if resp.StatusCode == 200 {
+      if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
+        rawBytes, err = ioutil.ReadAll(resp.Body)
+        if err != nil {
+          return err
+        }
+      } else {
+        return nil
+      }
+    } else {
+      return errors.New("Error: unable to get " + path)
+    }
+  } else {
+    var err error
+    rawBytes, err = ioutil.ReadFile(path)
+    if err != nil {
+      return err
+    }
+  }
+
+  // still need path for reference in context
+  p, err := parsers.NewXMLParserFromBytes(rawBytes, path)
   if err != nil {
     return err
   }
@@ -230,13 +323,66 @@ func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIn
 
   content := extractTagText(contentTags)
 
+  // prepend the description
+  if cfg.IncludeDescription {
+    sel, err := parseSelector("head > meta[name=\"description\"]", cmdArgs.configFile)
+    if err != nil {
+      // must be valid!
+      panic(err)
+    }
+
+    tags := sel.Match(root)
+    if len(tags) > 0 {
+      if contentToken_, ok := tags[0].Attributes().Get("content"); ok {
+        contentToken, err := tokens.AssertString(contentToken_)
+        if err == nil {
+          content = append([]string{contentToken.Value()}, content...)
+        }
+      }
+    }
+  }
+
+  if cs != nil {
+    sel, err := parseSelector("a[href]", cmdArgs.configFile)
+    if err != nil {
+      panic(err)
+    }
+
+    tags := sel.Match(root)
+    for _, t := range tags {
+      if hrefToken_, ok := t.Attributes().Get("href"); ok {
+        hrefToken, err := tokens.AssertString(hrefToken_)
+        href := hrefToken.Value()
+        if err == nil {
+          pendingURL := ""
+          if (strings.HasPrefix(href, "https://") || strings.HasPrefix(href, "http://")) && !strings.HasPrefix(href, cmdArgs.root) {
+            // other domain, ignore
+          } else if strings.HasPrefix(href, cmdArgs.root) {
+            pendingURL = href
+          } else if strings.HasPrefix(href, "/") {
+            pendingURL = cmdArgs.root + href
+          } else { // assume relative path
+            pendingURL = cmdArgs.root + filepath.Dir(url) + 
+            "/" + href
+          }
+
+          // can't check suffix because could be php or all kinds of other crap
+          if pendingURL != "" {
+            cs.AddPending(pendingURL)
+          }
+        }
+      }
+    }
+  }
+
   fmt.Println("indexing ", url, "(title=", title, ")")
+
   si.AddPage(url, title, content)
 
   return nil
 }
 
-func registerSearchableContent(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex, error) {
+func registerSearchableContentDisc(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex, error) {
 	searchIndex := NewSearchIndex()
 
   if err := filepath.Walk(cmdArgs.root, func(path string, info os.FileInfo, err error) error {
@@ -250,7 +396,7 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex
     }
 
     // now read the html file
-    if err := parseHTMLFile(cmdArgs, cfg, path, searchIndex); err != nil {
+    if err := parseHTMLFile(cmdArgs, cfg, path, searchIndex, nil); err != nil {
       return err
     }
 
@@ -260,6 +406,27 @@ func registerSearchableContent(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex
   }
 
 	return searchIndex, nil
+}
+
+func registerSearchableContent(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex, error) {
+  if files.IsURL(cmdArgs.root) {
+    searchIndex := NewSearchIndex()
+    cs := NewCrawlState()
+    cs.AddPending(cmdArgs.root)
+
+    for cs.HasPending() {
+      url := cs.GetFirstPending()
+      if err := parseHTMLFile(cmdArgs, cfg, url, searchIndex, cs); err != nil {
+        fmt.Println("Error: unable to crawl page " + url + "(" + err.Error() + ")")
+      }
+
+      cs.SetDone(url)
+    }
+
+    return searchIndex, nil
+  } else {
+    return registerSearchableContentDisc(cmdArgs, cfg)
+  }
 }
 
 func (si *SearchIndex) indexWord(m map[string]interface{}, pageID int, f string) error {
@@ -369,10 +536,52 @@ func buildSearchIndex(cfg *SearchConfig, searchIndex *SearchIndex) error {
 	return nil
 }
 
+func limitSearchIndexContent(searchIndex *SearchIndex) error {
+  for i, page := range searchIndex.Pages {
+    content := make([]string, 0)
+    count := 0
+    for _, part := range page.Content {
+      count += len(part)
+
+      if count < CONTENT_LIMIT {
+        content = append(content, part)
+      } else {
+        content = append(content, part[0:len(part) - (count - CONTENT_LIMIT)] + "...")
+        break
+      }
+    }
+
+    page.Content = content
+    searchIndex.Pages[i] = page
+  }
+
+  return nil
+}
+
+func parseSelectors(str string, refPath string) ([]styles.Selector, error) {
+  return styles.ParseSelectorList(
+    tokens.NewValueString(str, context.NewContext(context.NewSource(str), refPath)),
+  )
+}
+
+func parseSelector(str string, refPath string) (styles.Selector, error) {
+  sels, err := parseSelectors(str, refPath)
+  if err != nil {
+    return nil, err
+  }
+
+  if len(sels) != 1 {
+    return nil, errors.New("Error: expected only one title query")
+  }
+
+  return sels[0], nil
+}
+
 func ReadConfigFile(cmdArgs *CmdArgs) (*SearchConfig, error) {
   cfg := &SearchConfig{
     TitleQuery: "",
     titleQuery: nil,
+    IncludeDescription: false,
     ContentQuery: "",
     contentQueries: []styles.Selector{},
     Ignore:         []string{},
@@ -387,19 +596,12 @@ func ReadConfigFile(cmdArgs *CmdArgs) (*SearchConfig, error) {
 		return cfg, errors.New("Error: bad config file syntax (" + err.Error() + ")")
 	}
 
-  // parse
-  titleQueries, err := styles.ParseSelectorList(tokens.NewValueString(cfg.TitleQuery, context.NewContext(context.NewSource(cfg.TitleQuery), cmdArgs.configFile)))
+  cfg.titleQuery, err = parseSelector(cfg.TitleQuery, cmdArgs.configFile)
   if err != nil {
     return nil, err
   }
 
-  if len(titleQueries) != 1 {
-    return cfg, errors.New("Error: expected only one title query")
-  }
-
-  cfg.titleQuery = titleQueries[0]
-
-  cfg.contentQueries, err = styles.ParseSelectorList(tokens.NewValueString(cfg.ContentQuery, context.NewContext(context.NewSource(cfg.ContentQuery), cmdArgs.configFile)))
+  cfg.contentQueries, err = parseSelectors(cfg.ContentQuery, cmdArgs.configFile)
   if err != nil {
     return nil, err
   }
@@ -428,6 +630,10 @@ func main() {
 	if err := buildSearchIndex(cfg, searchIndex); err != nil {
 		printMessageAndExit(err.Error()+"\n")
 	}
+
+  if err := limitSearchIndexContent(searchIndex); err != nil {
+		printMessageAndExit(err.Error()+"\n")
+  }
 
 	b, err := json.Marshal(searchIndex)
 	if err != nil {

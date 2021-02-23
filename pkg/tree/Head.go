@@ -23,7 +23,7 @@ func NewHead(attr *tokens.StringDict, ctx context.Context) (Tag, error) {
 func (t *Head) Validate() error {
 	for _, child := range t.children {
 		switch ct := child.(type) {
-		case *Meta, *Title, *Link, *Script, *Style, *LoaderScript, *SrcScript:
+		case *Base, *Meta, *Title, *Link, *Script, *Style, *LoaderScript, *SrcScript:
 			// ok
 		default:
 			errCtx := ct.Context()

@@ -35,28 +35,32 @@ func Style(scope Scope, node Node, tag *tokens.Tag) error {
 		return err
 	}
 
+  contentStr := ""
 	contentToken, ok := attr.Get(".content")
   if !ok {
-    return buildInlineStyle(node, attr, "", tag.Context())
-    //errCtx := tag.Context()
-    //return errCtx.NewError("Error: style without content")
+    if !tag.IsScript() {
+      errCtx := tag.Context()
+      return errCtx.NewError("Error: style without content")
+    }
+
+    contentStr = tag.Text()
+  } else {
+    // build the style
+    d, err := tokens.AssertStringDict(contentToken)
+    if err != nil {
+      return err
+    }
+
+    // save the sheet in a global variable, so that wraps can be applied later?
+    // are append to the node, as interface{}
+
+    contentStr, err = BuildStyle(d, node)
+    if err != nil {
+      return err
+    }
+
+    attr.Delete(".content")
   }
-
-  // build the style
-  d, err := tokens.AssertStringDict(contentToken)
-  if err != nil {
-    return err
-  }
-
-  // save the sheet in a global variable, so that wraps can be applied later?
-  // are append to the node, as interface{}
-
-  contentStr, err := BuildStyle(d, node)
-  if err != nil {
-    return err
-  }
-
-  attr.Delete(".content")
 
   return buildInlineStyle(node, attr, contentStr, tag.Context())
 }

@@ -236,7 +236,7 @@ func (p *Parser) nextGroupStopMatch(group patterns.Group, trackStarts bool) ([2]
 					count++
 				}
 			default:
-				panic("bad regexp")
+        // dont do anything (might've detected quotes)
 			}
 		} else {
 			break

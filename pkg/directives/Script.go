@@ -37,9 +37,10 @@ func Script(scope Scope, node Node, tag *tokens.Tag) error {
 		}
 
 		content = valueToken.Value()
-	}
-
-	attr.Delete("value")
+    attr.Delete("value")
+	} else {
+    content = tag.Text()
+  }
 
 	script, err := tree.NewScript(attr, content, tag.Context())
 	if err != nil {
