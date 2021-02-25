@@ -2,7 +2,6 @@ package tree
 
 import (
 	"fmt"
-  "reflect"
 	"strings"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
@@ -63,10 +62,6 @@ func newTag(name string, selfClosing bool, attr *tokens.StringDict, ctx context.
 			}
 
 			id = idToken.Value()
-			if id == "" {
-				errCtx := idToken.Context()
-				return tagData{}, errCtx.NewError("Error: id can't be empty")
-			}
 		}
 
 		attr.Delete("id")
@@ -92,21 +87,7 @@ func newTag(name string, selfClosing bool, attr *tokens.StringDict, ctx context.
 func validateAttributes(id string, name string, attr *tokens.StringDict) error {
 	// check attribute values
 	return attr.Loop(func(key *tokens.String, value tokens.Token, last bool) error {
-		if tokens.IsList(value) {
-      errCtx := value.Context()
-      return errCtx.NewError("Error: a list is not a valid final attribute")
-		} else if tokens.IsStringDict(value) {
-			if key.Value() != "style" && key.Value() != "__style__" {
-				errCtx := value.Context()
-				return errCtx.NewError("Error: attr " + key.Value() + " cannot have a dict value")
-			}
-		} else if !(tokens.IsStringDict(value) || tokens.IsNull(value)) && (key.Value() == "style" || key.Value() == "__style__") {
-			errCtx := value.Context()
-			return errCtx.NewError("Error: expected dict, got " + reflect.TypeOf(value).String())
-		} else if (!tokens.IsNull(value) && !tokens.IsPrimitive(value)) && (key.Value() == "class" || key.Value() == "href") {
-			errCtx := value.Context()
-			return errCtx.NewError("Error: expected primitive")
-		} else if !tokens.IsBool(value) && !tokens.IsNull(value) && !tokens.IsPrimitive(value) {
+		if !tokens.IsBool(value) && !tokens.IsNull(value) && !tokens.IsPrimitive(value) {
 			errCtx := value.Context()
 			return errCtx.NewError("Error: expected primitive")
 		}

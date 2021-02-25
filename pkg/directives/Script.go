@@ -7,11 +7,13 @@ import (
 
 // scripts are usefull for internet explorer fallback
 func Script(scope Scope, node Node, tag *tokens.Tag) error {
-	if !tag.IsScript() || tag.Name() != "script" {
-		panic("expected js script tag")
-	}
-
 	subScope := NewSubScope(scope)
+
+  if tag.Children() != nil {
+    if len(tag.Children()) != 0 {
+      panic("unexpected children")
+    }
+  }
 
 	attr, err := tag.Attributes([]string{"value"})
 	if err != nil {

@@ -379,6 +379,7 @@ func ToStringDict(t Token) (*StringDict, error) {
 	default:
 		errCtx := t.Context()
 		err := errCtx.NewError("Error: expected dict, got " + reflect.TypeOf(t).String())
+    panic(err)
 		return nil, err
 	}
 }

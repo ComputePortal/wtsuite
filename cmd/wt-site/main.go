@@ -444,6 +444,26 @@ func buildProject(cmdArgs CmdArgs, cfg *config.Config) error {
 
 var fProf *os.File = nil
 
+func startProfiling(profFile string) {
+  var err error
+  fProf, err = os.Create(profFile)
+  if err != nil {
+    printMessageAndExit(err.Error())
+  }
+
+  pprof.StartCPUProfile(fProf)
+
+  go func() {
+    sigchan := make(chan os.Signal)
+    signal.Notify(sigchan, os.Interrupt)
+    <-sigchan
+
+    stopProfiling(profFile)
+
+    os.Exit(1)
+  }()
+}
+
 func stopProfiling(profFile string) {
   if fProf != nil {
 		pprof.StopCPUProfile()
@@ -475,22 +495,7 @@ func main() {
   }
 
 	if cmdArgs.profFile != "" {
-		fProf, err = os.Create(cmdArgs.profFile)
-		if err != nil {
-			printMessageAndExit(err.Error())
-		}
-
-		pprof.StartCPUProfile(fProf)
-
-    go func() {
-      sigchan := make(chan os.Signal)
-      signal.Notify(sigchan, os.Interrupt)
-      <-sigchan
-
-      stopProfiling(cmdArgs.profFile)
-
-      os.Exit(1)
-    }()
+    startProfiling(cmdArgs.profFile)
 	}
 
 	if err := buildProject(cmdArgs, cfg); err != nil {

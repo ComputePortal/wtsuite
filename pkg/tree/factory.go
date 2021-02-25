@@ -160,12 +160,20 @@ func IsTag(key string) bool {
 	return ok
 }
 
-func BuildTag(key string, attr *tokens.StringDict, ctx context.Context) (Tag, error) {
+func buildTag(key string, attr *tokens.StringDict, permissive bool, ctx context.Context) (Tag, error) {
 	b, ok := table[key]
 
 	if !ok {
-		return nil, ctx.NewError("Error: tag " + key + " not found")
+    if !permissive {
+      return nil, ctx.NewError("Error: tag " + key + " not found")
+    } else {
+      b = &GenBuilder{false}
+    }
 	}
 
 	return b.Build(key, attr, ctx)
+}
+
+func BuildTag(key string, attr *tokens.StringDict, ctx context.Context) (Tag, error) {
+  return buildTag(key, attr, false, ctx)
 }

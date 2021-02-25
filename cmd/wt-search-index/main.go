@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-  "net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime/pprof"
 	"sort"
 	"strings"
 
@@ -36,6 +37,7 @@ type CmdArgs struct {
   root string // can be a url
   configFile string // defaults to search.json in pwd
 	searchIndexOutput string
+  profFile string
 
 	verbosity int
 }
@@ -65,6 +67,7 @@ func parseArgs() CmdArgs {
 		root: "",
     configFile: "search-config.json",
 		searchIndexOutput: "search-index.json",
+    profFile: "",
 
 		verbosity: 0,
 	}
@@ -73,10 +76,11 @@ func parseArgs() CmdArgs {
 
   cmdParser = parsers.NewCLIParser(
     fmt.Sprintf("Usage: %s [options] <root>\n", os.Args[0]),
-    "<root> may be an URL (i.e. start with <scheme>://)",
+    "<root> directory",
     []parsers.CLIOption{
       parsers.NewCLIString("c", "config", "-c, --config <config-file>   Defaults to ./search-config.json", &(cmdArgs.configFile)),
       parsers.NewCLIString("o", "output", "-o, --output <output-file>   Defaults to ./search-index.json", &(cmdArgs.searchIndexOutput)),
+      parsers.NewCLIUniqueFile("", "prof", "--prof <file>   Profile the indexer, output written to file (analyzeable with go tool pprof)", false, &(cmdArgs.profFile)),
       parsers.NewCLICountFlag("v", "", "Verbosity", &(cmdArgs.verbosity)),
     },
     parsers.NewCLIRemaining(&positional),
@@ -90,11 +94,8 @@ func parseArgs() CmdArgs {
 		printMessageAndExit("Error: expected 1 positional arguments")
 	}
 
-  if files.IsURL(positional[0]) {
-    cmdArgs.root = strings.TrimRight(positional[0], "/")
-  } else if !files.IsDir(positional[0]) {
-    // TODO: might be url
-		printMessageAndExit("Error: first argument is not a directory or an url")
+  if !files.IsDir(positional[0]) {
+		printMessageAndExit("Error: first argument is not a directory")
 	} else {
     var err error
     cmdArgs.root, err = filepath.Abs(positional[0])
@@ -136,7 +137,7 @@ func setUpEnv(cmdArgs CmdArgs, cfg *SearchConfig) error {
 	//styles.VERBOSITY = cmdArgs.verbosity
 	scripts.VERBOSITY = cmdArgs.verbosity
 
-  return files.ResolvePackages(cmdArgs.configFile)
+  return nil
 }
 
 type SearchIndexPage struct {
@@ -191,92 +192,36 @@ func extractTagText(tags []tree.Tag) []string {
   return str
 }
 
-type CrawlStatePage struct {
-  url string
-  done bool
-  pending bool
-}
+func extractHeadTitle(root *tree.Root) string {
+  for _, rootChild := range root.Children() {
+    if rootChild.Name() == "html" {
+      for _, htmlChild := range rootChild.Children() {
+        if htmlChild.Name() == "head" {
+          for _, headChild := range htmlChild.Children() {
+            if headChild.Name() == "title" {
+              titleTag, ok := headChild.(*tree.Title)
+              if !ok {
+                panic("unexpeced")
+              }
 
-func (c *CrawlStatePage) SetDone() {
-  c.done = true
-  c.pending = false
-}
-
-func (c *CrawlStatePage) IsPending() bool {
-  return c.pending
-}
-
-func NewCrawlStatePage(url string) *CrawlStatePage {
-  return &CrawlStatePage{url, false, true}
-}
-
-type CrawlState struct {
-  pages map[string]*CrawlStatePage
-}
-
-func NewCrawlState() *CrawlState {
-  return &CrawlState{make(map[string]*CrawlStatePage)}
-}
-
-func (cs *CrawlState) HasPending() bool {
-  for _, p := range cs.pages {
-    if p.IsPending() {
-      return true
+              return titleTag.Content()
+            }
+          }
+        }
+      }
     }
   }
 
-  return false
-}
-
-func (cs *CrawlState) GetFirstPending() string {
-  for url, p := range cs.pages {
-    if p.IsPending() {
-      return url
-    }
-  }
-
-  panic("nothing pending")
-}
-
-func (cs *CrawlState) AddPending(url string) {
-  if _, ok := cs.pages[url]; !ok {
-    cs.pages[url] = NewCrawlStatePage(url)
-  }
-}
-
-func (cs *CrawlState) SetDone(url string) {
-  cs.pages[url].SetDone()
+  return ""
 }
 
 // this function can only add pending
-func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIndex, cs *CrawlState) error {
+func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIndex) error {
   url := path[len(cmdArgs.root):]
 
-  var rawBytes []byte = nil
-  if files.IsURL(path) {
-    resp, err := http.Get(path)
-    if err != nil {
-      return err
-    }
-
-    if resp.StatusCode == 200 {
-      if strings.Contains(resp.Header.Get("Content-Type"), "text/html") {
-        rawBytes, err = ioutil.ReadAll(resp.Body)
-        if err != nil {
-          return err
-        }
-      } else {
-        return nil
-      }
-    } else {
-      return errors.New("Error: unable to get " + path)
-    }
-  } else {
-    var err error
-    rawBytes, err = ioutil.ReadFile(path)
-    if err != nil {
-      return err
-    }
+  rawBytes, err := ioutil.ReadFile(path)
+  if err != nil {
+    return err
   }
 
   // still need path for reference in context
@@ -290,7 +235,8 @@ func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIn
 		return err
 	}
 
-	root := tree.NewRoot(p.NewContext(0, 1))
+  // TODO: fast build that circumvents directives
+	/*root := tree.NewRoot(p.NewContext(0, 1))
 	node := directives.NewRootNode(root, directives.HTML)
   // the source isn't really used, because the html file doesnt contain import statements
 	fileScope := directives.NewFileScope(false, directives.NewFileCache())
@@ -304,16 +250,33 @@ func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIn
   tree.RegisterParents(root)
   if err := root.Validate(); err != nil {
     return err
+  }*/
+
+  root, err := tree.BuildPermissive(rawTags)
+  if err != nil {
+    return err
   }
 
   // now we can apply the search queries
-  titleTags := cfg.titleQuery.Match(root)
-  if len(titleTags) > 1 {
-    return errors.New("Error: multiple titles found in " + path)
+  title := ""
+  if cfg.titleQuery != nil {
+    titleTags := cfg.titleQuery.Match(root)
+    if len(titleTags) > 0 {
+      titleParts := extractTagText(titleTags)
+      title = strings.Join(titleParts, " ")
+    }
+  } 
+
+  if title == "" {
+    // html -> head -> title
+    title = extractHeadTitle(root)
   }
 
-  titleParts := extractTagText(titleTags)
-  title := strings.Join(titleParts, " ")
+  if strings.Contains(title, "|") {
+    title = strings.Split(title, "|")[0]
+  }
+
+  title = strings.TrimSpace(title)
 
   contentTags := make([]tree.Tag, 0)
 
@@ -342,48 +305,22 @@ func parseHTMLFile(cmdArgs CmdArgs, cfg *SearchConfig, path string, si *SearchIn
     }
   }
 
-  if cs != nil {
-    sel, err := parseSelector("a[href]", cmdArgs.configFile)
-    if err != nil {
-      panic(err)
-    }
-
-    tags := sel.Match(root)
-    for _, t := range tags {
-      if hrefToken_, ok := t.Attributes().Get("href"); ok {
-        hrefToken, err := tokens.AssertString(hrefToken_)
-        href := hrefToken.Value()
-        if err == nil {
-          pendingURL := ""
-          if (strings.HasPrefix(href, "https://") || strings.HasPrefix(href, "http://")) && !strings.HasPrefix(href, cmdArgs.root) {
-            // other domain, ignore
-          } else if strings.HasPrefix(href, cmdArgs.root) {
-            pendingURL = href
-          } else if strings.HasPrefix(href, "/") {
-            pendingURL = cmdArgs.root + href
-          } else { // assume relative path
-            pendingURL = cmdArgs.root + filepath.Dir(url) + 
-            "/" + href
-          }
-
-          // can't check suffix because could be php or all kinds of other crap
-          if pendingURL != "" {
-            cs.AddPending(pendingURL)
-          }
-        }
-      }
-    }
+  if strings.HasSuffix(url, "/index.html") {
+    url = strings.TrimSuffix(url, "/index.html")
   }
 
-  fmt.Println("indexing ", url, "(title=", title, ")")
+  fmt.Fprintf(os.Stdout, "Adding to index %s (title=%s)\n", url, title)
 
   si.AddPage(url, title, content)
 
   return nil
 }
 
-func registerSearchableContentDisc(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex, error) {
+func registerSearchableContent(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex, error) {
 	searchIndex := NewSearchIndex()
+
+  // collect files first
+  htmlFiles := []string{}
 
   if err := filepath.Walk(cmdArgs.root, func(path string, info os.FileInfo, err error) error {
     if err != nil {
@@ -395,38 +332,27 @@ func registerSearchableContentDisc(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchI
       return nil
     }
 
-    // now read the html file
-    if err := parseHTMLFile(cmdArgs, cfg, path, searchIndex, nil); err != nil {
-      return err
-    }
+    htmlFiles = append(htmlFiles, path)
 
     return nil
   }); err != nil {
     return nil, err
   }
 
-	return searchIndex, nil
-}
+  sort.Strings(htmlFiles)
 
-func registerSearchableContent(cmdArgs CmdArgs, cfg *SearchConfig) (*SearchIndex, error) {
-  if files.IsURL(cmdArgs.root) {
-    searchIndex := NewSearchIndex()
-    cs := NewCrawlState()
-    cs.AddPending(cmdArgs.root)
+  fmt.Fprintf(os.Stdout, "Indexing %d files\n", len(htmlFiles))
 
-    for cs.HasPending() {
-      url := cs.GetFirstPending()
-      if err := parseHTMLFile(cmdArgs, cfg, url, searchIndex, cs); err != nil {
-        fmt.Println("Error: unable to crawl page " + url + "(" + err.Error() + ")")
-      }
+  for i, htmlPath := range htmlFiles {
+    fmt.Fprintf(os.Stdout, "Indexing %d/%d\n", i+1, len(htmlFiles))
 
-      cs.SetDone(url)
+    // now read the html file
+    if err := parseHTMLFile(cmdArgs, cfg, htmlPath, searchIndex); err != nil {
+      return nil, err
     }
-
-    return searchIndex, nil
-  } else {
-    return registerSearchableContentDisc(cmdArgs, cfg)
   }
+
+	return searchIndex, nil
 }
 
 func (si *SearchIndex) indexWord(m map[string]interface{}, pageID int, f string) error {
@@ -516,6 +442,8 @@ func indexSentence(cfg *SearchConfig, si *SearchIndex, pageID int, sentence stri
 
 // actually fill the index/partial nested trees
 func buildSearchIndex(cfg *SearchConfig, searchIndex *SearchIndex) error {
+  fmt.Println("processing ", len(searchIndex.Pages), " pages...")
+
 	// loop each word of each page
 	for i, page := range searchIndex.Pages {
 		if err := indexSentence(cfg, searchIndex, i, page.Title); err != nil {
@@ -596,9 +524,11 @@ func ReadConfigFile(cmdArgs *CmdArgs) (*SearchConfig, error) {
 		return cfg, errors.New("Error: bad config file syntax (" + err.Error() + ")")
 	}
 
-  cfg.titleQuery, err = parseSelector(cfg.TitleQuery, cmdArgs.configFile)
-  if err != nil {
-    return nil, err
+  if cfg.TitleQuery != "" {
+    cfg.titleQuery, err = parseSelector(cfg.TitleQuery, cmdArgs.configFile)
+    if err != nil {
+      return nil, err
+    }
   }
 
   cfg.contentQueries, err = parseSelectors(cfg.ContentQuery, cmdArgs.configFile)
@@ -607,6 +537,45 @@ func ReadConfigFile(cmdArgs *CmdArgs) (*SearchConfig, error) {
   }
 
   return cfg, nil
+}
+
+var fProf *os.File = nil
+
+func startProfiling(profFile string) {
+  var err error
+  fProf, err = os.Create(profFile)
+  if err != nil {
+    printMessageAndExit(err.Error())
+  }
+
+  pprof.StartCPUProfile(fProf)
+
+  go func() {
+    sigchan := make(chan os.Signal)
+    signal.Notify(sigchan, os.Interrupt)
+    <-sigchan
+
+    stopProfiling(profFile)
+
+    os.Exit(1)
+  }()
+}
+
+func stopProfiling(profFile string) {
+  if fProf != nil {
+		pprof.StopCPUProfile()
+
+    // also write mem profile
+		fMem, err := os.Create(profFile + ".mprof")
+		if err != nil {
+			printMessageAndExit(err.Error())
+		}
+
+		pprof.WriteHeapProfile(fMem)
+		fMem.Close()
+
+    fProf = nil
+  }
 }
 
 func main() {
@@ -621,6 +590,10 @@ func main() {
   if err := setUpEnv(cmdArgs, cfg); err != nil {
 		printMessageAndExit(err.Error()+"\n")
   }
+
+	if cmdArgs.profFile != "" {
+    startProfiling(cmdArgs.profFile)
+	}
 
 	searchIndex, err := registerSearchableContent(cmdArgs, cfg)
 	if err != nil {
@@ -642,5 +615,9 @@ func main() {
 
 	if err := ioutil.WriteFile(cmdArgs.searchIndexOutput, b, 0644); err != nil {
 		printMessageAndExit(err.Error()+"\n")
+	}
+
+	if cmdArgs.profFile != "" {
+    stopProfiling(cmdArgs.profFile)
 	}
 }

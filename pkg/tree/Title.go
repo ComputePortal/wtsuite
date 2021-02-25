@@ -31,3 +31,13 @@ func (t *Title) Validate() error {
 
 	return nil
 }
+
+func (t *Title) Content() string {
+  if len(t.children) > 0 {
+    if txt, ok := t.children[0].(*Text); ok {
+      return txt.Value()
+    }
+  }
+
+  return ""
+}

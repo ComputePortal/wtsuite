@@ -6,15 +6,42 @@ import (
 )
 
 type Source struct {
-	source string
+	source []rune
+}
+
+func String2RuneSlice(s string) []rune {
+  raw := []rune(s)
+
+  n := len(raw)
+
+  result := []rune{}
+  for i, r := range raw {
+    if r == '\r' {
+      if (i > 0 && raw[i-1] != '\n') && (i < n - 1 && raw[i+1] != '\n') {
+        result = append(result, rune('\n'))
+      }
+    } else {
+      result = append(result, r)
+    }
+  }
+
+  return result
 }
 
 func NewSource(src string) *Source {
-	return &Source{src}
+	return &Source{String2RuneSlice(src)}
 }
 
-func (s *Source) GetChar(i int) byte {
+func (s *Source) GetChar(i int) rune {
   return s.source[i]
+}
+
+func (s *Source) GetString(start, stop int) string {
+  if stop == -1 {
+    return string(s.source[start:])
+  } else {
+    return string(s.source[start:stop])
+  }
 }
 
 func (s *Source) Len() int {
@@ -37,7 +64,7 @@ func newContext(start, stop int, source *Source, path string) Context {
 
 // for preset globals
 func NewDummyContext() Context {
-	return newContext(0, 0, &Source{""}, "")
+	return newContext(0, 0, &Source{[]rune{}}, "")
 }
 
 func NewContext(source *Source, path string) Context {
@@ -197,7 +224,7 @@ func (c *Context) IsAtLineStart() bool {
   if i <= 0 {
     return true
   } else {
-    char := (c.source.source)[i-1]
+    char := c.source.GetChar(i-1)
     if char == '\n' || char == '\r' {
       return true
     } else {
@@ -221,7 +248,7 @@ func (c *Context) IsSingleLine() bool {
 	stop := c.ranges[len(c.ranges)-1].stop
 
   for i := start; i < stop; i++ {
-    char := (c.source.source)[i]
+    char := c.source.GetChar(i)
 
     if char == '\n' || char == '\r' {
       return false
@@ -256,7 +283,7 @@ func (c *Context) Content() string {
     //start, stop = stop, start
   //}
 
-	return (c.source.source)[start:stop]
+	return c.source.GetString(start, stop)
 }
 
 // replace sadly means reading entire file, and then replacing it
@@ -267,15 +294,15 @@ func (c *Context) SearchReplaceOrig(old, new string) error {
 
   prev := 0
   for _, r := range c.ranges {
-    b.WriteString((c.source.source)[prev:r.start])
+    b.WriteString(c.source.GetString(prev, r.start))
 
-    b.WriteString(strings.Replace((c.source.source)[r.start:r.stop], old, new, -1))
+    b.WriteString(strings.Replace(c.source.GetString(r.start, r.stop), old, new, -1))
 
     prev = r.stop
   }
 
   if prev < c.source.Len() {
-    b.WriteString((c.source.source)[prev:c.source.Len()])
+    b.WriteString(c.source.GetString(prev, c.source.Len()))
   }
 
   if err := ioutil.WriteFile(c.Path(), []byte(b.String()), 0); err != nil {

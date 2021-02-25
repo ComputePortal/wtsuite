@@ -174,8 +174,8 @@ func RegisterActivateMacroHeadersCallback() bool {
 		switch name {
 		case "WebAssemblyEnv":
 			ActivateWebAssemblyEnvHeader()
-		case "SearchIndex":
-			ActivateSearchIndexHeader()
+		//case "SearchIndex":
+			//ActivateSearchIndexHeader()
     case "__checkType__":
       ActivateCheckTypeHeader()
     case "WebGLProgram":

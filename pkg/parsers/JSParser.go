@@ -35,7 +35,8 @@ func tokenizeJSWordsAndLiterals(s string, ctx context.Context) (raw.Token, error
 	case patterns.IsJSWord(s):
 		return raw.NewWord(s, ctx)
 	default:
-		return nil, ctx.NewError("Syntax Error: unparseable")
+    err := ctx.NewError("Syntax Error: unparseable")
+		return nil, err
 	}
 }
 

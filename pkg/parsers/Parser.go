@@ -38,7 +38,7 @@ type Parser struct {
 func newParser(raw string, settings ParserSettings, ctx context.Context) Parser {
 	n := len(raw)
 
-	return Parser{0, []rune(raw), make([]RuneMask, n), settings, ctx}
+	return Parser{0, context.String2RuneSlice(raw), make([]RuneMask, n), settings, ctx}
 }
 
 func (p *Parser) NewContext(start, stop int) context.Context {
@@ -54,7 +54,9 @@ func (p *Parser) refine(start, stop int) Parser {
 		stop = p.Len()
 	}
 
-	return Parser{0, p.raw[start:stop], p.mask[start:stop], p.settings, p.NewContext(start, stop)}
+  ctx := p.NewContext(start, stop)
+
+	return Parser{0, p.raw[start:stop], p.mask[start:stop], p.settings, ctx}
 }
 
 func (p *Parser) NewError(start, stop int, msg string) error {
@@ -462,7 +464,8 @@ func (p *Parser) assertNoStrayCharacters() error {
 
 	if len(ctxs) > 0 {
 		ctx := context.MergeContexts(ctxs...)
-		return ctx.NewError("Syntax Error: stray characters")
+    err := ctx.NewError("Syntax Error: stray characters")
+		return err
 	}
 
 	return nil

@@ -27,7 +27,8 @@ func tokenizeTemplateWordsAndLiterals(s string, ctx context.Context) (raw.Token,
 	case patterns.IsTemplateWord(s):
 		return raw.NewWord(s, ctx)
 	default:
-		return nil, ctx.NewError("Syntax Error: unparseable")
+    err := ctx.NewError("Syntax Error: unparseable")
+		return nil, err
 	}
 }
 
@@ -81,12 +82,11 @@ var uiParserSettings = ParserSettings{
 		pattern:   patterns.TEMPLATE_WORD_OR_LITERAL_REGEXP,
 		tokenizer: tokenizeTemplateWordsAndLiterals,
 	},
-	// handled by FormulaParser
 	symbols: symbolsSettings{
 		maskType: SYMBOL,
 		pattern:  patterns.TEMPLATE_SYMBOLS_REGEXP,
 	},
-	operators:                newOperatorsSettings([]operatorSettings{
+	operators: newOperatorsSettings([]operatorSettings{
     operatorSettings{17, "$", PRE},
 		operatorSettings{16, "-", PRE},
 		operatorSettings{16, "!", PRE},

@@ -210,7 +210,7 @@ func FillBrowserScope(scope Scope) {
   registerPrototype(scope, pr.NewKeyboardEventPrototype(nil))
   registerPrototype(scope, pr.NewMouseEventPrototype())
   registerPrototype(scope, pr.NewNodePrototype())
-  registerPrototype(scope, pr.NewSearchIndexPrototype())
+  //registerPrototype(scope, pr.NewSearchIndexPrototype())
   registerPrototype(scope, pr.NewSharedWorkerPrototype())
   registerPrototype(scope, pr.NewStoragePrototype())
   registerPrototype(scope, pr.NewTextPrototype())

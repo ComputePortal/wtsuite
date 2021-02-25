@@ -1,7 +1,7 @@
 package macros
 
 import (
-	"github.com/computeportal/wtsuite/pkg/tokens/context"
+	//"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
 type SearchIndexHeader struct {
@@ -187,8 +187,8 @@ func (h *SearchIndexHeader) Write() string {
 	return b.String()
 }
 
-var searchIndexHeader = &SearchIndexHeader{newHeaderData("SearchIndex")}
+/*var searchIndexHeader = &SearchIndexHeader{newHeaderData("SearchIndex")}
 
 func ActivateSearchIndexHeader() {
 	ResolveHeaderActivity(searchIndexHeader, context.NewDummyContext())
-}
+}*/

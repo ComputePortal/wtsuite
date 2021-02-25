@@ -58,11 +58,16 @@ const (
 	ML_COMMENT_STOP   = `*/`
 	XML_COMMENT_START = `<!--`
 	XML_COMMENT_STOP  = `-->`
+
+  HTML_SCRIPT_START = `<[\s]*script`
+  HTML_SCRIPT_STOP = `</[\s]*script[\s]*>`
+  HTML_STYLE_START = `<[\s]*style`
+  HTML_STYLE_STOP = `</[\s]*style[\s]*>`
 )
 
 // internal names
 const (
-	INTERNAL_STYLE_TREE = "__styleTree__"
+	//INTERNAL_STYLE_TREE = "__styleTree__"
 )
 
 var (
@@ -93,6 +98,8 @@ var (
 	SL_COMMENT_GROUP  = NewGroup(SL_COMMENT_START, "\n")
 	ML_COMMENT_GROUP  = NewGroup(ML_COMMENT_START, ML_COMMENT_STOP)
 	XML_COMMENT_GROUP = NewGroup(XML_COMMENT_START, XML_COMMENT_STOP)
+  HTML_SCRIPT_GROUP = NewGroup(HTML_SCRIPT_START, HTML_SCRIPT_STOP)
+  HTML_STYLE_GROUP = NewGroup(HTML_STYLE_START, HTML_STYLE_STOP)
 
 	ALPHABET_REGEXP       = regexp.MustCompile(`\b[a-zA-Z]*\b`)
 	SIMPLE_WORD_REGEXP    = regexp.MustCompile(`^[a-zA-Z]*$`)
@@ -113,15 +120,15 @@ var (
 	PLAIN_FLOAT_REGEXP = regexp.MustCompile(`^[\-]?[0-9]+(\.[0-9]+)?(e[\-+]?[0-9]+)?$`) // doesnt include units
 
 	TAG_START_REGEXP       = compileRegexp(TAG_START)
-	TAG_NAME_REGEXP        = regexp.MustCompile(`[!?]?[#_a-zA-Z\-][0-9A-Za-z_\-\.]*`)
+	TAG_NAME_REGEXP        = regexp.MustCompile(`(!\-\-)|([!?]?[#_a-zA-Z][0-9A-Za-z_\.]*)`)
 	TAG_STOP_REGEXP        = regexp.MustCompile(`[/]?>`)
 	XML_HEADER_STOP_REGEXP = regexp.MustCompile(`[?]>`)
 	XML_COMMENT_STOP_REGEXP  = regexp.MustCompile(`-->`)
 	DUMMY_TAG_NAME_REGEXP  = regexp.MustCompile(`^[\s]*>`)
 
 	NAMESPACE_SEPARATOR_REGEXP = compileRegexp(NAMESPACE_SEPARATOR)
-	XML_SYMBOLS_REGEXP        = regexp.MustCompile(`[=,{}()[\]]`)
-	FORMULA_SYMBOLS_REGEXP     = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?])`)
+	XML_SYMBOLS_REGEXP        = regexp.MustCompile(`[=]`)
+	//FORMULA_SYMBOLS_REGEXP     = regexp.MustCompile(`([=][=][=])|([<>=!:][=])|([&][&])|([|][|])|([!][!])|([?][?])|([!<>=:,;{}()[\]+*/\-?])`)
 	JS_SYMBOLS_REGEXP          = regexp.MustCompile(`([>][>][>][=])|([=!][=][=])|([*][*][=])|([<][<][=])|([>][>][=])|([>][>][>])|([<>=!:+\-*/%&|^][=])|([*][*])|([&][&])|([<][<])|([>=][>])|([|][|])|([+][+])|([:][:])|([\-][\-])|([!<>=:,;{}()[\]+*/\-?%\.&|^~])`)
 	MATH_SYMBOLS_REGEXP        = regexp.MustCompile(`([>][>])|([<][<])|([/][/])|([-=][>])|([!<>=~]?[=])|([{}()[\]+\-<>*/\.^_=,])`)
   GLSL_SYMBOLS_REGEXP        = regexp.MustCompile(`([+][+])|([-][-])|([&][&])|([|][|])|([<>!=*+\-][=])|([#:!<>;{}()[\]/\-\.+*=,])`)
@@ -134,8 +141,8 @@ var (
   TEMPLATE_WORD_REGEXP          = regexp.MustCompile(`[a-zA-Z_][0-9A-Za-z_\-.]*\b`)
 	JS_WORD_REGEXP                = regexp.MustCompile(`^[a-zA-Z_][0-9A-Za-z_]*$`)
 	XML_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`[!]?[A-Za-z_]+[0-9A-Za-z_\-.:]*`)
-	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`([#][0-9a-fA-F]{8})|([#][0-9a-fA-F]{6})|([#][0-9a-fA-F]{4})|([#][0-9a-fA-F]{3})|([0-9A-Za-z_]+[0-9A-Za-z_\-%.]*)`)
-	FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
+	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`([#][0-9a-fA-F]{8})|([#][0-9a-fA-F]{6})|([#][0-9a-fA-F]{4})|([#][0-9a-fA-F]{3})|([0-9A-Za-z_]+[0-9A-Za-z_\-%\.]*)`)
+	//FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP
   CSS_WORD_REGEXP                = regexp.MustCompile(`[a-zA-Z0-9\-#\.]+\b`)
   CSS_WORD_OR_LITERAL_REGEXP     = CSS_WORD_REGEXP

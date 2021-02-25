@@ -81,7 +81,7 @@ func WriteHeaders() string {
     rpcServerHeader,
 		webAssemblyEnvHeader,
     webGLProgramHeader,
-		searchIndexHeader,
+		//searchIndexHeader,
     mathFontHeader,
 	}
 

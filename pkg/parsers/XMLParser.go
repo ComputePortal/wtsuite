@@ -47,6 +47,20 @@ var xmlParserSettings = ParserSettings{
 				info:            "double quotes",
 				trackStarts:     true,
 			},
+      quotedGroupSettings{
+        maskType:        FORMULA,
+        groupPattern:    patterns.HTML_SCRIPT_GROUP,
+        assertStopMatch: true,
+        info:            "script",
+        trackStarts:     true,
+      },
+      quotedGroupSettings{
+        maskType:        FORMULA,
+        groupPattern:    patterns.HTML_STYLE_GROUP,
+        assertStopMatch: true,
+        info:            "style",
+        trackStarts:     true,
+      },
 		},
 	},
 	formulas: formulasSettings{
@@ -83,7 +97,15 @@ func NewXMLParserFromBytes(rawBytes []byte, path string) (*XMLParser, error) {
 	ctx := context.NewContext(src, path)
 	p := &XMLParser{newParser(raw, xmlParserSettings, ctx)}
 
-  // dont mask anything yet, because style/script/text tags can contain anything
+  if err := p.maskFormulas(); err != nil {
+    return nil, err
+  }
+
+  /*for i, m := range p.mask {
+    if m == STRING {
+      p.mask[i] = NONE // keep only the formulas
+    }
+  }*/
 
 	return p, nil
 }
@@ -107,28 +129,31 @@ func NewEmptyXMLParser(ctx context.Context) *XMLParser {
 }
 
 func (p *XMLParser) Refine(start, stop int) *XMLParser {
-	return &XMLParser{p.refine(start, stop)}
+  sub := &XMLParser{p.refine(start, stop)}
+
+  return sub
 }
 
 // used only for attributes
-func (p *XMLParser) tokenize() ([]raw.Token, error) {
+/*func (p *XMLParser) tokenize() ([]raw.Token, error) {
 	ts, err := p.Parser.tokenize()
 	if err != nil {
 		return nil, err
 	}
 
 	return p.nestOperators(ts)
-}
+}*/
 
 func (p *XMLParser) parseAttributes(ctx context.Context) (*html.RawDict, error) {
+	result := html.NewEmptyRawDict(ctx)
+
 	ts, err := p.tokenize()
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
 	ts = p.expandTmpGroups(ts)
 
-	result := html.NewEmptyRawDict(ctx)
 
 	appendKeyVal := func(k *raw.Word, v html.Token) error {
 		if other, otherValue_, ok := result.GetKeyValue(k.Value()); ok {
@@ -177,20 +202,20 @@ func (p *XMLParser) parseAttributes(ctx context.Context) (*html.RawDict, error) 
 	for i < len(ts) {
 		key, err := raw.AssertWord(ts[i])
 		if err != nil {
-			return nil, err
+			return result, err
 		}
 
 		if (i + 1) < len(ts) {
 			switch t := ts[i+1].(type) {
 			case *raw.Symbol:
 				if _, err := raw.AssertSymbol(t, patterns.EQUAL); err != nil {
-					return nil, err
+					return result, err
 				}
 
 				if (i + 2) < len(ts) {
 					val := ts[i+2]
 					if err := raw.AssertNotSymbol(val); err != nil {
-						return nil, err
+						return result, err
 					}
 
 					vs := []raw.Token{val}
@@ -203,28 +228,28 @@ func (p *XMLParser) parseAttributes(ctx context.Context) (*html.RawDict, error) 
 					}
 
 					if err := convertAppendKeyVal(key, vs); err != nil {
-						return nil, err
+						return result, err
 					}
 
 					i += 3
 				} else {
 					errCtx := t.Context()
-					return nil, errCtx.NewError("Syntax Error: expected more")
+					return result, errCtx.NewError("Syntax Error: expected more")
 				}
 			case *raw.Word:
 				if err := appendFlag(key); err != nil {
-					return nil, err
+					return result, err
 				}
 				// leave ts[i+1] to next iteration
 				i++
 			default:
 				errCtx := t.Context()
-				return nil, errCtx.NewError("Syntax Error: bad attribute")
+				return result, errCtx.NewError("Syntax Error: bad attribute")
 			}
 		} else {
 			// append a flag
 			if err := appendFlag(key); err != nil {
-				return nil, err
+				return result, err
 			}
 
 			i++
@@ -234,37 +259,297 @@ func (p *XMLParser) parseAttributes(ctx context.Context) (*html.RawDict, error) 
 	return result, nil
 }
 
+// script or 
+func (p *XMLParser) maskFormula(tagName string) error {
+  inSingleQuotes := false
+  inTag := false
+  inDoubleQuotes := false
+  inComment := false
+
+  //re := patterns.TAG_NAME_REGEXP
+
+  formulaStarting := false
+  formulaStart := -1
+
+  tmpPos := p.pos
+  
+  p.pos = 0
+  for p.pos < p.Len() {
+    c := p.raw[p.pos]
+
+    if inComment {
+      if p.pos > 2 && c == '>' && p.raw[p.pos-1] == '-' && p.raw[p.pos-2] == '-' {
+        inComment = false
+      } 
+
+      p.pos += 1
+    } else if !inTag {
+      if c == '<' {
+        if p.pos < p.Len() - 3 && p.raw[p.pos+1] == '!' && p.raw[p.pos+2] == '-' && p.raw[p.pos+3] == '-' {
+          inComment = true
+          p.pos += 4
+          continue
+        }
+
+        inTag = true
+
+        closing := false
+        if p.pos < p.Len() - 1 {
+          if p.raw[p.pos+1] == '/' {
+            closing = true
+            p.pos += 1
+          } 
+        }
+
+        pos := p.pos
+        // TODO: replace by simply searching the next whitespace
+        rname0 := pos+1
+        rname1 := pos+1
+        foundName := false
+        for true {
+          c := p.raw[rname1]
+          if (c == ' ') || (c == '\n') || (c == '/') || (c == '>') || (c == '"') || (c == '\'') {
+            foundName = true
+            p.pos = rname1
+            break
+          } else {
+            rname1 += 1
+          }
+        }
+
+        /*rname, _, ok := p.nextMatch(re, false)
+
+        if ok {
+          if !foundName {
+            panic("algo error 1")
+          } else if rname[0] != rname0 {
+            fmt.Println(rname, rname0)
+            panic("algo error 2")
+          } else if rname[1] != rname1 {
+            nameCtx := p.NewContext(rname[0], rname[1])
+            fmt.Println(rname, rname1)
+            fmt.Println(nameCtx.NewError("name match").Error())
+            panic("algo error 3")
+          }
+        }*/
+        rname, ok := [2]int{rname0, rname1}, foundName
+
+        name := p.Write(pos+1, rname[1])
+        if ok && name == tagName {
+          if !closing {
+            if formulaStart == -1 {
+              formulaStarting = true
+            } else {
+              inTag = false
+            }
+          } else {
+            if formulaStart != -1 {
+              p.SetMask(formulaStart, rname[0] - 2, FORMULA)
+              formulaStart = -1
+            }
+
+            p.nextMatch(patterns.TAG_STOP_REGEXP, false)
+
+            inTag = false
+          }
+        } else {
+          p.pos = pos + 1
+
+          if formulaStart != -1 {
+            inTag = false
+          }
+        }
+      } else {
+        p.pos += 1
+      }
+    } else {
+      if inSingleQuotes {
+        if c == '\'' {
+          inSingleQuotes = false
+        }
+      } else if inDoubleQuotes {
+        if c == '"' {
+          inDoubleQuotes = false
+        }
+      } else if c == '>' {
+        inTag = false
+        if formulaStarting {
+          formulaStart = p.pos + 1
+          formulaStarting = false
+        }
+      } else if c == '\'' {
+        inSingleQuotes = true
+      } else if c == '"' {
+        inDoubleQuotes = true
+      }
+
+      p.pos += 1
+    }
+  }
+
+  p.pos = tmpPos
+
+  return nil
+}
+
+func (p *XMLParser) maskFormulas() error {
+  if err := p.maskFormula("script"); err != nil {
+    return err
+  }
+
+  if err := p.maskFormula("style"); err != nil {
+    return err
+  }
+
+  return nil
+}
+
 // returns string of end
-func (p *XMLParser) findTagEnd() ([2]int, string, bool) {
+func (p *XMLParser) findTagEnd(stopSymbol string) ([2]int, string, bool) {
   inSingleQuotes := false
   inDoubleQuotes := false
+
+  nStop := len(stopSymbol)
+
+  isComment := stopSymbol == "-->"
 
   pos := p.pos
   for ;pos < p.Len(); pos++ {
     c := p.raw[pos]
-    if inDoubleQuotes {
-      if c == '"' {
-        inDoubleQuotes = false
-      }
-    } else if inSingleQuotes {
-      if c == '\'' {
-        inSingleQuotes = false
-      }
-    } else if c == '"' {
-      inDoubleQuotes = true
-    } else if c == '\'' {
-      inSingleQuotes = true
-    } else if c == '>' {
 
-      if p.raw[pos-1] == '/' {
-        return [2]int{pos-1, pos+1}, "/>", true
-      } else {
-        return [2]int{pos, pos+1}, ">", true
+    if isComment {
+      // quotes dont matter inside xml comments
+      if c == '>' {
+        if pos > nStop && string(p.raw[pos-nStop+1:pos+1]) == stopSymbol {
+          p.pos = pos + 1
+          return [2]int{pos-nStop+1, pos+1}, stopSymbol, true
+        } 
+      }
+    } else {
+      if inDoubleQuotes {
+        if c == '"' {
+          inDoubleQuotes = false
+        }
+      } else if inSingleQuotes {
+        if c == '\'' {
+          inSingleQuotes = false
+        }
+      } else if c == '"' {
+        inDoubleQuotes = true
+      } else if c == '\'' {
+        inSingleQuotes = true
+      } else if c == '>' {
+        if stopSymbol == ">" && p.raw[pos-1] == '/' {
+          p.pos = pos+1
+          return [2]int{pos-1, pos+1}, "/>", true
+        } else if pos > nStop && string(p.raw[pos-nStop+1:pos+1]) == stopSymbol {
+          p.pos = pos + 1
+          return [2]int{pos-nStop+1, pos+1}, stopSymbol, true
+        } else {
+          continue
+        }
       }
     }
   }
 
   return [2]int{0, 0,}, "", false
+}
+
+// p.pos is advanced if stop is found, otherwise it is unchanged
+func (p *XMLParser) findStopTag(tagName string, inScript bool) ([2]int, bool) {
+  count := 0
+  
+  inSingleQuotes := false
+  inTag := false
+  inDoubleQuotes := false
+  inComment := false
+
+  re := patterns.TAG_NAME_REGEXP
+
+  start := p.pos
+  for ;p.pos < p.Len(); {
+    if p.mask[p.pos] == FORMULA {
+      p.pos += 1
+      continue
+    }
+
+    c := p.raw[p.pos]
+
+    if inComment {
+      if p.pos > 2 && c == '>' && p.raw[p.pos-1] == '-' && p.raw[p.pos-2] == '-' {
+        inComment = false
+      } 
+
+      p.pos += 1
+    } else if !inTag {
+      if c == '<' {
+        if p.pos < p.Len() - 3 && p.raw[p.pos+1] == '!' && p.raw[p.pos+2] == '-' && p.raw[p.pos+3] == '-' {
+          inComment = true
+          p.pos += 4
+          continue
+        }
+
+        if !inScript {
+          inTag = true
+        }
+
+        closing := false
+        if p.pos < p.Len() - 1 {
+          if p.raw[p.pos+1] == '/' {
+            closing = true
+            p.pos += 1
+          } 
+        }
+
+        rname, name, ok := p.nextMatch(re, true)
+        if ok && name == tagName {
+          if !closing {
+            if !inScript {
+              count += 1
+            }
+          } else {
+
+            if count == 0 {
+              rend, _, ok := p.nextMatch(patterns.TAG_STOP_REGEXP, false)
+
+              if ok {
+                //p.pos = start
+                return [2]int{rname[0] - 2, rend[1]}, true
+              } else {
+                return [2]int{rname[0] - 2, rname[1]}, true
+              }
+            }
+
+            count -= 1
+          }
+        }
+      } else {
+        p.pos += 1
+      }
+    } else {
+      if inSingleQuotes {
+        if c == '\'' {
+          inSingleQuotes = false
+        }
+      } else if inDoubleQuotes {
+        if c == '"' {
+          inDoubleQuotes = false
+        }
+      } else if c == '>' {
+        inTag = false
+      } else if c == '\'' {
+        inSingleQuotes = true
+      } else if c == '"' {
+        inDoubleQuotes = true
+      }
+
+      p.pos += 1
+    }
+  }
+
+  p.pos = start
+
+  return [2]int{0, 0}, false
 }
 
 func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
@@ -294,15 +579,16 @@ func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
 			rprev = r
 
 			if rname, name, ok := p.nextMatch(patterns.TAG_NAME_REGEXP, false); ok {
-				/*stopRegexp := patterns.TAG_STOP_REGEXP
+				stopSymbol := ">"
 				if name == "?xml" {
-					stopRegexp = patterns.XML_HEADER_STOP_REGEXP
+					stopSymbol = "?>"
 				} else if name == "!--" {
-          stopRegexp = patterns.XML_COMMENT_STOP_REGEXP
-        }*/
+          stopSymbol = "-->"
+        }
 
-				if rr, s, ok := p.findTagEnd(); ok {
-          if name == "!--" {
+				if rr, s, ok := p.findTagEnd(stopSymbol); ok {
+          if name == "!--" || (rname[0] > 0 && p.raw[rname[0]-1] == '/') {
+            // skip if tag is comment, or if tag is redundant stop tag
             rprev = rr
             continue
           } 
@@ -310,12 +596,13 @@ func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
 					ctx := context.MergeContexts(p.NewContext(r[0], rname[1]), p.NewContext(rr[0], rr[1]))
 
 					attrParser := p.Refine(rname[1], rr[0])
+          attrParser.Reset()
           if err := attrParser.maskQuoted(); err != nil {
             return nil, err
           }
 
 					attr, err := attrParser.parseAttributes(ctx) // this is where the magic happens
-					if err != nil {
+					if err != nil && attr == nil { // some attributes might be correctly parsed
 						return nil, err
 					}
 
@@ -325,7 +612,8 @@ func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
             // single and double quotes need to be matched, during search for stops
             // it is unlikely that the comments comment out the tags
             // the ScriptTagGroup keeps track of the quotes
-            if rrr, ok := p.nextGroupStopMatch(patterns.NewScriptTagGroup(name), true); ok {
+            //if rrr, ok := p.nextGroupStopMatch(patterns.NewScriptTagGroup(name), true); ok {
+            if rrr, ok := p.findStopTag(name, true); ok {
 
               ctx = context.MergeContexts(ctx, p.NewContext(rrr[0], rrr[1]))
               subParser := p.Refine(rr[1], rrr[0])
@@ -345,12 +633,16 @@ func (p *XMLParser) BuildTags() ([]*html.Tag, error) {
                 panic("shouldn't get here")
               }
 
-              if rrr, ok := p.nextGroupStopMatch(patterns.NewTagGroup(name), true); ok {
+              if rrr, ok := p.findStopTag(name, false); ok {
+              //if rrr, ok := p.nextGroupStopMatch(patterns.NewTagGroup(name), true); ok {
                 ctx = context.MergeContexts(ctx, p.NewContext(rrr[0], rrr[1]))
                 subParser = p.Refine(rr[1], rrr[0])
                 rprev = rrr
               } else {
-                return nil, ctx.NewError("Syntax Error: unmatched tag (" + name + ")")
+                // don't actually throw an error, just ignore
+                //return nil, ctx.NewError("Syntax Error: stop tag not found (" + name + ")")
+                p.pos = rr[1]
+                continue
               }
             }
 

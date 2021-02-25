@@ -14,13 +14,35 @@ const (
 
 type contextLines struct {
 	ctx         *Context
-	lines       []string
+	lines       [][]rune
 	active      []bool
 	first, last int
 }
 
+func splitRuneLines(runes []rune) [][]rune {
+  lines := [][]rune{}
+
+  last := -1
+  for i, r := range runes{
+    if r == '\n' {
+      if i > last+1 {
+        lines = append(lines, runes[last+1:i])
+      } else {
+        lines = append(lines, []rune{})
+      }
+      last = i
+    }
+  }
+
+  if last+1 < len(runes) {
+    lines = append(lines, runes[last+1:])
+  }
+
+  return lines
+}
+
 func (c *Context) newContextLines() contextLines {
-	lines := strings.Split(strings.Trim(c.source.source, "\n"), "\n")
+	lines := splitRuneLines(c.source.source)
 	active := make([]bool, len(lines))
 
 	first, last := -1, -1
@@ -76,7 +98,7 @@ func (cl *contextLines) pad(np int) {
 	}
 }
 
-func (cl *contextLines) loopLines(fn func(il, al, bl int, line string, active bool)) {
+func (cl *contextLines) loopLines(fn func(il, al, bl int, line []rune, active bool)) {
 	al, bl := 0, 0
 	for il, line := range cl.lines {
 		bl = al + len(line)
@@ -98,7 +120,7 @@ func (cl *contextLines) write(lnf string) string {
 
 	prevLine := -1
 
-	cl.loopLines(func(il, al, bl int, line string, active bool) {
+	cl.loopLines(func(il, al, bl int, line []rune, active bool) {
 		c := cl.ctx.slice(al, bl)
 
 		if active {
@@ -114,15 +136,15 @@ func (cl *contextLines) write(lnf string) string {
 			prevStop := 0
 			for _, r := range c.ranges {
 				start, stop := r.start-al, r.stop-al
-				b.WriteString(line[prevStop:start])
+				b.WriteString(string(line[prevStop:start]))
 				b.WriteString(HIGHLIGHT_START)
-				b.WriteString(line[start:stop])
+				b.WriteString(string(line[start:stop]))
 				b.WriteString(HIGHLIGHT_STOP)
 				prevStop = stop
 			}
 
 			if prevStop < len(line) {
-				b.WriteString(line[prevStop:])
+				b.WriteString(string(line[prevStop:]))
 			}
 
 			prevLine = il
