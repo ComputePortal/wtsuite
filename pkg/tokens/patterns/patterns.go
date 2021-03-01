@@ -144,7 +144,7 @@ var (
 	TEMPLATE_WORD_OR_LITERAL_REGEXP    = regexp.MustCompile(`([#][0-9a-fA-F]{8})|([#][0-9a-fA-F]{6})|([#][0-9a-fA-F]{4})|([#][0-9a-fA-F]{3})|([0-9A-Za-z_]+[0-9A-Za-z_\-%\.]*)`)
 	//FORMULA_WORD_OR_LITERAL_REGEXP = regexp.MustCompile(`[!#$]?[0-9A-Za-z_]+[0-9A-Za-z_\-.%]*`)
 	GLSL_WORD_REGEXP               = JS_WORD_REGEXP
-  CSS_WORD_REGEXP                = regexp.MustCompile(`[a-zA-Z0-9\-#\.]+\b`)
+  CSS_WORD_REGEXP                = regexp.MustCompile(`[a-zA-Z0-9\-#\._]+\b`)
   CSS_WORD_OR_LITERAL_REGEXP     = CSS_WORD_REGEXP
 
 	// must match hex before number (because otherwise the '0' before the 'x' becomes a token by itself)

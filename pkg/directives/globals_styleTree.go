@@ -62,7 +62,7 @@ func (t *PStyle) Get(scope tokens.Scope, idx_ tokens.Token, ctx context.Context)
 // search in incoming attr first, the search in parent styles
 // used by Math and SVG to search for color
 // scope is needed for permissiveness
-func SearchStyle(node Node, scope Scope, tagAttr *tokens.StringDict, key string, ctx context.Context) (tokens.Token, error) {
+/*func SearchStyle(node Node, scope Scope, tagAttr *tokens.StringDict, key string, ctx context.Context) (tokens.Token, error) {
 	if styleToken_, ok := tagAttr.Get("style"); ok && !tokens.IsNull(styleToken_) {
 		styleToken, err := tokens.AssertStringDict(styleToken_)
 		if err != nil {
@@ -75,4 +75,4 @@ func SearchStyle(node Node, scope Scope, tagAttr *tokens.StringDict, key string,
 	}
 
   return node.SearchStyle(scope, tokens.NewValueString(key, ctx), ctx)
-}
+}*/

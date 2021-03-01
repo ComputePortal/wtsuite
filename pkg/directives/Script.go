@@ -25,11 +25,6 @@ func Script(scope Scope, node Node, tag *tokens.Tag) error {
 		return err
 	}
 
-	if idToken, ok := attr.Get("id"); ok {
-		errCtx := idToken.Context()
-		return errCtx.NewError("Error: id for scripts is meaningless")
-	}
-
 	content := ""
 	_, ok := attr.Get("value")
 	if ok {

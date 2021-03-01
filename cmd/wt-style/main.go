@@ -8,6 +8,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/cache"
 	"github.com/computeportal/wtsuite/pkg/directives"
 	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/git"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
@@ -34,6 +35,7 @@ type CmdArgs struct {
   pxPerRem int
 
   compactOutput bool
+  autoDownload bool
   verbosity int
 }
 
@@ -54,6 +56,7 @@ func parseArgs() CmdArgs {
     mathFontURL: DEFAULT_MATHFONTURL,
     pxPerRem: DEFAULT_PX_PER_REM,
 		compactOutput: false,
+    autoDownload: false,
 		verbosity:     0,
 	}
 
@@ -66,6 +69,7 @@ func parseArgs() CmdArgs {
       parsers.NewCLIUniqueFile("o", "output"        , "-o, --output <file>    Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
       parsers.NewCLIUniqueString("", "math-font-url", "--math-font-url <url>  Defaults to \"" + DEFAULT_MATHFONTURL + "\"", &(cmdArgs.mathFontURL)),
       parsers.NewCLIUniqueInt("", "px-per-rem"      , "--px-per-rem <int>     Defaults to " + strconv.Itoa(DEFAULT_PX_PER_REM), &(cmdArgs.pxPerRem)),
+      parsers.NewCLIUniqueFlag("", "auto-download"         , "--auto-download                   Automatically download missing packages (use wt-pkg-sync if you want to do this manually). Doesn't update packages!", &(cmdArgs.autoDownload)), 
       parsers.NewCLIUniqueFlag("l", "latest"        , "-l, --latest           Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
       parsers.NewCLICountFlag("v", ""               , "-v[v[v..]]             Verbosity", &(cmdArgs.verbosity)),
     },
@@ -95,6 +99,10 @@ func setUpEnv(cmdArgs CmdArgs) error {
 	if cmdArgs.pxPerRem > 0 {
 		tokens.PX_PER_REM = cmdArgs.pxPerRem
 	}
+
+  if cmdArgs.autoDownload {
+    git.RegisterFetchPublicOrPrivate()
+  }
 
   directives.MATH_FONT = "FreeSerifMath"
   directives.MATH_FONT_FAMILY = "FreeSerifMath, FreeSerif" // keep original FreeSerif as backup

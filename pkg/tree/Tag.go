@@ -8,7 +8,7 @@ import (
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tokens/patterns"
 
-	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	//"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 type Tag interface {
@@ -34,7 +34,7 @@ type Tag interface {
   Siblings() []Tag
   LaterSiblings() []Tag // tags that come after!
 
-	CollectScripts(bundle *scripts.InlineBundle) error
+	//CollectScripts(bundle *scripts.InlineBundle) error
 
 	Validate() error
 	Write(indent string, nl, tab string) string
@@ -113,7 +113,7 @@ func (t *tagData) Attributes() *tokens.StringDict {
 	return t.attributes
 }
 
-func (t *tagData) CollectScripts(bundle *scripts.InlineBundle) error {
+/*func (t *tagData) CollectScripts(bundle *scripts.InlineBundle) error {
 	// scripts themselves dont have children, so can easily override this
 	newChildren := make([]Tag, 0)
 	for _, child := range t.children {
@@ -131,7 +131,7 @@ func (t *tagData) CollectScripts(bundle *scripts.InlineBundle) error {
 	t.children = newChildren
 
 	return nil
-}
+}*/
 
 func (t *tagData) collectAttributeClasses() ([]string, error) {
 	result := make([]string, 0)
@@ -184,10 +184,10 @@ func (t *tagData) collectAttributeClasses() ([]string, error) {
 	return result, nil
 }
 
-func (t *tagData) writeAttributes() string {
+func writeAttributes(attr *tokens.StringDict) string {
 	var b strings.Builder
 
-	if err := t.attributes.Loop(func(key *tokens.String, val tokens.Token, last bool) error {
+	if err := attr.Loop(func(key *tokens.String, val tokens.Token, last bool) error {
 		// val can also be null, in which case we skip writing it
 		if tokens.IsNull(val) || tokens.IsFalseBool(val) {
 			return nil
@@ -243,6 +243,10 @@ func (t *tagData) writeAttributes() string {
 	}
 
 	return b.String()
+}
+
+func (t *tagData) writeAttributes() string {
+  return writeAttributes(t.attributes)
 }
 
 func (t *tagData) writeStartStop(wrapAutoHref bool, indent string, stop bool) string {

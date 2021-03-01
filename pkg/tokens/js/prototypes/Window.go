@@ -67,6 +67,8 @@ func (p *Window) GetInstanceMember(key string, includePrivate bool, ctx context.
     return values.NewFunction([]values.Value{s, s}, ctx), nil
   case "blur", "close", "focus":
     return values.NewFunction([]values.Value{nil}, ctx), nil
+  case "crypto":
+    return NewCrypto(ctx), nil
   case "devicePixelRatio", "innerHeight", "innerWidth", "scrollX", "scrollY":
     return f, nil
   case "fetch":

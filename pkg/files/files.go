@@ -10,7 +10,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 )
 
-var htmlppPath = os.Getenv("HTMLPPPATH")
+//var htmlppPath = os.Getenv("HTMLPPPATH")
 
 var (
 	JS_MODE    = false
@@ -18,12 +18,13 @@ var (
 )
 
 const (
-  JSFILE_EXT = ".wts"
+  JSFILE_EXT = ".wts" // used by refactor and grapher
 )
 
 var StartCacheUpdate func(fname string) = nil
 var AddCacheDependency func(fname string, dep string) = nil
 var HasUpstreamCacheDependency func(thisPath string, upstreamPath string) bool = nil
+var FetchPublicOrPrivate func(url string, smv *SemVerRange) (string, error) = nil
 
 func IsFile(fname string) bool {
 	if info, err := os.Stat(fname); os.IsNotExist(err) {

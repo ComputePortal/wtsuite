@@ -3,7 +3,7 @@ package tree
 import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
-	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	//"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 // implements Tag interface
@@ -40,9 +40,9 @@ func (t *LeafTag) CollectIDs(idMap IDMap) error {
 	return nil
 }
 
-func (t *LeafTag) CollectScripts(bundle *scripts.InlineBundle) error {
+/*func (t *LeafTag) CollectScripts(bundle *scripts.InlineBundle) error {
 	return nil
-}
+}*/
 
 func (t *LeafTag) Attributes() *tokens.StringDict {
 	return nil

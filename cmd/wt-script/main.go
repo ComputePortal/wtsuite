@@ -9,6 +9,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/cache"
 	"github.com/computeportal/wtsuite/pkg/directives"
 	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/git"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
 	"github.com/computeportal/wtsuite/pkg/tokens/js/macros"
@@ -35,6 +36,7 @@ type CmdArgs struct {
 	compactOutput bool
 	forceBuild    bool // delete cache and start fresh
   executable    bool // create an executable
+  autoDownload  bool
 
 	verbosity int
 }
@@ -62,6 +64,7 @@ func parseArgs() CmdArgs {
 		compactOutput: false,
 		forceBuild:    false,
     executable:    false,
+    autoDownload:  false,
 		verbosity:     0,
 	}
 
@@ -74,6 +77,7 @@ func parseArgs() CmdArgs {
       parsers.NewCLIUniqueFlag("f", "force"     , "-f, --force                 Force a complete project rebuild", &(cmdArgs.forceBuild)),
       parsers.NewCLIUniqueEnum("t", "target"    , "-t, --target <js-target>    Defaults to \"" + DEFAULT_TARGET + "\", other possibilities are \"browser\" or \"worker\"", []string{"nodejs", "browser", "worker"}, &(cmdArgs.target)),
       parsers.NewCLIUniqueFlag("x", "executable", "-x, --executable            Create an executable with a node hashbang (target must be nodejs)", &(cmdArgs.executable)),
+      parsers.NewCLIUniqueFlag("", "auto-download"         , "--auto-download                   Automatically download missing packages (use wt-pkg-sync if you want to do this manually). Doesn't update packages!", &(cmdArgs.autoDownload)), 
       parsers.NewCLIUniqueFlag("l", "latest"    , "-l, --latest                Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
       parsers.NewCLICountFlag("v", ""           , "-v[v[v..]]                  Verbosity", &(cmdArgs.verbosity)),
     },
@@ -100,6 +104,10 @@ func setUpEnv(cmdArgs CmdArgs) error {
 		patterns.COMPACT_NAMING = true
 		macros.COMPACT = true
 	}
+
+  if cmdArgs.autoDownload {
+    git.RegisterFetchPublicOrPrivate()
+  }
 
 	js.TARGET = cmdArgs.target
 	directives.ForceNewViewFileScriptRegistration(directives.NewFileCache())

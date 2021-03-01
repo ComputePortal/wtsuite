@@ -93,7 +93,12 @@ func buildSVGArrowHead(l, x0, y0, tx, ty, sw float64, ctx context.Context) (tree
 		styleVal.Set("fill", fillVal)
 	}
 
-	attr.Set("style", styleVal)
+  styleStr, err := styleVal.ToString("", "")
+  if err != nil {
+    panic(err)
+  }
+
+	attr.Set("style", tokens.NewValueString(styleStr, ctx))
 
 	tag, err := svg.BuildPath(attr, pcs, ctx)
 	if err != nil {
@@ -103,7 +108,7 @@ func buildSVGArrowHead(l, x0, y0, tx, ty, sw float64, ctx context.Context) (tree
 	return tag, nil
 }
 
-func searchSVGStrokeWidth(node Node, scope Scope, attr *tokens.StringDict,
+/*func searchSVGStrokeWidth(node Node, scope Scope, attr *tokens.StringDict,
 	ctx context.Context) (*tokens.Float, error) {
 	swToken_, err := SearchStyle(node, scope, attr, "stroke-width", ctx)
 	if err != nil {
@@ -115,7 +120,7 @@ func searchSVGStrokeWidth(node Node, scope Scope, attr *tokens.StringDict,
 	} else {
 		return tokens.AssertIntOrFloat(swToken_)
 	}
-}
+}*/
 
 func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 	if err := tag.AssertEmpty(); err != nil {
@@ -126,7 +131,7 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 
 	subScope := NewSubScope(scope)
 
-	attr, err := buildAttributes(subScope, tag, []string{"d", "type"})
+	attr, err := buildAttributes(subScope, tag, []string{"d", "type", "size"})
 	if err != nil {
 		return err
 	}
@@ -143,13 +148,19 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 
 	attr.Delete("d")
 
-	// TODO: get size from stroke-width
-	sw, err := searchSVGStrokeWidth(node, scope, attr, tag.Context())
-	if err != nil {
-		return err
-	}
+  headSize := 5.0
+  if sizeToken_, ok := attr.Get("size"); ok {
+    sizeToken, err := tokens.AssertIntOrFloat(sizeToken_)
+    if err != nil {
+      return err
+    }
 
-	headSize := sw.Value() * 5
+    headSize = sizeToken.Value()
+
+    attr.Delete("size")
+  }
+
+	//headSize := sw.Value() * 5
 
 	typeToken, err := tokens.DictString(attr, "type")
 	if err != nil {
@@ -181,7 +192,7 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 		return err
 	}
 
-	pathOffset := sw.Value() / math.Sin(math.Atan(0.5*0.66))
+	pathOffset := (headSize / 5.0) / math.Sin(math.Atan(0.5*0.66))
 	startLen := 0.0
 	if hasStart {
 		startLen = pathOffset
@@ -189,7 +200,7 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 		tipX, tipY := segments[0].Position(0.0)
 		tanX, tanY := segments[0].Tangent(0.0)
 
-		startArrow, err := buildSVGArrowHead(headSize, tipX, tipY, -tanX, -tanY, sw.Value(), ctx)
+		startArrow, err := buildSVGArrowHead(headSize, tipX, tipY, -tanX, -tanY, (headSize / 5.0), ctx)
 		if err != nil {
 			return err
 		}
@@ -212,7 +223,7 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 		tipX, tipY := segments[iLast].Position(1.0)
 		tanX, tanY := segments[iLast].Tangent(1.0)
 
-		stopArrow, err := buildSVGArrowHead(headSize, tipX, tipY, tanX, tanY, sw.Value(), ctx)
+		stopArrow, err := buildSVGArrowHead(headSize, tipX, tipY, tanX, tanY, (headSize / 5.0), ctx)
 		if err != nil {
 			return err
 		}
@@ -251,7 +262,13 @@ func buildSVGArrow(scope Scope, node Node, tag *tokens.Tag) error {
 	}
 	pathStyle := tokens.NewEmptyStringDict(ctx)
 	pathStyle.Set("fill", tokens.NewValueString("none", ctx))
-	pathAttr.Set("style", pathStyle)
+
+  pathStyleStr, err := pathStyle.ToString("", "")
+  if err != nil {
+    panic(err)
+  }
+
+	pathAttr.Set("style", tokens.NewValueString(pathStyleStr, ctx))
 	pathTag, err := svg.BuildPath(pathAttr, pcs, ctx)
 	if err != nil {
 		return err

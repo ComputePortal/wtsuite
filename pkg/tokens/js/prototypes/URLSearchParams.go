@@ -42,5 +42,14 @@ func (p *URLSearchParams) GetInstanceMember(key string, includePrivate bool, ctx
 
 func (p *URLSearchParams) GetClassValue() (*values.Class, error) {
   ctx := p.Context()
-  return values.NewUnconstructableClass(NewURLSearchParamsPrototype(), ctx), nil
+  s := NewString(ctx)
+
+  return values.NewClass(
+    [][]values.Value{
+      []values.Value{},
+      []values.Value{s},
+    }, 
+    NewURLSearchParamsPrototype(), 
+    ctx,
+  ), nil
 }

@@ -99,7 +99,8 @@ func (p *JSParser) buildRegularImportStatement(ts []raw.Token, lang files.Lang) 
 
 	switch {
 	case n == 2: // simple import
-    if err := p.module.AddImportedName("", "", pathLiteral, files.SCRIPT,
+    uniqueName := "." + pathLiteral.Value()
+    if err := p.module.AddImportedName(uniqueName, "", pathLiteral, files.SCRIPT,
       context.MergeFill(ts[0].Context(), pathLiteral.Context())); err != nil {
       return err
     }

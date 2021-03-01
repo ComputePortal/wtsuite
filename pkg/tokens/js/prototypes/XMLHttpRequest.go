@@ -37,6 +37,8 @@ func (p *XMLHttpRequest) GetInstanceMember(key string, includePrivate bool, ctx 
     return values.NewFunction([]values.Value{s, s, nil}, ctx), nil
   case "status":
     return i, nil
+  case "send":
+    return values.NewFunction([]values.Value{s, nil}, ctx), nil
   case "responseText":
     return s, nil
   default:

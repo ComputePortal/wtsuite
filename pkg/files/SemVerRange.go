@@ -25,6 +25,7 @@ func (sr *SemVerRange) Max() *SemVer {
   return sr.max
 }
 
+// returns empty string if no relevant version found
 func (sr *SemVerRange) FindBestVersion(dir string) (string, error) {
   files, err := ioutil.ReadDir(dir)
   if err != nil {
@@ -55,7 +56,7 @@ func (sr *SemVerRange) FindBestVersion(dir string) (string, error) {
   }
 
   if iBest == -1 {
-    return "", errors.New("Error: no valid package versions found for " + dir)
+    return "", nil
   } else {
     return filepath.Join(dir, files[iBest].Name()), nil
   }

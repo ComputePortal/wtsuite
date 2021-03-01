@@ -4,7 +4,7 @@ import (
   "strings"
 
 	"github.com/computeportal/wtsuite/pkg/functions"
-	"github.com/computeportal/wtsuite/pkg/parsers"
+	//"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tree"
@@ -60,7 +60,7 @@ func buildAttributes(scope Scope, tag *tokens.Tag,
     return nil, err
   }
 
-	if style_, ok := attr.Get("style"); ok && tokens.IsString(style_) {
+	/*if style_, ok := attr.Get("style"); ok && tokens.IsString(style_) {
 		styleStr, err := tokens.AssertString(style_)
 		if err != nil {
 			panic(err)
@@ -72,7 +72,7 @@ func buildAttributes(scope Scope, tag *tokens.Tag,
 		}
 
 		attr.Set("style", style)
-	}
+	}*/
 
 	return attr, nil
 }

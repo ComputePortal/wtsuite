@@ -5,7 +5,7 @@ import (
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
-	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	//"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 // reuse tagData's write functions
@@ -19,7 +19,7 @@ func NewScript(attr *tokens.StringDict, content string, ctx context.Context) (Ta
 	return &Script{attr, content, NewLeafTag(ctx)}, nil
 }
 
-func (t *Script) CollectScripts(bundle *scripts.InlineBundle) error {
+/*func (t *Script) CollectScripts(bundle *scripts.InlineBundle) error {
 	srcToken_, hasSrc := t.attributes.Get("src")
 
 	if t.content != "" && hasSrc {
@@ -60,17 +60,24 @@ func (t *Script) CollectScripts(bundle *scripts.InlineBundle) error {
 	}
 
 	return nil
-}
+}*/
 
 func (t *Script) Write(indent string, nl, tab string) string {
 	var b strings.Builder
 
   b.WriteString(indent)
-  b.WriteString("<script>")
-  b.WriteString(nl)
-  b.WriteString(t.content)
-  b.WriteString(nl)
-  b.WriteString(indent)
+  b.WriteString("<script")
+
+  b.WriteString(writeAttributes(t.attributes))
+  b.WriteString(">")
+
+  if len(t.content) > 0 {
+    b.WriteString(nl)
+    b.WriteString(t.content)
+    b.WriteString(nl)
+    b.WriteString(indent)
+  }
+
   b.WriteString("</script>")
   b.WriteString(nl)
 

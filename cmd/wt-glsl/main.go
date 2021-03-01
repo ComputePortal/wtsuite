@@ -7,6 +7,7 @@ import (
   "os"
 
 	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/git"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tree/shaders"
 	"github.com/computeportal/wtsuite/pkg/tokens/glsl"
@@ -27,6 +28,7 @@ type CmdArgs struct {
 
   target string
   compactOutput bool
+  autoDownload bool
 
   verbosity int
 }
@@ -48,6 +50,7 @@ func parseArgs() CmdArgs {
 		outputFile:    DEFAULT_OUTPUTFILE,
     target:        "vertex",
 		compactOutput: false,
+    autoDownload:  false,
 		verbosity:     0,
 	}
 
@@ -57,6 +60,7 @@ func parseArgs() CmdArgs {
     []parsers.CLIOption{
       parsers.NewCLIUniqueFile("o", "output" , "-o, --output    <output-file> Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
       parsers.NewCLIUniqueFlag("c", "compact", "-c, --compact   Compact output with minimal whitespace and short names", &(cmdArgs.compactOutput)),
+      parsers.NewCLIUniqueFlag("", "auto-download"         , "--auto-download                   Automatically download missing packages (use wt-pkg-sync if you want to do this manually). Doesn't update packages!", &(cmdArgs.autoDownload)), 
       parsers.NewCLIUniqueEnum("t", "target" , "-t, --target    \"vertex\" or \"fragment\", defaults to \"vertex\"", []string{"vertex", "fragment"}, &(cmdArgs.target)),
       parsers.NewCLICountFlag("v", ""        , "-v[v[v..]]      Verbosity", &(cmdArgs.verbosity)),
       parsers.NewCLIUniqueFlag("l", "latest" , "-l, --latest    Ignore max semver, use latest tagged versions of dependencies", &(files.LATEST)),
@@ -80,6 +84,10 @@ func setUpEnv(cmdArgs CmdArgs) error {
 
   if cmdArgs.target != "" {
     glsl.TARGET = cmdArgs.target
+  }
+
+  if cmdArgs.autoDownload {
+    git.RegisterFetchPublicOrPrivate()
   }
 
 	VERBOSITY = cmdArgs.verbosity

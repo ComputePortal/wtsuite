@@ -8,6 +8,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/cache"
 	"github.com/computeportal/wtsuite/pkg/directives"
 	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/git"
 	"github.com/computeportal/wtsuite/pkg/parsers"
   tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
@@ -38,6 +39,7 @@ type CmdArgs struct {
   mathFontURL string
   pxPerRem int
   autoLink bool
+  autoDownload bool
 
   // stylesheets and js is included inline
 
@@ -63,6 +65,7 @@ func parseArgs() CmdArgs {
     mathFontURL: DEFAULT_MATHFONTURL,
     pxPerRem: DEFAULT_PX_PER_REM,
     autoLink: false,
+    autoDownload: false,
 		compactOutput: false,
 		verbosity:     0,
 	}
@@ -73,7 +76,7 @@ func parseArgs() CmdArgs {
     []parsers.CLIOption{
       parsers.NewCLIUniqueFlag("c", "compact"       , "-c, --compact          Compact output with minimal whitespace and short names", &(cmdArgs.compactOutput)),
       parsers.NewCLIUniqueFlag("", "auto-link"      , "--auto-link            Convert tags to <a> automatically if they have href attribute", &(cmdArgs.autoLink)),
-  
+      parsers.NewCLIUniqueFlag("", "auto-download"         , "--auto-download                   Automatically download missing packages (use wt-pkg-sync if you want to do this manually). Doesn't update packages!", &(cmdArgs.autoDownload)), 
       parsers.NewCLIUniqueFile("o", "output"        , "-o, --output <file>    Defaults to \"" + DEFAULT_OUTPUTFILE + "\" if not set", false, &(cmdArgs.outputFile)),
       parsers.NewCLIUniqueFile("", "control"        , "--control <file>       Optional control file", true, &(cmdArgs.control)),
       parsers.NewCLIUniqueString("", "math-font-url", "--math-font-url <url>  Defaults to \"" + DEFAULT_MATHFONTURL + "\"", &(cmdArgs.mathFontURL)),
@@ -108,6 +111,10 @@ func setUpEnv(cmdArgs CmdArgs) error {
 	if cmdArgs.autoLink {
 		tree.AUTO_LINK = true
 	}
+
+  if cmdArgs.autoDownload {
+    git.RegisterFetchPublicOrPrivate()
+  }
 
 	if cmdArgs.pxPerRem > 0 {
 		tokens.PX_PER_REM = cmdArgs.pxPerRem

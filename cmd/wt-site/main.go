@@ -13,6 +13,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/cache"
 	"github.com/computeportal/wtsuite/pkg/directives"
 	"github.com/computeportal/wtsuite/pkg/files"
+	"github.com/computeportal/wtsuite/pkg/git"
 	"github.com/computeportal/wtsuite/pkg/parsers"
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
@@ -40,6 +41,7 @@ type CmdArgs struct {
 	forceBuild    bool
 	noAliasing    bool
 	autoLink      bool
+  autoDownload  bool 
 	profFile      string
 
 	verbosity int // defaults to zero, every -v[v[v]] adds a level
@@ -64,6 +66,7 @@ func parseArgs() CmdArgs {
 		forceBuild:    false,
 		noAliasing:    false,
 		autoLink:      false,
+    autoDownload:  false,
 		profFile:      "",
 		verbosity:     0,
 	}
@@ -77,6 +80,7 @@ func parseArgs() CmdArgs {
       parsers.NewCLIUniqueFlag("c", "compact"          , "-c, --compact                 Compact output with minimal whitespace, newline etc.", &(cmdArgs.compactOutput)),
       parsers.NewCLIUniqueFlag("f", "force"            , "-f, --force                   Force a complete project build", &(cmdArgs.forceBuild)),
       parsers.NewCLIUniqueFlag("", "auto-link"         , "--auto-link                   Convert tags to <a> automatically if they have the 'href' attribute", &(cmdArgs.autoLink)), 
+      parsers.NewCLIUniqueFlag("", "auto-download"         , "--auto-download                   Automatically download missing packages (use wt-pkg-sync if you want to do this manually). Doesn't update packages!", &(cmdArgs.autoDownload)), 
       parsers.NewCLIUniqueFlag("", "no-aliasing"       , "--no-aliasing                 Don't allow standard html tags to be aliased", &(cmdArgs.noAliasing)),
       parsers.NewCLIUniqueKeyValue("D"                 , "-D<name> <value>              Define a global variable with a value", cmdArgs.GlobalVars),
       parsers.NewCLIUniqueKey("B"                      , "-B<name>                      Define a global flag (its value is an empty string)", cmdArgs.GlobalVars),
@@ -170,6 +174,10 @@ func setUpEnv(cmdArgs CmdArgs, cfg *config.Config) error {
 	if cmdArgs.autoLink {
 		tree.AUTO_LINK = true
 	}
+
+  if cmdArgs.autoDownload {
+    git.RegisterFetchPublicOrPrivate()
+  }
 
 	if cfg.PxPerRem != 0 {
 		tokens.PX_PER_REM = cfg.PxPerRem

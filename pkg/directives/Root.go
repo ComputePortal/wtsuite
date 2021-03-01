@@ -2,7 +2,7 @@ package directives
 
 import (
 	"github.com/computeportal/wtsuite/pkg/tree"
-	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	//"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 func NewRoot(cache *FileCache, path string, control string, cssUrl string, jsUrl string, sheet StyleSheet) (*tree.Root, error) {
@@ -44,10 +44,10 @@ func FinalizeRoot(node *RootNode, control string, cssUrl string, jsUrl string, s
     }
   }
 
-	bundle := scripts.NewInlineBundle()
+	/*bundle := scripts.NewInlineBundle()
 	if err := root.CollectScripts(bundle); err != nil {
 		return nil, err
-	}
+	}*/
 
 	if control != "" {
 		if err := root.ApplyControl(control, jsUrl); err != nil {

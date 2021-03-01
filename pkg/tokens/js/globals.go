@@ -144,6 +144,7 @@ func FillBrowserAndWorkerCommonScope(scope Scope) {
   FillCoreScope(scope)
 
   registerPrototype(scope, pr.NewBlobPrototype())
+  registerPrototype(scope, pr.NewCryptoPrototype())
   registerPrototype(scope, pr.NewEventTargetPrototype())
   registerPrototype(scope, pr.NewFileReaderPrototype())
   registerPrototype(scope, pr.NewIDBCursorPrototype())

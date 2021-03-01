@@ -3,17 +3,24 @@ package files
 import (
   "encoding/json"
   "errors"
+  "fmt"
   "io/ioutil"
   "path/filepath"
   "os"
   "strings"
 )
 
-const PACKAGE_JSON = "package.json"
+const (
+  PACKAGE_JSON = "package.json"
+  USER_DIR_ENV_KEY = "WTPATH"
+  USER_REL_DIR = ".local/share/wtsuite/private"
 
-const USER_ENV_KEY = "WTPATH"
+  SHARE_DIR_ENV_KEY = "WTSHARE"
+  SHARE_REL_DIR = ".local/share/wtsuite/public"
 
-const BASE_DIR = ".local/share/wtsuite/"
+  PRIVSSH_ENV_KEY = "WTSSHKEY"
+  PRIVSSH_REL_PATH = ".ssh/id_rsa"
+)
 
 // json structures
 
@@ -23,11 +30,17 @@ type DependencyConfig struct {
   URL string `json:"url"` // github.com/...
 }
 
+type SSGConfig struct {
+  MinVersion string `json:"minVersion"`
+  MaxVersion string `json:"maxVersion"`
+}
+
 type PackageConfig struct {
   Dependencies map[string]DependencyConfig `json:"dependencies"`
   TemplateModules map[string]string `json:"templateModules"`
   ScriptModules map[string]string `json:"scriptModules"`
   ShaderModules map[string]string `json:"shaderModules"`
+  SSG SSGConfig `json:"ssg"`
 }
 
 type Package struct {
@@ -36,9 +49,8 @@ type Package struct {
   templateModules map[string]string // resolved paths
   scriptModules map[string]string
   shaderModules map[string]string
+  ssgSemVerRange *SemVerRange
 }
-
-var _packages map[string]*Package = nil
 
 func NewEmptyPackageConfig() *PackageConfig {
   return &PackageConfig{
@@ -46,10 +58,12 @@ func NewEmptyPackageConfig() *PackageConfig {
     TemplateModules: make(map[string]string),
     ScriptModules: make(map[string]string),
     ShaderModules: make(map[string]string),
+    SSG: SSGConfig{},
   }
 }
 
-type FetchFunc func(url string, svr *SemVerRange) error
+// returns the directory of the installed package
+type FetchFunc func(url string, svr *SemVerRange) (string, error)
 
 // dir assumed to be abs
 func findPackageConfig(dir string, canMoveUp bool) string {
@@ -71,7 +85,9 @@ func findPackageConfig(dir string, canMoveUp bool) string {
 func readPackageConfig(dir string, canMoveUp bool) (*PackageConfig, string, error) {
   fname := findPackageConfig(dir, canMoveUp)
   if fname == "" {
-    return nil, "", errors.New("Error: " + filepath.Join(dir, PACKAGE_JSON) + " not found\n")
+    fmt.Fprintf(os.Stderr, "Warning: " + filepath.Join(dir, PACKAGE_JSON) + " not found\n")
+
+    return NewEmptyPackageConfig(), dir, nil
   }
 
 	b, err := ioutil.ReadFile(fname)
@@ -87,15 +103,20 @@ func readPackageConfig(dir string, canMoveUp bool) (*PackageConfig, string, erro
   return cfg, fname, nil
 }
 
-func readPackage(dir string, canMoveUp bool, fetcher FetchFunc) (*Package, error) {
+func LoadPackage(dir string, canMoveUp bool, fetcher FetchFunc) (*Package, error) {
+  return loadPackage(dir, canMoveUp, fetcher, []string{})
+}
+
+func loadPackage(dir string, canMoveUp bool, fetcher FetchFunc, prevDeps []string) (*Package, error) {
   cfg, fname, err := readPackageConfig(dir, canMoveUp)
   if err != nil {
     return nil, err
   }
 
+  // TODO: detect circular dependencies
   deps := make(map[string]*Package)
   for k, depCfg := range cfg.Dependencies {
-    deps[k], err = resolveDependency(depCfg, fetcher)
+    deps[k], err = resolveDependency(depCfg, fetcher, prevDeps)
     if err != nil {
       return nil, err
     }
@@ -139,24 +160,82 @@ func readPackage(dir string, canMoveUp bool, fetcher FetchFunc) (*Package, error
     }
   }
 
+  var ssgMinVersion *SemVer = nil
+  if cfg.SSG.MinVersion != "" {
+    ssgMinVersion, err = ParseSemVer(cfg.SSG.MinVersion)
+    if err != nil {
+      return nil, err
+    }
+  }
+
+  var ssgMaxVersion *SemVer = nil
+  if cfg.SSG.MaxVersion != "" {
+    ssgMaxVersion, err = ParseSemVer(cfg.SSG.MaxVersion)
+    if err != nil {
+      return nil, err
+    }
+  }
+
   return &Package{
     fname,
     deps,
     templateModules,
     scriptModules,
     shaderModules,
+    NewSemVerRange(ssgMinVersion, ssgMaxVersion),
   }, nil
 }
 
-func PkgInstallDst(url string) string {
+func PublicPkgInstallDir(url string) string {
   var base string
-  if userBase := os.Getenv(USER_ENV_KEY); userBase != "" {
+  if shareBase := os.Getenv(SHARE_DIR_ENV_KEY); shareBase != "" {
+    base = shareBase
+  } else {
+    base = filepath.Join(os.Getenv("HOME"), SHARE_REL_DIR)
+  }
+  
+  return filepath.Join(base, url)
+}
+
+func PrivatePkgInstallDir(url string) string {
+  var base string
+  if userBase := os.Getenv(USER_DIR_ENV_KEY); userBase != "" {
     base = userBase
   } else {
-    base = filepath.Join(os.Getenv("HOME"), BASE_DIR)
+    base = filepath.Join(os.Getenv("HOME"), USER_REL_DIR)
   }
 
-  return filepath.Join(base, url)
+  return filepath.Join(base, "pkg", url)
+}
+
+func PkgInstallDir(url string) string {
+  privateDir := PrivatePkgInstallDir(url)
+  publicDir := PublicPkgInstallDir(url)
+
+  if IsDir(publicDir) {
+    return publicDir
+  } else if IsDir(privateDir) {
+    return privateDir
+  } else {
+    return publicDir
+  }
+}
+
+func ReadPrivateSSHKey() (string, error) {
+  var path string
+  if privSSHPath := os.Getenv(PRIVSSH_ENV_KEY); privSSHPath != "" {
+  
+    path = privSSHPath
+  } else {
+    path = filepath.Join(os.Getenv("HOME"), PRIVSSH_REL_PATH)
+  }
+
+  b, err := ioutil.ReadFile(path)
+  if err != nil {
+    return "", err
+  }
+
+  return string(b), nil
 }
 
 func validateURL(url string) error {
@@ -175,8 +254,7 @@ func validateURL(url string) error {
   return nil
 }
 
-// adds result to _packages too
-func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc) (*Package, error) {
+func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc, prevDeps []string) (*Package, error) {
   semVerMin, err := ParseSemVer(depCfg.MinVersion)
   if err != nil {
     return nil, errors.New("Error: bad minVersion semver\n")
@@ -190,53 +268,62 @@ func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc) (*Package, er
     }
   }
 
-  semVerRange := NewSemVerRange(semVerMin, semVerMax)
+  svr := NewSemVerRange(semVerMin, semVerMax)
 
-  if err := validateURL(depCfg.URL); err != nil {
+  url := depCfg.URL
+
+  for _, prevURL := range prevDeps {
+    if url == prevURL {
+      return nil, errors.New("Error: circular dependencies (" + strings.Join(prevDeps, ", ") + ", " + url + ")")
+    }
+  }
+
+  prevDeps = append(prevDeps, url)
+
+  if err := validateURL(url); err != nil {
     return nil, err
   }
 
-  pkgDir := PkgInstallDst(depCfg.URL)
-
-  if fetcher != nil {
-    if err := fetcher(depCfg.URL, semVerRange); err != nil {
-      return nil, err
-    }
+  pkgDir, err := fetcher(url, svr)
+  if err != nil {
+    return nil, err
   }
 
   if !IsDir(pkgDir) {
-    if fetcher != nil {
-      panic("fetcher failed")
-    }
-
     if IsFile(pkgDir) {
       return nil, errors.New("Error: dependent package " + pkgDir + " is a file?\n")
     }
 
-    return nil, errors.New("Error: dependent package " + pkgDir + " not found (hint: use wt-pkg-sync)\n")
+    if FetchPublicOrPrivate == nil {
+      return nil, errors.New("Error: dependent package " + pkgDir + " not found (hint: use wt-pkg-sync)\n")
+    } else {
+      // auto download at least one version
+      pkgDir, err = FetchPublicOrPrivate(url, svr)
+      if err != nil {
+        return nil, err
+      }
+    }
   }
 
-  semVerDir, err := semVerRange.FindBestVersion(pkgDir)
+  semVerDir, err := svr.FindBestVersion(pkgDir)
   if err != nil {
     return nil, err
+  }
+
+  if semVerDir == "" {
+    return nil, errors.New("Error: no valid package versions found for " + pkgDir)
   }
   
-  pkg, err := readPackage(semVerDir, false, fetcher)
+  pkg, err := loadPackage(semVerDir, false, fetcher, prevDeps)
   if err != nil {
     return nil, err
   }
-
-  _packages[filepath.Dir(pkg.configPath)] = pkg
 
   return pkg, nil
 }
 
 // must be called explicitly by cli tools so that packages become available for search
 func resolvePackages(startFile string, fetcher FetchFunc) error {
-  if _packages == nil {
-    _packages = make(map[string]*Package)
-  }
-
   dir := startFile
 
   if !filepath.IsAbs(dir) {
@@ -251,19 +338,17 @@ func resolvePackages(startFile string, fetcher FetchFunc) error {
     return errors.New("Error: " + dir + " is not a directory\n")
   }
 
-  pkg, err := readPackage(dir, true, fetcher)
-  if err != nil {
+  if _, err := LoadPackage(dir, true, fetcher); err != nil {
     return err
   }
-
-  //fmt.Println("Resolved package.json in ", dir, " for ", startFile, filepath.Dir(pkg.configPath)
-  _packages[filepath.Dir(pkg.configPath)] = pkg
 
   return nil
 }
 
 func ResolvePackages(startFile string) error {
-  return resolvePackages(startFile, nil)
+  return resolvePackages(startFile, func(url string, semVer *SemVerRange) (string, error) {
+    return PkgInstallDir(url), nil
+  })
 }
 
 func SyncPackages(startFile string, fetcher FetchFunc) error {
@@ -275,15 +360,10 @@ func SyncPackages(startFile string, fetcher FetchFunc) error {
 }
 
 func findPackage(callerDir string) *Package {
-  if pkg, ok := _packages[callerDir]; ok {
-    return pkg
-  } else if callerDir == "/" {
+  if callerDir == "/" {
     return nil
   } else {
     pkg := findPackage(filepath.Dir(callerDir))
-    if pkg != nil {
-      _packages[callerDir] = pkg
-    }
 
     return pkg
   }
@@ -305,6 +385,10 @@ func (pkg *Package) GetModule(moduleName string, lang Lang) (string, bool) {
   }
 
   return "", false
+}
+
+func (pkg *Package) SSGSemVerRange() *SemVerRange {
+  return pkg.ssgSemVerRange
 }
 
 func SearchPackage(caller string, pkgPath string, lang Lang) (string, error) {

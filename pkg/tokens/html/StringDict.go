@@ -26,6 +26,7 @@ func AssertStringDict(t Token) (*StringDict, error) {
 	} else {
 		errCtx := t.Context()
 		err := errCtx.NewError("Error: expected string dict (got " + reflect.TypeOf(t).String() + ")")
+    panic(err)
 		return nil, err
 	}
 }

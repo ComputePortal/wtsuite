@@ -12,7 +12,6 @@ out
 *.pdf
 *.ttx
 *.ttf
-woff2.go
 build
 examples
 go.sum

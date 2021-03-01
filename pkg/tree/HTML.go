@@ -6,7 +6,7 @@ import (
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
 	tokens "github.com/computeportal/wtsuite/pkg/tokens/html"
 	"github.com/computeportal/wtsuite/pkg/tokens/js"
-	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	//"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 type HTML struct {
@@ -125,7 +125,7 @@ func (t *HTML) SetStyleURL(cssUrl string) error {
   return nil
 }
 
-func (t *HTML) CollectScripts(bundle *scripts.InlineBundle) error {
+/*func (t *HTML) CollectScripts(bundle *scripts.InlineBundle) error {
 	// bundle is only used here, but HTML must implement Tag interface (to be a child of Root), so that's why bundle is passed in as an argument
 
 	head, body, err := t.getHeadBody()
@@ -168,7 +168,7 @@ func (t *HTML) CollectScripts(bundle *scripts.InlineBundle) error {
 	}
 
 	return nil
-}
+}*/
 
 func (t *HTML) ApplyControl(control string, jsUrl string) error {
 	head, body, err := t.getHeadBody()

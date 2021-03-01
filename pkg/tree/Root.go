@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/computeportal/wtsuite/pkg/tokens/context"
-	"github.com/computeportal/wtsuite/pkg/tree/scripts"
+	//"github.com/computeportal/wtsuite/pkg/tree/scripts"
 )
 
 // doesn't need to implement Tag interface
@@ -117,7 +117,7 @@ func (t *Root) SetStyleURL(cssUrl string) error {
 }
 
 // dummy is just to respect the interface
-func (t *Root) CollectScripts(bundle *scripts.InlineBundle) error {
+/*func (t *Root) CollectScripts(bundle *scripts.InlineBundle) error {
 	_, html, err := t.GetDocTypeAndHTML()
 	if err != nil {
 		return err
@@ -125,7 +125,7 @@ func (t *Root) CollectScripts(bundle *scripts.InlineBundle) error {
 
 	// bundle is only used in html, but HTML must implement Tag interface (to be a child of Root), so that's why bundle is passed in as an argument
 	return html.CollectScripts(bundle)
-}
+}*/
 
 func (t *Root) ApplyControl(control string, jsUrl string) error {
 	_, html, err := t.GetDocTypeAndHTML()

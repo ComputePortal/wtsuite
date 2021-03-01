@@ -367,10 +367,6 @@ func NewImportedVariable(oldName, newName string, pathLiteral *LiteralString, la
 
 func (m *ModuleData) AddImportedName(newName, oldName string, pathLiteral *LiteralString, lang files.Lang, ctx context.Context) error {
 	if newName != "" {
-		if oldName == "" {
-			panic("invalid oldname")
-		}
-
 		if other, ok := m.importedNames[newName]; ok {
 			err := ctx.NewError("Error: imported variable already imported")
 			err.AppendContextString("Info: imported here", other.ctx)
