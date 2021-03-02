@@ -128,7 +128,7 @@ func selectBranch(url string, branch string, sshKey string) (gitplumbing.Referen
   found := false
   var res gitplumbing.ReferenceName
 
-  fullName := "ref/head/" + branch
+  fullName := "refs/heads/" + branch
 
   if err := loopReferenceNames(url, sshKey, func(rn gitplumbing.ReferenceName) error {
     if rn.IsBranch() {
@@ -145,6 +145,10 @@ func selectBranch(url string, branch string, sshKey string) (gitplumbing.Referen
     return nil
   }); err != nil {
     return res, err
+  }
+
+  if !found {
+    return res, errors.New("branch \"" + branch + "\" not found in repo \"" + url + "\"")
   }
 
   return res, nil
