@@ -30,7 +30,6 @@ func newAuthMethod(sshKey string) gittransport.AuthMethod {
   // pem decoding is done inside gitssh
   authMethod, err := gitssh.NewPublicKeys("git", []byte(sshKey), "")
   if err != nil {
-    fmt.Println(sshKey)
     panic(err)
   }
 
@@ -186,20 +185,32 @@ func cloneRef(libURL string, ref gitplumbing.ReferenceName, dst string, sshKey s
   return writeWorktree(wt, dst)
 }
 
-func correctURL(url string) string {
+func correctURL(url string, sshKey string) string {
   if !strings.HasSuffix(url, ".git") {
     url += ".git"
   }
-  
-  if !strings.HasSuffix(url, "https://") {
-    url = "https://" + url
+
+  if sshKey == "" {
+    if !strings.HasPrefix(url, "https://") {
+      url = "https://" + url
+    }
+  } else {
+    if strings.HasPrefix(url, "https://") {
+      url = strings.TrimPrefix(url, "https://")
+    } else if strings.HasPrefix(url, "http://") {
+      url = strings.TrimPrefix(url, "http://")
+    }
+
+    url = "git@" + strings.Replace(url, "/", ":", 1)
+
+    fmt.Println("ssh url: " , url)
   }
 
   return url
 }
 
 func FetchRangedTag(libURL string, libDst string, svr *files.SemVerRange, sshKey string) error {
-  libURL = correctURL(libURL)
+  libURL = correctURL(libURL, sshKey)
 
   tagRef, err := selectLatestTag(libURL, svr, sshKey)
   if err != nil {
@@ -236,7 +247,7 @@ func FetchLatestTag(libURL string, dstPath string, sshKey string) error {
 }
 
 func FetchBranch(repoURL string, branch string, dstPath string, sshKey string) error {
-  repoURL = correctURL(repoURL)
+  repoURL = correctURL(repoURL, sshKey)
 
   branchRef, err := selectBranch(repoURL, branch, sshKey)
   if err != nil {
@@ -256,7 +267,7 @@ func FetchBranch(repoURL string, branch string, dstPath string, sshKey string) e
 }
 
 func ForcePush(srcDir string, dstURL string, sshKey string) error {
-  dstURL = correctURL(dstURL)
+  dstURL = correctURL(dstURL, sshKey)
 
   wt, err := readWorktree(srcDir)
   if err != nil {
