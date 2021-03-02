@@ -297,11 +297,15 @@ func ForcePush(srcDir string, dstURL string, sshKey string) error {
   }
 
   if err := pushOptions.Validate(); err != nil {
-    return err
+    panic(err)
   }
 
   if err := repo.Push(pushOptions); err != nil {
-    return err
+    if err.Error() == "invalid auth method" {
+      return errors.New("invalid auth for \"" + dstURL + "\"")
+    } else {
+      return err
+    }
   }
 
   return nil
