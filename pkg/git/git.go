@@ -1,7 +1,6 @@
 package git
 
 import (
-  "encoding/pem"
   "errors"
   "fmt"
   "path/filepath"
@@ -28,15 +27,10 @@ func newAuthMethod(sshKey string) gittransport.AuthMethod {
     return nil
   }
 
-  // properly pem encode
-  privPem, rest := pem.Decode([]byte(sshKey))
-  if privPem == nil || len(rest) > 0 {
-    fmt.Println(errors.New("bad key stored"))
-    return nil
-  }
-
-  authMethod, err := gitssh.NewPublicKeys("wtaas", privPem.Bytes, "")
+  // pem decoding is done inside gitssh
+  authMethod, err := gitssh.NewPublicKeys("git", []byte(sshKey), "")
   if err != nil {
+    fmt.Println(sshKey)
     panic(err)
   }
 
