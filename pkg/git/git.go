@@ -65,6 +65,7 @@ func loopReferenceNames(url string, sshKey string, cond func(rn gitplumbing.Refe
   storer := gitmemory.NewStorage()
 
   remoteConfig := &gitconfig.RemoteConfig{
+    Name: "origin",
     URLs: []string{url},
   }
 

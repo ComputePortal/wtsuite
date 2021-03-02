@@ -3,7 +3,6 @@ package files
 import (
   "errors"
   "io/ioutil"
-  "path/filepath"
 )
 
 var LATEST bool = false
@@ -26,15 +25,16 @@ func (sr *SemVerRange) Max() *SemVer {
 }
 
 // returns empty string if no relevant version found
+// not concatenated with dir!
 func (sr *SemVerRange) FindBestVersion(dir string) (string, error) {
-  files, err := ioutil.ReadDir(dir)
+  fls, err := ioutil.ReadDir(dir)
   if err != nil {
     return "", err
   }
 
   iBest := -1
 
-  for i, file := range files {
+  for i, file := range fls {
     if !file.IsDir() {
       continue
     }
@@ -58,7 +58,7 @@ func (sr *SemVerRange) FindBestVersion(dir string) (string, error) {
   if iBest == -1 {
     return "", nil
   } else {
-    return filepath.Join(dir, files[iBest].Name()), nil
+    return fls[iBest].Name(), nil
   }
 }
 

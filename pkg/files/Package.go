@@ -22,6 +22,11 @@ const (
   PRIVSSH_REL_PATH = ".ssh/id_rsa"
 )
 
+var (
+  _packages map[string]*Package = nil
+  CACHE_PACKAGES = true // the wtaas server should set this to false though
+)
+
 // json structures
 
 type DependencyConfig struct {
@@ -305,14 +310,16 @@ func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc, prevDeps []st
     }
   }
 
-  semVerDir, err := svr.FindBestVersion(pkgDir)
+  version, err := svr.FindBestVersion(pkgDir)
   if err != nil {
     return nil, err
   }
 
-  if semVerDir == "" {
+  if version == "" {
     return nil, errors.New("Error: no valid package versions found for " + pkgDir)
   }
+
+  semVerDir := filepath.Join(pkgDir, version)
   
   pkg, err := loadPackage(semVerDir, false, fetcher, prevDeps)
   if err != nil {
@@ -324,6 +331,10 @@ func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc, prevDeps []st
 
 // must be called explicitly by cli tools so that packages become available for search
 func resolvePackages(startFile string, fetcher FetchFunc) error {
+  if _packages == nil && CACHE_PACKAGES {
+    _packages = make(map[string]*Package)
+  }
+
   dir := startFile
 
   if !filepath.IsAbs(dir) {
@@ -338,8 +349,13 @@ func resolvePackages(startFile string, fetcher FetchFunc) error {
     return errors.New("Error: " + dir + " is not a directory\n")
   }
 
-  if _, err := LoadPackage(dir, true, fetcher); err != nil {
+  pkg, err := LoadPackage(dir, true, fetcher)
+  if err != nil {
     return err
+  }
+
+  if CACHE_PACKAGES {
+    _packages[filepath.Dir(pkg.configPath)] = pkg
   }
 
   return nil
@@ -360,10 +376,20 @@ func SyncPackages(startFile string, fetcher FetchFunc) error {
 }
 
 func findPackage(callerDir string) *Package {
+  if _packages != nil {
+    if pkg, ok := _packages[callerDir]; ok {
+      return pkg
+    }
+  }
+
   if callerDir == "/" {
     return nil
   } else {
     pkg := findPackage(filepath.Dir(callerDir))
+
+    if CACHE_PACKAGES {
+      _packages[callerDir] = pkg
+    }
 
     return pkg
   }
