@@ -12,6 +12,8 @@ import (
   gitcore      "gopkg.in/src-d/go-git.v4"
   gitconfig    "gopkg.in/src-d/go-git.v4/config"
   gitplumbing  "gopkg.in/src-d/go-git.v4/plumbing"
+  gitobject    "gopkg.in/src-d/go-git.v4/plumbing/object"
+  //gitcache     "gopkg.in/src-d/go-git.v4/plumbing/cache"
   gittransport "gopkg.in/src-d/go-git.v4/plumbing/transport"
   gitssh       "gopkg.in/src-d/go-git.v4/plumbing/transport/ssh"
   gitmemory    "gopkg.in/src-d/go-git.v4/storage/memory"
@@ -281,6 +283,27 @@ func ForcePush(srcDir string, dstURL string, sshKey string) error {
     return err
   }
 
+  // now try to commit the files to the correct branch
+  if err := repo.CreateBranch(&gitconfig.Branch{
+    Name: "main",
+    Remote: "origin",
+  }); err != nil {
+    return err
+  }
+
+  if ci, err := repo.CommitObjects(); err != nil {
+    return err
+  } else {
+    if err := ci.ForEach(func(cmt *gitobject.Commit) error {
+      fmt.Println("commit: ", cmt.Message)
+      return nil
+    }); err != nil {
+      return err
+    }
+
+    ci.Close()
+  }
+
   // set the remote info
   // assume branch-name is "main"
   cfg, err := repo.Config()
@@ -315,6 +338,7 @@ func ForcePush(srcDir string, dstURL string, sshKey string) error {
     if err.Error() == "invalid auth method" {
       return errors.New("invalid auth for \"" + dstURL + "\"")
     } else {
+      panic(err)
       return err
     }
   }
