@@ -275,7 +275,7 @@ func resolveDependency(depCfg DependencyConfig, fetcher FetchFunc, prevDeps []st
 
   svr := NewSemVerRange(semVerMin, semVerMax)
 
-  url := depCfg.URL
+  url := strings.ToLower(strings.TrimSpace(depCfg.URL))
 
   for _, prevURL := range prevDeps {
     if url == prevURL {
