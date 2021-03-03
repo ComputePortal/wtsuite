@@ -12,7 +12,7 @@ import (
   gitcore      "gopkg.in/src-d/go-git.v4"
   gitconfig    "gopkg.in/src-d/go-git.v4/config"
   gitplumbing  "gopkg.in/src-d/go-git.v4/plumbing"
-  gitobject    "gopkg.in/src-d/go-git.v4/plumbing/object"
+  //gitobject    "gopkg.in/src-d/go-git.v4/plumbing/object"
   //gitcache     "gopkg.in/src-d/go-git.v4/plumbing/cache"
   gittransport "gopkg.in/src-d/go-git.v4/plumbing/transport"
   gitssh       "gopkg.in/src-d/go-git.v4/plumbing/transport/ssh"
@@ -271,14 +271,12 @@ func FetchBranch(repoURL string, branch string, dstPath string, sshKey string) e
 func ForcePush(srcDir string, dstURL string, sshKey string) error {
   dstURL = correctURL(dstURL, sshKey)
 
-  wt, err := readWorktree(srcDir)
-  if err != nil {
-    return err
-  }
+  //wt, err := readWorktree(srcDir)
+  //if err != nil {
+    //return err
+  //}
 
-  // first init
-  storer := gitmemory.NewStorage()
-  repo, err := gitcore.Init(storer, wt)
+  repo, err := gitcore.PlainInit(srcDir, false)
   if err != nil {
     return err
   }
@@ -291,17 +289,30 @@ func ForcePush(srcDir string, dstURL string, sshKey string) error {
     return err
   }
 
-  if ci, err := repo.CommitObjects(); err != nil {
+  wt, err := repo.Worktree()
+  if err != nil {
     return err
-  } else {
-    if err := ci.ForEach(func(cmt *gitobject.Commit) error {
-      fmt.Println("commit: ", cmt.Message)
-      return nil
-    }); err != nil {
-      return err
-    }
+  }
 
-    ci.Close()
+  if err := wt.Checkout(&gitcore.CheckoutOptions{
+    Branch: gitplumbing.NewBranchReferenceName("main"),
+  }); err != nil {
+    return err
+  }
+
+  if err := readWorktree(wt, srcDir); err != nil {
+    return err
+  }
+
+  commit, err := wt.Commit("www update", &gitcore.CommitOptions{})
+  if err != nil {
+    return err
+  }
+
+  if obj, err := repo.CommitObject(commit); err != nil {
+    return err
+  }  else {
+    fmt.Println(obj)
   }
 
   // set the remote info
