@@ -149,6 +149,41 @@ func selectBranch(url string, branch string, sshKey string) (gitplumbing.Referen
   return res, nil
 }
 
+func selectRepoBranchReference(repo *gitcore.Repository, branch string) (gitplumbing.ReferenceName, error) {
+  found := false
+  var res gitplumbing.ReferenceName
+
+  fullName := "refs/heads/" + branch
+
+  refs, err := repo.References()
+  if err != nil {
+    return res, err
+  }
+
+  if err := refs.ForEach(func(ref *gitplumbing.Reference) error {
+    rn := ref.Name()
+    if rn.IsBranch() {
+      if rn.String() == fullName {
+        if found {
+          return errors.New("duplicate branch?")
+        } else {
+          found = true
+          res = rn
+        }
+      }
+    }
+    return nil
+  }); err != nil {
+    return res, err
+  }
+
+  if !found {
+    return res, errors.New("branch \"" + branch + "\" not found")
+  }
+
+  return res, nil
+}
+
 func cloneRef(libURL string, ref gitplumbing.ReferenceName, dst string, sshKey string) error {
   wt := billymemfs.New()
 
@@ -294,8 +329,13 @@ func ForcePush(srcDir string, dstURL string, sshKey string) error {
     return err
   }
 
+  branchRef, err := selectRepoBranchReference(repo, "main")
+  if err != nil {
+    return err
+  }
+
   if err := wt.Checkout(&gitcore.CheckoutOptions{
-    Branch: gitplumbing.NewBranchReferenceName("main"),
+    Branch: branchRef,
   }); err != nil {
     return err
   }
