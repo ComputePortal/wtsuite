@@ -317,19 +317,19 @@ func ForcePush(srcDir string, dstURL string, sshKey string) error {
   }
 
   // now try to commit the files to the correct branch
-  if err := repo.CreateBranch(&gitconfig.Branch{
+  /*if err := repo.CreateBranch(&gitconfig.Branch{
     Name: "main",
     Remote: "origin",
   }); err != nil {
     return err
-  }
+  }*/
 
   wt, err := repo.Worktree()
   if err != nil {
     return err
   }
 
-  branchRef, err := selectRepoBranchReference(repo, "main")
+  /*branchRef, err := selectRepoBranchReference(repo, "main")
   if err != nil {
     return err
   }
@@ -338,7 +338,7 @@ func ForcePush(srcDir string, dstURL string, sshKey string) error {
     Branch: branchRef,
   }); err != nil {
     return err
-  }
+  }*/
 
   if err := readWorktree(wt, srcDir); err != nil {
     return err
